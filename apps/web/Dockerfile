@@ -7,7 +7,7 @@ ENV PORT=3000
 
 COPY . .
 
-RUN npm ci
+RUN npm ci --include=dev
 RUN npm run build -w @receituario/web
 
 EXPOSE 3000

@@ -6,7 +6,7 @@ ENV NODE_ENV=production
 
 COPY . .
 
-RUN npm ci
+RUN npm ci --include=dev
 RUN npm run prisma:generate -w @receituario/api
 RUN npm run build -w @receituario/api
 
