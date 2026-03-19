@@ -12,4 +12,4 @@ RUN npm run build -w @receituario/api
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npm run db:deploy -w @receituario/api && node apps/api/dist/main.js"]
+CMD ["sh", "-c", "npm run db:deploy -w @receituario/api && node apps/api/dist/apps/api/src/main.js"]
