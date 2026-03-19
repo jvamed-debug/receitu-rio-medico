@@ -67,6 +67,7 @@ model ProfessionalProfile {
   documentNumber       String
   councilType          String
   councilState         String
+  rqe                  String?
   cbo                  String?
   specialty            String?
   cnes                 String?

@@ -147,6 +147,7 @@ export class AuthService {
         documentNumber: stringOrDefault(input.documentNumber, user.professionalProfile.documentNumber),
         councilType: stringOrDefault(input.councilType, user.professionalProfile.councilType),
         councilState: stringOrDefault(input.councilState, user.professionalProfile.councilState),
+        rqe: stringOrNullable(input.rqe),
         cbo: stringOrNullable(input.cbo),
         specialty: stringOrNullable(input.specialty),
         cnes: stringOrNullable(input.cnes),

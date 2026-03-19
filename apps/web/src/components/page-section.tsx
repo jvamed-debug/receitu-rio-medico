@@ -15,7 +15,7 @@ export function PageSection({
         background: "white",
         padding: 24,
         borderRadius: 20,
-        boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
+        boxShadow: "0 18px 40px rgba(15, 64, 128, 0.08)"
       }}
     >
       <div style={{ marginBottom: children ? 16 : 0 }}>

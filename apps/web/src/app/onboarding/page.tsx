@@ -1,3 +1,4 @@
+import { Shell } from "../../components/shell";
 import { ProfessionalProfileForm } from "../../components/auth/professional-profile-form";
 import { FeatureList } from "../../components/feature-list";
 import { PageSection } from "../../components/page-section";
@@ -13,6 +14,7 @@ export default async function OnboardingPage() {
         documentNumber?: string | null;
         councilType?: string | null;
         councilState?: string | null;
+        rqe?: string | null;
         specialty?: string | null;
         cbo?: string | null;
         cnes?: string | null;
@@ -21,26 +23,47 @@ export default async function OnboardingPage() {
     | undefined;
 
   return (
-    <main style={{ maxWidth: 980, margin: "0 auto", padding: "56px 24px", display: "grid", gap: 20 }}>
-      <PageSection
-        title="Onboarding profissional"
-        description="Jornada inicial para cadastro, validacao do perfil de saude e habilitacao de assinatura."
-      >
-        <FeatureList
-          items={[
-            `Sessao atual: ${me?.email ?? "nao autenticado"}`,
-            `Status profissional: ${profile?.status ?? "desconhecido"}`,
-            "Preencha os dados abaixo para deixar o perfil pronto para emissao",
-            "Depois disso, siga para validacao da assinatura"
-          ]}
-        />
-      </PageSection>
-      <PageSection
-        title="Dados profissionais"
-        description="Formulario conectado ao backend para atualizar conselho, especialidade e identificadores."
-      >
-        <ProfessionalProfileForm initialValues={profile} />
-      </PageSection>
-    </main>
+    <Shell
+      title="Onboarding profissional"
+      subtitle="Jornada inicial para cadastro, validacao do perfil de saude e habilitacao da assinatura, com retorno facil ao dashboard."
+      actions={
+        <a href="/dashboard" style={actionLinkStyle}>
+          Voltar ao dashboard
+        </a>
+      }
+    >
+      <div style={{ display: "grid", gap: 20 }}>
+        <PageSection
+          title="Panorama inicial"
+          description="Preencha os dados essenciais e siga para assinatura sem se perder entre as telas."
+        >
+          <FeatureList
+            items={[
+              `Sessao atual: ${me?.email ?? "nao autenticado"}`,
+              `Status profissional: ${profile?.status ?? "desconhecido"}`,
+              "Preencha os dados abaixo para deixar o perfil pronto para emissao",
+              "Depois disso, siga para validacao da assinatura em /signature-validation"
+            ]}
+          />
+        </PageSection>
+        <PageSection
+          title="Dados profissionais"
+          description="Formulario conectado ao backend para atualizar conselho, RQE, especialidade e identificadores opcionais."
+        >
+          <ProfessionalProfileForm initialValues={profile} />
+        </PageSection>
+      </div>
+    </Shell>
   );
 }
+
+const actionLinkStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 14,
+  border: "1px solid #c9d8ea",
+  background: "#ffffff",
+  padding: "12px 16px",
+  fontWeight: 700
+};

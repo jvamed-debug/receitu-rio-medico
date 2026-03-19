@@ -7,8 +7,8 @@ export function FeatureList({ items }: { items: string[] }) {
           style={{
             padding: "14px 16px",
             borderRadius: 14,
-            background: "#f7faf8",
-            border: "1px solid #d9e8de"
+            background: "#f7fbff",
+            border: "1px solid #d7e6f6"
           }}
         >
           {item}

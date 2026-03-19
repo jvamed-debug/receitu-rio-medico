@@ -12,6 +12,7 @@ export function ProfessionalProfileForm({
     documentNumber?: string | null;
     councilType?: string | null;
     councilState?: string | null;
+    rqe?: string | null;
     specialty?: string | null;
     cbo?: string | null;
     cnes?: string | null;
@@ -21,7 +22,8 @@ export function ProfessionalProfileForm({
     documentNumber: initialValues?.documentNumber ?? "",
     councilType: initialValues?.councilType ?? "CRM",
     councilState: initialValues?.councilState ?? "SP",
-    specialty: initialValues?.specialty ?? "",
+    rqe: initialValues?.rqe ?? "",
+    specialty: initialValues?.specialty ?? "Clinica Medica",
     cbo: initialValues?.cbo ?? "",
     cnes: initialValues?.cnes ?? ""
   });
@@ -61,16 +63,41 @@ export function ProfessionalProfileForm({
         <input value={form.councilState} onChange={(event) => update("councilState", event.target.value)} style={inputStyle} />
       </label>
       <label style={fieldStyle}>
+        <span>RQE</span>
+        <input
+          value={form.rqe}
+          onChange={(event) => update("rqe", event.target.value)}
+          style={inputStyle}
+          placeholder="Opcional para especialistas"
+        />
+      </label>
+      <label style={fieldStyle}>
         <span>Especialidade</span>
-        <input value={form.specialty} onChange={(event) => update("specialty", event.target.value)} style={inputStyle} />
+        <select value={form.specialty} onChange={(event) => update("specialty", event.target.value)} style={inputStyle}>
+          {specialties.map((specialty) => (
+            <option key={specialty} value={specialty}>
+              {specialty}
+            </option>
+          ))}
+        </select>
       </label>
       <label style={fieldStyle}>
-        <span>CBO</span>
-        <input value={form.cbo} onChange={(event) => update("cbo", event.target.value)} style={inputStyle} />
+        <span>CBO (opcional)</span>
+        <input
+          value={form.cbo}
+          onChange={(event) => update("cbo", event.target.value)}
+          style={inputStyle}
+          placeholder="Preencha se quiser detalhar a ocupacao"
+        />
       </label>
       <label style={fieldStyle}>
-        <span>CNES</span>
-        <input value={form.cnes} onChange={(event) => update("cnes", event.target.value)} style={inputStyle} />
+        <span>CNES (opcional)</span>
+        <input
+          value={form.cnes}
+          onChange={(event) => update("cnes", event.target.value)}
+          style={inputStyle}
+          placeholder="Preencha se atuar vinculado a estabelecimento"
+        />
       </label>
       {error ? <div style={{ color: "var(--danger)", fontWeight: 700 }}>{error}</div> : null}
       {message ? <div style={{ color: "var(--primary)", fontWeight: 700 }}>{message}</div> : null}
@@ -121,3 +148,21 @@ const buttonStyle = {
   fontSize: 16,
   cursor: "pointer"
 };
+
+const specialties = [
+  "Clinica Medica",
+  "Cardiologia",
+  "Pediatria",
+  "Ginecologia e Obstetricia",
+  "Ortopedia e Traumatologia",
+  "Dermatologia",
+  "Psiquiatria",
+  "Neurologia",
+  "Endocrinologia",
+  "Medicina de Familia e Comunidade",
+  "Oftalmologia",
+  "Otorrinolaringologia",
+  "Cirurgia Geral",
+  "Anestesiologia",
+  "Radiologia e Diagnostico por Imagem"
+];
