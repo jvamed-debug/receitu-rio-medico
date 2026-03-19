@@ -4,6 +4,8 @@ import { ApiClient } from "@receituario/api-client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { getBrowserApiBaseUrl } from "../../lib/browser-api";
+
 export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("profissional.demo@receituario.local");
@@ -19,8 +21,7 @@ export function LoginForm() {
     const redirectTo = searchParams.get("redirect") || "/dashboard";
 
     try {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3333";
+      const baseUrl = getBrowserApiBaseUrl();
       const api = new ApiClient(baseUrl);
       const tokens = await api.login({ email, password });
       const me = await new ApiClient(baseUrl, tokens.accessToken).me();

@@ -3,6 +3,7 @@
 import { ApiClient, type TemplateSummary } from "@receituario/api-client";
 import { useEffect, useState } from "react";
 
+import { getBrowserApiBaseUrl } from "../../../lib/browser-api";
 import { PageSection } from "../../../components/page-section";
 import { Shell } from "../../../components/shell";
 
@@ -17,8 +18,7 @@ export default function TemplatesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3333";
+    const baseUrl = getBrowserApiBaseUrl();
     const token = document.cookie
       .split("; ")
       .find((entry) => entry.startsWith("receituario_access_token="))
