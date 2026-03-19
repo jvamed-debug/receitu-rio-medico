@@ -1,7 +1,7 @@
 "use client";
 
 import { ApiClient, type TemplateSummary } from "@receituario/api-client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PageSection } from "../../../components/page-section";
 import { Shell } from "../../../components/shell";
@@ -9,16 +9,7 @@ import { Shell } from "../../../components/shell";
 type TemplateType = "prescription" | "exam-request" | "medical-certificate" | "free-document";
 
 export default function TemplatesPage() {
-  const api = useMemo(() => {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3333";
-    const token = document.cookie
-      .split("; ")
-      .find((entry) => entry.startsWith("receituario_access_token="))
-      ?.split("=")[1];
-
-    return new ApiClient(baseUrl, token ? decodeURIComponent(token) : undefined);
-  }, []);
+  const [api, setApi] = useState<ApiClient | null>(null);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [name, setName] = useState("");
   const [type, setType] = useState<TemplateType>("prescription");
@@ -26,6 +17,21 @@ export default function TemplatesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3333";
+    const token = document.cookie
+      .split("; ")
+      .find((entry) => entry.startsWith("receituario_access_token="))
+      ?.split("=")[1];
+
+    setApi(new ApiClient(baseUrl, token ? decodeURIComponent(token) : undefined));
+  }, []);
+
+  useEffect(() => {
+    if (!api) {
+      return;
+    }
+
     let active = true;
 
     api
@@ -47,6 +53,12 @@ export default function TemplatesPage() {
   }, [api]);
 
   async function createTemplate() {
+    if (!api) {
+      setError("Cliente da API ainda nao inicializado.");
+      setMessage(null);
+      return;
+    }
+
     try {
       const created = await api.createTemplate({
         name,
