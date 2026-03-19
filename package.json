@@ -1,0 +1,32 @@
+{
+  "name": "receituario-digital",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Monorepo do Receituário Médico Digital Web + Mobile",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:web": "npm run dev -w @receituario/web",
+    "dev:api": "npm run dev -w @receituario/api",
+    "prisma:generate": "npm run prisma:generate -w @receituario/api",
+    "db:migrate": "npm run db:migrate -w @receituario/api",
+    "db:deploy": "npm run db:deploy -w @receituario/api",
+    "db:seed": "npm run db:seed -w @receituario/api",
+    "infra:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "infra:prod:up": "docker compose -f infra/docker/docker-compose.prod.yml up -d",
+    "infra:prod:down": "docker compose -f infra/docker/docker-compose.prod.yml down",
+    "setup:local": "powershell -ExecutionPolicy Bypass -File ./scripts/setup/bootstrap.ps1"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  }
+}

@@ -1,0 +1,49 @@
+name: Deploy Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Deploy to Hostinger VPS
+        uses: hostinger/deploy-action@v1
+        with:
+          api-key: ${{ secrets.HOSTINGER_API_KEY }}
+          virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
+          project-name: receituario-digital
+          docker-compose-path: infra/docker/docker-compose.prod.yml
+          environment-variables: |
+            NODE_ENV=production
+            APP_PUBLIC_URL=${{ vars.APP_PUBLIC_URL }}
+            API_PUBLIC_URL=${{ vars.API_PUBLIC_URL }}
+            API_BASE_URL=http://api:3001
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.API_PUBLIC_URL }}
+            PORT=3001
+            APP_NAME=receituario-digital-api
+            AUTH_TOKEN_SECRET=${{ secrets.AUTH_TOKEN_SECRET }}
+            POSTGRES_DB=${{ vars.POSTGRES_DB }}
+            POSTGRES_USER=${{ vars.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=redis://redis:6379
+            STORAGE_ENDPOINT=http://minio:9000
+            STORAGE_REGION=${{ vars.STORAGE_REGION }}
+            STORAGE_BUCKET=${{ vars.STORAGE_BUCKET }}
+            STORAGE_ACCESS_KEY=${{ vars.STORAGE_ACCESS_KEY }}
+            STORAGE_SECRET_KEY=${{ secrets.STORAGE_SECRET_KEY }}
+            OIDC_ISSUER_URL=${{ vars.OIDC_ISSUER_URL }}
+            OIDC_CLIENT_ID=${{ vars.OIDC_CLIENT_ID }}
+            OIDC_CLIENT_SECRET=${{ secrets.OIDC_CLIENT_SECRET }}
+            SIGNATURE_PROVIDER_BASE_URL=${{ vars.SIGNATURE_PROVIDER_BASE_URL }}
+            SIGNATURE_PROVIDER_API_KEY=${{ secrets.SIGNATURE_PROVIDER_API_KEY }}
+            EMAIL_FROM=${{ vars.EMAIL_FROM }}
+            SMTP_HOST=${{ vars.SMTP_HOST }}
+            SMTP_PORT=${{ vars.SMTP_PORT }}
+            SMTP_USER=${{ secrets.SMTP_USER }}
+            SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}

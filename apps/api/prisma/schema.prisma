@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PROFESSIONAL
+  ASSISTANT
+  ADMIN
+  COMPLIANCE
+}
+
+enum ProfessionalStatus {
+  PENDING_VALIDATION
+  ACTIVE
+  SUSPENDED
+}
+
+enum DocumentType {
+  PRESCRIPTION
+  EXAM_REQUEST
+  MEDICAL_CERTIFICATE
+  FREE_DOCUMENT
+}
+
+enum DocumentStatus {
+  DRAFT
+  READY_FOR_REVIEW
+  PENDING_SIGNATURE
+  SIGNED
+  ISSUED
+  DELIVERED
+  ARCHIVED
+}
+
+enum SignatureProvider {
+  ICP_BRASIL_VENDOR
+  GOVBR_VENDOR
+}
+
+enum SignatureSessionStatus {
+  PENDING
+  AUTHORIZED
+  SIGNED
+  EXPIRED
+  FAILED
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  passwordHash       String
+  fullName           String
+  role               UserRole             @default(PROFESSIONAL)
+  professionalProfile ProfessionalProfile?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+model ProfessionalProfile {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  documentNumber       String
+  councilType          String
+  councilState         String
+  cbo                  String?
+  specialty            String?
+  cnes                 String?
+  signatureProvider    SignatureProvider?
+  signatureValidatedAt DateTime?
+  status               ProfessionalStatus @default(PENDING_VALIDATION)
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents            ClinicalDocument[]
+  signatureSessions    SignatureSession[]
+  auditLogs            AuditLog[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model Patient {
+  id         String             @id @default(cuid())
+  fullName   String
+  cpf        String?            @unique
+  cns        String?            @unique
+  birthDate  DateTime?
+  phone      String?
+  email      String?
+  notes      String?
+  documents  ClinicalDocument[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+}
+
+model ClinicalDocument {
+  id                    String               @id @default(cuid())
+  type                  DocumentType
+  status                DocumentStatus       @default(DRAFT)
+  patientId             String
+  authorProfessionalId  String
+  title                 String
+  payload               Json
+  layoutVersion         String
+  payloadHash           String?
+  issuedAt              DateTime?
+  derivedFromDocumentId String?
+  patient               Patient              @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  authorProfessional    ProfessionalProfile  @relation(fields: [authorProfessionalId], references: [id], onDelete: Restrict)
+  signatures            SignatureSession[]
+  deliveries            DeliveryEvent[]
+  pdfArtifact           PdfArtifact?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+}
+
+model Template {
+  id          String       @id @default(cuid())
+  name        String
+  type        DocumentType
+  version     Int          @default(1)
+  structure   Json
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model SignatureSession {
+  id              String                 @id @default(cuid())
+  professionalId  String
+  documentId      String
+  provider        SignatureProvider
+  status          SignatureSessionStatus @default(PENDING)
+  expiresAt       DateTime?
+  createdAt       DateTime               @default(now())
+  professional    ProfessionalProfile    @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  document        ClinicalDocument       @relation(fields: [documentId], references: [id], onDelete: Restrict)
+}
+
+model PdfArtifact {
+  id          String            @id @default(cuid())
+  documentId  String            @unique
+  storageKey  String
+  sha256      String
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+  document    ClinicalDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model DeliveryEvent {
+  id          String            @id @default(cuid())
+  documentId  String
+  channel     String
+  target      String?
+  status      String
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+  document    ClinicalDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id                   String               @id @default(cuid())
+  actorUserId          String?
+  actorProfessionalId  String?
+  entityType           String
+  entityId             String
+  action               String
+  correlationId        String
+  origin               String
+  metadata             Json
+  occurredAt           DateTime             @default(now())
+  actorProfessional    ProfessionalProfile? @relation(fields: [actorProfessionalId], references: [id], onDelete: SetNull)
+}

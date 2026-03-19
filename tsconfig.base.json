@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM"],
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@receituario/domain": ["packages/domain/src/index.ts"],
+      "@receituario/schemas": ["packages/schemas/src/index.ts"],
+      "@receituario/auth-contracts": ["packages/auth-contracts/src/index.ts"],
+      "@receituario/compliance-rules": ["packages/compliance-rules/src/index.ts"],
+      "@receituario/fhir": ["packages/fhir/src/index.ts"],
+      "@receituario/pdf-core": ["packages/pdf-core/src/index.ts"],
+      "@receituario/api-client": ["packages/api-client/src/index.ts"],
+      "@receituario/ui-tokens": ["packages/ui-tokens/src/index.ts"],
+      "@receituario/design-system": ["packages/design-system/src/index.ts"]
+    }
+  }
+}
+
