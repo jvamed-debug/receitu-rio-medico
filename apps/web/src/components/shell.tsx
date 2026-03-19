@@ -34,16 +34,16 @@ export function Shell({
         style={{
           minHeight: "100vh",
           background:
-            "radial-gradient(circle at top, rgba(21, 87, 61, 0.95), #0f2b1f 65%)",
-          color: "#f8faf9",
+            "radial-gradient(circle at top, rgba(21, 96, 189, 0.92), rgba(8, 39, 88, 0.98) 68%)",
+          color: "#f5f9ff",
           padding: "32px 24px",
           position: "sticky",
           top: 0
         }}
       >
         <div style={{ marginBottom: 40 }}>
-          <div style={{ fontSize: 14, opacity: 0.7 }}>Receituario Medico</div>
-          <div style={{ fontSize: 28, marginTop: 8 }}>Digital Care</div>
+          <div style={{ fontSize: 14, opacity: 0.74 }}>Receituario Medico</div>
+          <div style={{ fontSize: 28, marginTop: 8 }}>Blue Care</div>
           <p style={{ opacity: 0.78, lineHeight: 1.5 }}>
             Operacao clinica com assinatura, PDF e historico auditavel.
           </p>
@@ -56,8 +56,8 @@ export function Shell({
               style={{
                 padding: "12px 14px",
                 borderRadius: 14,
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.06)"
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(173, 216, 255, 0.14)"
               }}
             >
               {label}

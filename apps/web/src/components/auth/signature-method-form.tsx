@@ -3,6 +3,8 @@
 import { ApiClient } from "@receituario/api-client";
 import { useState } from "react";
 
+import { getBrowserApiBaseUrl } from "../../lib/browser-api";
+
 export function SignatureMethodForm({
   initialProvider
 }: {
@@ -49,8 +51,7 @@ export function SignatureMethodForm({
 }
 
 function createBrowserAuthedClient() {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3333";
+  const baseUrl = getBrowserApiBaseUrl();
   const token = document.cookie
     .split("; ")
     .find((entry) => entry.startsWith("receituario_access_token="))
@@ -67,7 +68,7 @@ const fieldStyle = {
 
 const inputStyle = {
   borderRadius: 14,
-  border: "1px solid #d8e2dc",
+  border: "1px solid #c9d8ea",
   padding: "14px 16px",
   fontSize: 16,
   background: "#fff"

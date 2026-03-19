@@ -1,11 +1,11 @@
 :root {
   color-scheme: light;
-  --background: #f4f7f5;
-  --foreground: #102418;
-  --primary: #0a7f5a;
-  --accent: #d9a441;
+  --background: #f3f8ff;
+  --foreground: #0e2238;
+  --primary: #0b63ce;
+  --accent: #5db7ff;
   --surface: #ffffff;
-  --muted: #718096;
+  --muted: #60748a;
   --danger: #b42318;
 }
 
@@ -17,7 +17,9 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: linear-gradient(180deg, #eef4f1 0%, #f8faf9 100%);
+  background:
+    radial-gradient(circle at top, rgba(93, 183, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, #eef6ff 0%, #f7fbff 100%);
   color: var(--foreground);
   font-family: Georgia, "Times New Roman", serif;
 }
@@ -30,4 +32,3 @@ a {
 main {
   min-height: 100vh;
 }
-
