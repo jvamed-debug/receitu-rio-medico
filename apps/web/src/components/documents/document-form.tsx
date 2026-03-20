@@ -8,7 +8,9 @@ import type {
   PatientSummary
 } from "@receituario/api-client";
 import { ApiClient } from "@receituario/api-client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+
+import { getBrowserApiBaseUrl } from "../../lib/browser-api";
 
 type FormKind = "prescription" | "exam-request" | "medical-certificate" | "free-document";
 
@@ -53,6 +55,13 @@ type FormState = {
   body: string;
 };
 
+type FormPreset = {
+  label: string;
+  description: string;
+  values: Partial<FormState>;
+  selectedExams?: string[];
+};
+
 const initialState: FormState = {
   patientId: "",
   title: "",
@@ -72,22 +81,248 @@ const initialState: FormState = {
   body: ""
 };
 
+const defaultValuesByKind: Record<FormKind, Partial<FormState>> = {
+  prescription: {
+    title: "Prescricao medica",
+    frequency: "Conforme orientacao medica",
+    duration: "Uso conforme prescricao",
+    notes: "Retornar em caso de piora clinica ou efeitos adversos."
+  },
+  "exam-request": {
+    title: "Solicitacao de exames laboratoriais",
+    preparationNotes: "Levar documento com foto e seguir orientacoes de jejum quando aplicavel."
+  },
+  "medical-certificate": {
+    title: "Atestado medico",
+    purpose: "Comparecimento em consulta medica",
+    observations:
+      "Paciente esteve em consulta nesta data, devendo manter repouso conforme avaliacao clinica."
+  },
+  "free-document": {
+    title: "Relatorio clinico",
+    body:
+      "Paciente em acompanhamento clinico regular, com necessidade de seguimento assistencial e reavaliacao conforme evolucao."
+  }
+};
+
+const labExamGroups = [
+  {
+    label: "Hematologia e inflamacao",
+    description: "Triagem de anemia, infeccao e resposta inflamatoria.",
+    exams: ["Hemograma completo", "PCR", "Ferritina", "Ferro serico", "Vitamina B12"]
+  },
+  {
+    label: "Metabolico e lipidico",
+    description: "Controle glicemico, dislipidemia e seguimento cronico.",
+    exams: [
+      "Glicemia de jejum",
+      "Hemoglobina glicada",
+      "Colesterol total e fracoes",
+      "Triglicerideos",
+      "Vitamina D"
+    ]
+  },
+  {
+    label: "Renal e urinario",
+    description: "Avaliacao laboratorial da funcao renal e urinaria.",
+    exams: ["Ureia", "Creatinina", "Sodio", "Potassio", "EAS", "Urocultura"]
+  },
+  {
+    label: "Hepatico e digestivo",
+    description: "Enzimas hepaticas e investigacao intestinal basica.",
+    exams: ["TGO (AST)", "TGP (ALT)", "Gama GT", "Bilirrubinas", "Parasitologico de fezes"]
+  },
+  {
+    label: "Endocrino e coagulacao",
+    description: "Triagem tireoidiana e avaliacao hemostatica.",
+    exams: ["TSH", "T4 livre", "Coagulograma"]
+  }
+] as const;
+
+const examPanelPresets: FormPreset[] = [
+  {
+    label: "Check-up metabolico",
+    description: "Painel inicial para triagem clinica e metabolica.",
+    values: {
+      title: "Solicitacao de check-up metabolico",
+      preparationNotes: "Jejum de 8 horas quando aplicavel."
+    },
+    selectedExams: [
+      "Hemograma completo",
+      "Glicemia de jejum",
+      "Hemoglobina glicada",
+      "Colesterol total e fracoes",
+      "Triglicerideos",
+      "TSH",
+      "T4 livre"
+    ]
+  },
+  {
+    label: "Funcao renal",
+    description: "Painel laboratorial para seguimento renal e urinario.",
+    values: {
+      title: "Solicitacao de avaliacao de funcao renal"
+    },
+    selectedExams: ["Ureia", "Creatinina", "Sodio", "Potassio", "EAS", "Urocultura"]
+  },
+  {
+    label: "Perfil hepatico",
+    description: "Exames de funcao hepatica e vias biliares.",
+    values: {
+      title: "Solicitacao de perfil hepatica"
+    },
+    selectedExams: ["TGO (AST)", "TGP (ALT)", "Gama GT", "Bilirrubinas"]
+  },
+  {
+    label: "Investigacao de anemia",
+    description: "Triagem inicial hematimetrica e de ferro.",
+    values: {
+      title: "Solicitacao para investigacao de anemia"
+    },
+    selectedExams: ["Hemograma completo", "Ferritina", "Ferro serico", "Vitamina B12"]
+  },
+  {
+    label: "Seguimento do diabetes",
+    description: "Controle glicemico, renal e metabolico.",
+    values: {
+      title: "Solicitacao para seguimento do diabetes mellitus",
+      preparationNotes: "Jejum de 8 horas para glicemia e lipidograma."
+    },
+    selectedExams: [
+      "Glicemia de jejum",
+      "Hemoglobina glicada",
+      "Colesterol total e fracoes",
+      "Triglicerideos",
+      "Creatinina",
+      "EAS"
+    ]
+  },
+  {
+    label: "Perfil tireoidiano",
+    description: "Investigacao inicial de disfuncao tireoidiana.",
+    values: {
+      title: "Solicitacao de perfil tireoidiano"
+    },
+    selectedExams: ["TSH", "T4 livre"]
+  },
+  {
+    label: "Risco inflamatorio",
+    description: "Painel basico para suspeita de processo inflamatorio.",
+    values: {
+      title: "Solicitacao de avaliacao inflamatoria"
+    },
+    selectedExams: ["Hemograma completo", "PCR", "Ferritina"]
+  }
+];
+
+const prescriptionPresets: FormPreset[] = [
+  {
+    label: "Uso continuo",
+    description: "Base para medicacao de manutencao.",
+    values: {
+      title: "Prescricao de uso continuo",
+      frequency: "Uso continuo conforme orientacao medica",
+      duration: "Uso continuo",
+      notes: "Nao interromper sem reavaliacao medica."
+    }
+  },
+  {
+    label: "Tratamento curto",
+    description: "Base para uso por poucos dias com retorno se piora.",
+    values: {
+      title: "Prescricao para tratamento agudo",
+      duration: "7 dias",
+      notes: "Retornar se persistencia dos sintomas, piora ou evento adverso."
+    }
+  }
+];
+
+const medicalCertificatePresets: FormPreset[] = [
+  {
+    label: "Comparecimento",
+    description: "Declara comparecimento em consulta na data.",
+    values: {
+      title: "Atestado de comparecimento",
+      purpose: "Comparecimento em consulta medica",
+      restDays: "",
+      observations: "Paciente esteve em consulta medica nesta data."
+    }
+  },
+  {
+    label: "Repouso breve",
+    description: "Texto-base para afastamento curto.",
+    values: {
+      title: "Atestado medico para repouso",
+      purpose: "Necessidade de afastamento temporario das atividades habituais",
+      restDays: "2",
+      observations:
+        "Recomenda-se repouso pelo periodo informado e retorno se persistirem sintomas."
+    }
+  },
+  {
+    label: "Acompanhante",
+    description: "Base para justificar presenca de acompanhante.",
+    values: {
+      title: "Declaracao de acompanhante",
+      purpose: "Necessidade de acompanhante em consulta ou assistencia",
+      restDays: "",
+      observations:
+        "Declaro, para os devidos fins, a necessidade de acompanhante na presente assistencia."
+    }
+  }
+];
+
+const freeDocumentPresets: FormPreset[] = [
+  {
+    label: "Relatorio sucinto",
+    description: "Resumo clinico breve para continuidade assistencial.",
+    values: {
+      title: "Relatorio clinico sucinto",
+      body:
+        "Paciente em acompanhamento nesta unidade, com quadro clinico em seguimento, evolucao documentada e necessidade de continuidade do cuidado conforme avaliacao medica."
+    }
+  },
+  {
+    label: "Encaminhamento",
+    description: "Base para encaminhar a outra especialidade ou servico.",
+    values: {
+      title: "Encaminhamento medico",
+      body:
+        "Encaminho paciente para avaliacao especializada, com objetivo de complementar investigacao diagnostica, estratificacao de risco e definicao de conduta terapeutica."
+    }
+  },
+  {
+    label: "Declaracao",
+    description: "Modelo simples de declaracao clinica.",
+    values: {
+      title: "Declaracao medica",
+      body:
+        "Declaro, para os devidos fins, que o paciente encontra-se em acompanhamento medico nesta data."
+    }
+  },
+  {
+    label: "Relatorio para pericia",
+    description: "Texto-base mais formal para fins administrativos.",
+    values: {
+      title: "Relatorio medico",
+      body:
+        "Apresento relatorio medico sucinto, contendo informacoes clinicas pertinentes, historico assistencial resumido e necessidade de seguimento conforme avaliacao realizada nesta data."
+    }
+  }
+];
+
 export function DocumentForm({ kind, title, description }: DocumentFormProps) {
   const [patients, setPatients] = useState<PatientSummary[]>([]);
-  const [state, setState] = useState<FormState>(initialState);
+  const [state, setState] = useState<FormState>(() => buildInitialState(kind));
+  const [selectedExamCatalog, setSelectedExamCatalog] = useState<string[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const api = useMemo(() => {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3333";
-    return new ApiClient(baseUrl);
-  }, []);
-
   useEffect(() => {
     let active = true;
+    const api = createBrowserApiClient();
 
     api
       .listPatients()
@@ -116,7 +351,7 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
     return () => {
       active = false;
     };
-  }, [api]);
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -125,6 +360,8 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
     setMessage(null);
 
     try {
+      const api = createBrowserApiClient();
+
       if (kind === "prescription") {
         const payload: CreatePrescriptionInput = {
           patientId: state.patientId,
@@ -146,13 +383,11 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
       }
 
       if (kind === "exam-request") {
+        const requestedExams = buildExamRequestItems(state.requestedExams, selectedExamCatalog);
         const payload: CreateExamRequestInput = {
           patientId: state.patientId,
           title: state.title,
-          requestedExams: state.requestedExams
-            .split("\n")
-            .map((item) => item.trim())
-            .filter(Boolean),
+          requestedExams,
           preparationNotes: state.preparationNotes || undefined
         };
         await api.createExamRequest(payload);
@@ -180,9 +415,10 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
 
       setMessage("Rascunho criado com sucesso na API.");
       setState((current) => ({
-        ...initialState,
+        ...buildInitialState(kind),
         patientId: current.patientId
       }));
+      setSelectedExamCatalog([]);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Falha ao enviar o documento.");
     } finally {
@@ -234,90 +470,187 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
 
         {kind === "prescription" ? (
           <>
+            <PresetButtons title="Modelos rapidos" presets={prescriptionPresets} onApply={applyPreset} />
             <label style={fieldStyle}>
               <span>Medicamento</span>
-              <input value={state.medicationName} onChange={(event) => updateField("medicationName", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.medicationName}
+                onChange={(event) => updateField("medicationName", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Principio ativo</span>
-              <input value={state.activeIngredient} onChange={(event) => updateField("activeIngredient", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.activeIngredient}
+                onChange={(event) => updateField("activeIngredient", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Dosagem</span>
-              <input value={state.dosage} onChange={(event) => updateField("dosage", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.dosage}
+                onChange={(event) => updateField("dosage", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Via</span>
-              <input value={state.route} onChange={(event) => updateField("route", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.route}
+                onChange={(event) => updateField("route", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Frequencia</span>
-              <input value={state.frequency} onChange={(event) => updateField("frequency", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.frequency}
+                onChange={(event) => updateField("frequency", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Duracao</span>
-              <input value={state.duration} onChange={(event) => updateField("duration", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.duration}
+                onChange={(event) => updateField("duration", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Quantidade</span>
-              <input value={state.quantity} onChange={(event) => updateField("quantity", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.quantity}
+                onChange={(event) => updateField("quantity", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Observacoes</span>
-              <textarea value={state.notes} onChange={(event) => updateField("notes", event.target.value)} style={textAreaStyle} disabled={submitting} />
+              <textarea
+                value={state.notes}
+                onChange={(event) => updateField("notes", event.target.value)}
+                style={textAreaStyle}
+                disabled={submitting}
+              />
             </label>
           </>
         ) : null}
 
         {kind === "exam-request" ? (
           <>
+            <PresetButtons title="Paineis laboratoriais" presets={examPanelPresets} onApply={applyPreset} />
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ fontWeight: 600 }}>Checklist laboratorial</div>
+              <div style={{ display: "grid", gap: 16 }}>
+                {labExamGroups.map((group) => (
+                  <div key={group.label} style={examGroupStyle}>
+                    <div style={{ fontWeight: 700 }}>{group.label}</div>
+                    <div style={{ color: "var(--muted)", fontSize: 14 }}>{group.description}</div>
+                    <div style={examCatalogGridStyle}>
+                      {group.exams.map((exam) => {
+                        const selected = selectedExamCatalog.includes(exam);
+
+                        return (
+                          <label key={exam} style={selected ? selectedExamChipStyle : examChipStyle}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleExamCatalogItem(exam)}
+                              disabled={submitting}
+                              style={{ accentColor: "var(--primary)" }}
+                            />
+                            <span>{exam}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <label style={fieldStyle}>
-              <span>Exames solicitados</span>
+              <span>Exames personalizados</span>
               <textarea
                 value={state.requestedExams}
                 onChange={(event) => updateField("requestedExams", event.target.value)}
                 style={textAreaStyle}
                 disabled={submitting}
-                placeholder="Um exame por linha"
+                placeholder="Use uma linha por exame para complementar ou personalizar o pedido."
               />
             </label>
             <label style={fieldStyle}>
               <span>Preparo e observacoes</span>
-              <textarea value={state.preparationNotes} onChange={(event) => updateField("preparationNotes", event.target.value)} style={textAreaStyle} disabled={submitting} />
+              <textarea
+                value={state.preparationNotes}
+                onChange={(event) => updateField("preparationNotes", event.target.value)}
+                style={textAreaStyle}
+                disabled={submitting}
+              />
             </label>
           </>
         ) : null}
 
         {kind === "medical-certificate" ? (
           <>
+            <PresetButtons title="Textos-base" presets={medicalCertificatePresets} onApply={applyPreset} />
             <label style={fieldStyle}>
               <span>Finalidade</span>
-              <input value={state.purpose} onChange={(event) => updateField("purpose", event.target.value)} style={inputStyle} disabled={submitting} />
+              <input
+                value={state.purpose}
+                onChange={(event) => updateField("purpose", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              />
             </label>
             <label style={fieldStyle}>
               <span>Dias de afastamento</span>
-              <input value={state.restDays} onChange={(event) => updateField("restDays", event.target.value)} style={inputStyle} disabled={submitting} inputMode="numeric" />
+              <input
+                value={state.restDays}
+                onChange={(event) => updateField("restDays", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+                inputMode="numeric"
+              />
             </label>
             <label style={fieldStyle}>
               <span>Observacoes</span>
-              <textarea value={state.observations} onChange={(event) => updateField("observations", event.target.value)} style={textAreaStyle} disabled={submitting} />
+              <textarea
+                value={state.observations}
+                onChange={(event) => updateField("observations", event.target.value)}
+                style={textAreaStyle}
+                disabled={submitting}
+              />
             </label>
           </>
         ) : null}
 
         {kind === "free-document" ? (
-          <label style={fieldStyle}>
-            <span>Corpo do documento</span>
-            <textarea value={state.body} onChange={(event) => updateField("body", event.target.value)} style={{ ...textAreaStyle, minHeight: 220 }} disabled={submitting} />
-          </label>
+          <>
+            <PresetButtons title="Modelos padronizados" presets={freeDocumentPresets} onApply={applyPreset} />
+            <label style={fieldStyle}>
+              <span>Corpo do documento</span>
+              <textarea
+                value={state.body}
+                onChange={(event) => updateField("body", event.target.value)}
+                style={{ ...textAreaStyle, minHeight: 220 }}
+                disabled={submitting}
+              />
+            </label>
+          </>
         ) : null}
 
-        {error ? (
-          <div style={{ color: "var(--danger)", fontWeight: 700 }}>{error}</div>
-        ) : null}
-        {message ? (
-          <div style={{ color: "var(--primary)", fontWeight: 700 }}>{message}</div>
-        ) : null}
+        {error ? <div style={{ color: "var(--danger)", fontWeight: 700 }}>{error}</div> : null}
+        {message ? <div style={{ color: "var(--primary)", fontWeight: 700 }}>{message}</div> : null}
 
         <button type="submit" style={submitButtonStyle} disabled={submitting || loadingPatients}>
           {submitting ? "Enviando..." : "Criar rascunho"}
@@ -332,6 +665,69 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
       [field]: value
     }));
   }
+
+  function toggleExamCatalogItem(exam: string) {
+    setSelectedExamCatalog((current) =>
+      current.includes(exam)
+        ? current.filter((item) => item !== exam)
+        : [...current, exam]
+    );
+  }
+
+  function applyPreset(preset: FormPreset) {
+    setState((current) => ({
+      ...current,
+      ...preset.values
+    }));
+
+    if (preset.selectedExams) {
+      setSelectedExamCatalog(preset.selectedExams);
+    }
+  }
+}
+
+function createBrowserApiClient() {
+  return new ApiClient(getBrowserApiBaseUrl());
+}
+
+function buildInitialState(kind: FormKind): FormState {
+  return {
+    ...initialState,
+    ...defaultValuesByKind[kind]
+  };
+}
+
+function buildExamRequestItems(freeText: string, selectedCatalog: string[]) {
+  const typedItems = freeText
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...selectedCatalog, ...typedItems]));
+}
+
+function PresetButtons({
+  title,
+  presets,
+  onApply
+}: {
+  title: string;
+  presets: FormPreset[];
+  onApply: (preset: FormPreset) => void;
+}) {
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ fontWeight: 700 }}>{title}</div>
+      <div style={presetGridStyle}>
+        {presets.map((preset) => (
+          <button key={preset.label} type="button" onClick={() => onApply(preset)} style={presetButtonStyle}>
+            <span style={{ fontWeight: 700 }}>{preset.label}</span>
+            <span style={{ color: "var(--muted)", fontSize: 14 }}>{preset.description}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 const fieldStyle = {
@@ -361,5 +757,54 @@ const submitButtonStyle = {
   color: "white",
   padding: "14px 16px",
   fontSize: 16,
+  cursor: "pointer"
+};
+
+const examCatalogGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 10
+};
+
+const examGroupStyle = {
+  display: "grid",
+  gap: 10,
+  padding: "16px 18px",
+  borderRadius: 18,
+  border: "1px solid #d7e6f6",
+  background: "#fbfdff"
+};
+
+const examChipStyle = {
+  display: "flex",
+  gap: 10,
+  alignItems: "center",
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid #c9d8ea",
+  background: "#f7fbff",
+  fontWeight: 500
+};
+
+const selectedExamChipStyle = {
+  ...examChipStyle,
+  border: "1px solid rgba(11, 99, 206, 0.45)",
+  background: "rgba(93, 183, 255, 0.16)"
+};
+
+const presetGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 10
+};
+
+const presetButtonStyle = {
+  display: "grid",
+  gap: 6,
+  textAlign: "left" as const,
+  padding: "14px 16px",
+  borderRadius: 16,
+  border: "1px solid #c9d8ea",
+  background: "#f8fbff",
   cursor: "pointer"
 };
