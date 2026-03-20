@@ -23,6 +23,30 @@ export interface TemplateSummary {
   updatedAt: string;
 }
 
+export interface TemplateFavoriteSummary {
+  id: string;
+  userId: string;
+  presetKey: string;
+  label?: string | null;
+  category?: string | null;
+  templateId?: string | null;
+  createdAt: string;
+}
+
+export interface ProfessionalProfileSummary {
+  id?: string;
+  documentNumber?: string | null;
+  councilType?: string | null;
+  councilState?: string | null;
+  rqe?: string | null;
+  cbo?: string | null;
+  specialty?: string | null;
+  cnes?: string | null;
+  status?: string | null;
+  signatureProvider?: string | null;
+  signatureValidatedAt?: string | null;
+}
+
 export interface PrescriptionItemInput {
   medicationName: string;
   activeIngredient?: string;
@@ -229,7 +253,7 @@ export class ApiClient {
       SessionPrincipal & {
         email?: string;
         fullName?: string;
-        professionalProfile?: unknown;
+        professionalProfile?: ProfessionalProfileSummary;
       }
     >("/me");
   }
@@ -323,6 +347,35 @@ export class ApiClient {
 
   createTemplate(input: CreateTemplateInput) {
     return this.post<TemplateSummary>("/templates", input);
+  }
+
+  listTemplateFavorites() {
+    return this.get<TemplateFavoriteSummary[]>("/templates/favorites");
+  }
+
+  saveTemplateFavorite(input: {
+    presetKey: string;
+    label?: string;
+    category?: string;
+    templateId?: string;
+  }) {
+    return this.post<TemplateFavoriteSummary>("/templates/favorites", input);
+  }
+
+  async removeTemplateFavorite(presetKey: string) {
+    const response = await fetch(
+      `${this.baseUrl}${this.withApiPrefix(`/templates/favorites/${encodeURIComponent(presetKey)}`)}`,
+      {
+        method: "DELETE",
+        headers: this.getAuthHeaders()
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`DELETE /templates/favorites/${presetKey} falhou com status ${response.status}`);
+    }
+
+    return response.json() as Promise<{ removed: boolean; presetKey: string }>;
   }
 
   private getAuthHeaders() {

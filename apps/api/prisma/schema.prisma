@@ -57,6 +57,7 @@ model User {
   fullName           String
   role               UserRole             @default(PROFESSIONAL)
   professionalProfile ProfessionalProfile?
+  templateFavorites  UserTemplateFavorite[]
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 }
@@ -123,8 +124,24 @@ model Template {
   type        DocumentType
   version     Int          @default(1)
   structure   Json
+  favoritedBy UserTemplateFavorite[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+}
+
+model UserTemplateFavorite {
+  id         String    @id @default(cuid())
+  userId     String
+  presetKey  String
+  label      String?
+  category   String?
+  templateId String?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template   Template? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, presetKey])
+  @@index([userId, createdAt])
 }
 
 model SignatureSession {

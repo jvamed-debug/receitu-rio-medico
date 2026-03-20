@@ -11,6 +11,7 @@ import { ApiClient } from "@receituario/api-client";
 import { useEffect, useState } from "react";
 
 import { getBrowserApiBaseUrl } from "../../lib/browser-api";
+import { inferSpecialtyTrack, type SpecialtyTrack } from "../../lib/clinical-specialty";
 
 type FormKind = "prescription" | "exam-request" | "medical-certificate" | "free-document";
 
@@ -477,6 +478,7 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
   const [patients, setPatients] = useState<PatientSummary[]>([]);
   const [state, setState] = useState<FormState>(() => buildInitialState(kind));
   const [selectedExamCatalog, setSelectedExamCatalog] = useState<string[]>([]);
+  const [specialtyTrack, setSpecialtyTrack] = useState<SpecialtyTrack | null>(null);
   const [loadingPatients, setLoadingPatients] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -507,6 +509,19 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
       .finally(() => {
         if (active) {
           setLoadingPatients(false);
+        }
+      });
+
+    api
+      .me()
+      .then((me) => {
+        if (active) {
+          setSpecialtyTrack(inferSpecialtyTrack(me.professionalProfile?.specialty));
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSpecialtyTrack(null);
         }
       });
 
@@ -588,6 +603,11 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
     }
   }
 
+  const recommendedExamPresets = getRecommendedPresets("exam-request");
+  const recommendedPrescriptionPresets = getRecommendedPresets("prescription");
+  const recommendedCertificatePresets = getRecommendedPresets("medical-certificate");
+  const recommendedFreeDocumentPresets = getRecommendedPresets("free-document");
+
   return (
     <section
       style={{
@@ -632,6 +652,13 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
 
         {kind === "prescription" ? (
           <>
+            {recommendedPrescriptionPresets.length > 0 ? (
+              <PresetButtons
+                title="Recomendados para sua especialidade"
+                presets={recommendedPrescriptionPresets}
+                onApply={applyPreset}
+              />
+            ) : null}
             <PresetButtons title="Modelos rapidos" presets={prescriptionPresets} onApply={applyPreset} />
             <PresetButtons title="Sugestoes por especialidade" presets={specialtyPrescriptionPresets} onApply={applyPreset} />
             <label style={fieldStyle}>
@@ -711,6 +738,13 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
 
         {kind === "exam-request" ? (
           <>
+            {recommendedExamPresets.length > 0 ? (
+              <PresetButtons
+                title="Recomendados para sua especialidade"
+                presets={recommendedExamPresets}
+                onApply={applyPreset}
+              />
+            ) : null}
             <PresetButtons title="Paineis laboratoriais" presets={examPanelPresets} onApply={applyPreset} />
             <PresetButtons title="Sugestoes por especialidade" presets={specialtyExamPresets} onApply={applyPreset} />
             <div style={{ display: "grid", gap: 12 }}>
@@ -766,6 +800,13 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
 
         {kind === "medical-certificate" ? (
           <>
+            {recommendedCertificatePresets.length > 0 ? (
+              <PresetButtons
+                title="Recomendados para sua especialidade"
+                presets={recommendedCertificatePresets}
+                onApply={applyPreset}
+              />
+            ) : null}
             <PresetButtons title="Textos-base" presets={medicalCertificatePresets} onApply={applyPreset} />
             <PresetButtons title="Sugestoes por especialidade" presets={specialtyCertificatePresets} onApply={applyPreset} />
             <label style={fieldStyle}>
@@ -801,6 +842,13 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
 
         {kind === "free-document" ? (
           <>
+            {recommendedFreeDocumentPresets.length > 0 ? (
+              <PresetButtons
+                title="Recomendados para sua especialidade"
+                presets={recommendedFreeDocumentPresets}
+                onApply={applyPreset}
+              />
+            ) : null}
             <PresetButtons title="Modelos padronizados" presets={freeDocumentPresets} onApply={applyPreset} />
             <PresetButtons title="Biblioteca juridico-clinica" presets={legalClinicalPresets} onApply={applyPreset} />
             <label style={fieldStyle}>
@@ -850,10 +898,43 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
       setSelectedExamCatalog(preset.selectedExams);
     }
   }
+
+  function getRecommendedPresets(kindFilter: FormKind) {
+    if (!specialtyTrack) {
+      return [];
+    }
+
+    if (kindFilter === "exam-request") {
+      return specialtyExamPresets.filter((preset) =>
+        specialtyPresetMatchesTrack(preset.label, specialtyTrack)
+      );
+    }
+
+    if (kindFilter === "prescription") {
+      return specialtyPrescriptionPresets.filter((preset) =>
+        specialtyPresetMatchesTrack(preset.label, specialtyTrack)
+      );
+    }
+
+    if (kindFilter === "medical-certificate") {
+      return specialtyCertificatePresets.filter((preset) =>
+        specialtyPresetMatchesTrack(preset.label, specialtyTrack)
+      );
+    }
+
+    return legalClinicalPresets.filter((preset) =>
+      specialtyPresetSupportsTrack(preset.label, specialtyTrack)
+    );
+  }
 }
 
 function createBrowserApiClient() {
-  return new ApiClient(getBrowserApiBaseUrl());
+  const token = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith("receituario_access_token="))
+    ?.split("=")[1];
+
+  return new ApiClient(getBrowserApiBaseUrl(), token ? decodeURIComponent(token) : undefined);
 }
 
 function buildInitialState(kind: FormKind): FormState {
@@ -870,6 +951,23 @@ function buildExamRequestItems(freeText: string, selectedCatalog: string[]) {
     .filter(Boolean);
 
   return Array.from(new Set([...selectedCatalog, ...typedItems]));
+}
+
+function specialtyPresetMatchesTrack(label: string, specialtyTrack: SpecialtyTrack) {
+  const normalizedLabel = label.toLowerCase();
+
+  return (
+    normalizedLabel.includes(specialtyTrack.replace("-", " ")) ||
+    normalizedLabel.includes(specialtyTrack.split("-")[0]!)
+  );
+}
+
+function specialtyPresetSupportsTrack(label: string, specialtyTrack: SpecialtyTrack) {
+  if (specialtyTrack === "clinica-medica") {
+    return true;
+  }
+
+  return specialtyPresetMatchesTrack(label, specialtyTrack);
 }
 
 function PresetButtons({
