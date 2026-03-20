@@ -215,6 +215,70 @@ const examPanelPresets: FormPreset[] = [
   }
 ];
 
+const specialtyExamPresets: FormPreset[] = [
+  {
+    label: "Cardiologia",
+    description: "Painel laboratorial de apoio ao risco cardiometabolico.",
+    values: {
+      title: "Solicitacao de exames - avaliacao cardiometabolica",
+      preparationNotes: "Jejum de 8 horas para lipidograma quando aplicavel."
+    },
+    selectedExams: [
+      "Hemograma completo",
+      "Glicemia de jejum",
+      "Hemoglobina glicada",
+      "Colesterol total e fracoes",
+      "Triglicerideos",
+      "Creatinina",
+      "Sodio",
+      "Potassio"
+    ]
+  },
+  {
+    label: "Endocrinologia",
+    description: "Triagem inicial metabolica e tireoidiana.",
+    values: {
+      title: "Solicitacao de exames - avaliacao endocrinologica",
+      preparationNotes: "Jejum de 8 horas para glicemia e lipidograma."
+    },
+    selectedExams: [
+      "Glicemia de jejum",
+      "Hemoglobina glicada",
+      "TSH",
+      "T4 livre",
+      "Vitamina D",
+      "Vitamina B12",
+      "Colesterol total e fracoes",
+      "Triglicerideos"
+    ]
+  },
+  {
+    label: "Nefrologia",
+    description: "Avaliacao funcional renal e urinaria.",
+    values: {
+      title: "Solicitacao de exames - avaliacao nefrologica"
+    },
+    selectedExams: ["Ureia", "Creatinina", "Sodio", "Potassio", "EAS", "Urocultura", "Coagulograma"]
+  },
+  {
+    label: "Clinica medica",
+    description: "Base ampla para triagem e acompanhamento ambulatorial.",
+    values: {
+      title: "Solicitacao de exames - avaliacao clinica geral",
+      preparationNotes: "Jejum conforme orientacao especifica de cada exame."
+    },
+    selectedExams: [
+      "Hemograma completo",
+      "Glicemia de jejum",
+      "Creatinina",
+      "TGO (AST)",
+      "TGP (ALT)",
+      "TSH",
+      "EAS"
+    ]
+  }
+];
+
 const prescriptionPresets: FormPreset[] = [
   {
     label: "Uso continuo",
@@ -233,6 +297,38 @@ const prescriptionPresets: FormPreset[] = [
       title: "Prescricao para tratamento agudo",
       duration: "7 dias",
       notes: "Retornar se persistencia dos sintomas, piora ou evento adverso."
+    }
+  }
+];
+
+const specialtyPrescriptionPresets: FormPreset[] = [
+  {
+    label: "Cardiologia",
+    description: "Base para prescricao ambulatorial cardiovascular.",
+    values: {
+      title: "Prescricao cardiologica",
+      frequency: "Conforme esquema prescrito e monitorizacao clinica",
+      duration: "Uso continuo",
+      notes: "Orientado retorno para reavaliacao cardiovascular programada."
+    }
+  },
+  {
+    label: "Pediatria",
+    description: "Texto-base com reforco de reavaliacao e observacao familiar.",
+    values: {
+      title: "Prescricao pediatrica",
+      frequency: "Conforme orientacao medica e faixa etaria",
+      notes: "Responsavel orientado a observar sinais de alarme e retornar em caso de piora."
+    }
+  },
+  {
+    label: "Clinica medica",
+    description: "Modelo amplo para seguimento ambulatorial.",
+    values: {
+      title: "Prescricao de clinica medica",
+      frequency: "Conforme posologia prescrita",
+      duration: "Uso conforme orientacao",
+      notes: "Retorno ambulatorial conforme evolucao clinica."
     }
   }
 ];
@@ -272,6 +368,42 @@ const medicalCertificatePresets: FormPreset[] = [
   }
 ];
 
+const specialtyCertificatePresets: FormPreset[] = [
+  {
+    label: "Clinica medica",
+    description: "Afastamento curto com observacao clinica padronizada.",
+    values: {
+      title: "Atestado de clinica medica",
+      purpose: "Necessidade de afastamento temporario das atividades habituais",
+      restDays: "2",
+      observations:
+        "Paciente avaliado nesta data, com recomendacao de repouso e reavaliacao conforme evolucao clinica."
+    }
+  },
+  {
+    label: "Psiquiatria",
+    description: "Modelo inicial mais reservado para acompanhamento especializado.",
+    values: {
+      title: "Atestado medico",
+      purpose: "Necessidade de afastamento temporario por avaliacao psiquiatrica",
+      restDays: "7",
+      observations:
+        "Paciente em seguimento especializado, com necessidade de afastamento temporario e reavaliacao medica."
+    }
+  },
+  {
+    label: "Ortopedia",
+    description: "Texto-base para limitacao funcional temporaria.",
+    values: {
+      title: "Atestado medico ortopedico",
+      purpose: "Necessidade de afastamento temporario por limitacao funcional",
+      restDays: "5",
+      observations:
+        "Paciente apresenta limitacao funcional temporaria, devendo manter repouso relativo e seguir em acompanhamento."
+    }
+  }
+];
+
 const freeDocumentPresets: FormPreset[] = [
   {
     label: "Relatorio sucinto",
@@ -307,6 +439,36 @@ const freeDocumentPresets: FormPreset[] = [
       title: "Relatorio medico",
       body:
         "Apresento relatorio medico sucinto, contendo informacoes clinicas pertinentes, historico assistencial resumido e necessidade de seguimento conforme avaliacao realizada nesta data."
+    }
+  }
+];
+
+const legalClinicalPresets: FormPreset[] = [
+  {
+    label: "Relatorio para auditoria",
+    description: "Texto mais formal para justificativa assistencial e documental.",
+    values: {
+      title: "Relatorio medico para auditoria",
+      body:
+        "Apresento relatorio medico com sintese clinica objetiva, fundamentos assistenciais, historico resumido e justificativa tecnica para a conduta adotada, nos limites desta avaliacao."
+    }
+  },
+  {
+    label: "Declaracao de seguimento",
+    description: "Comprovacao formal de seguimento ambulatorial.",
+    values: {
+      title: "Declaracao de seguimento medico",
+      body:
+        "Declaro, para os devidos fins, que o paciente permanece em acompanhamento medico regular, com necessidade de seguimento conforme plano terapeutico em curso."
+    }
+  },
+  {
+    label: "Parecer clinico sucinto",
+    description: "Base para opiniao tecnica breve e objetiva.",
+    values: {
+      title: "Parecer clinico",
+      body:
+        "Em avaliacao clinica nesta data, emito parecer sucinto com base nos achados assistenciais disponiveis, recomendando seguimento e complementariedade conforme necessidade clinica."
     }
   }
 ];
@@ -471,6 +633,7 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
         {kind === "prescription" ? (
           <>
             <PresetButtons title="Modelos rapidos" presets={prescriptionPresets} onApply={applyPreset} />
+            <PresetButtons title="Sugestoes por especialidade" presets={specialtyPrescriptionPresets} onApply={applyPreset} />
             <label style={fieldStyle}>
               <span>Medicamento</span>
               <input
@@ -549,6 +712,7 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
         {kind === "exam-request" ? (
           <>
             <PresetButtons title="Paineis laboratoriais" presets={examPanelPresets} onApply={applyPreset} />
+            <PresetButtons title="Sugestoes por especialidade" presets={specialtyExamPresets} onApply={applyPreset} />
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ fontWeight: 600 }}>Checklist laboratorial</div>
               <div style={{ display: "grid", gap: 16 }}>
@@ -603,6 +767,7 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
         {kind === "medical-certificate" ? (
           <>
             <PresetButtons title="Textos-base" presets={medicalCertificatePresets} onApply={applyPreset} />
+            <PresetButtons title="Sugestoes por especialidade" presets={specialtyCertificatePresets} onApply={applyPreset} />
             <label style={fieldStyle}>
               <span>Finalidade</span>
               <input
@@ -637,6 +802,7 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
         {kind === "free-document" ? (
           <>
             <PresetButtons title="Modelos padronizados" presets={freeDocumentPresets} onApply={applyPreset} />
+            <PresetButtons title="Biblioteca juridico-clinica" presets={legalClinicalPresets} onApply={applyPreset} />
             <label style={fieldStyle}>
               <span>Corpo do documento</span>
               <textarea
