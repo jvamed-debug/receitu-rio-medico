@@ -9,8 +9,10 @@ import {
 
 import { AuthGuard } from "../auth/auth.guard";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
+import type { AccessPrincipal } from "../auth/auth.types";
 import { RequireRoles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
+import { ensureRecentStepUp } from "../auth/step-up.util";
 import { SignatureService } from "./signature.service";
 
 @UseGuards(AuthGuard, RolesGuard)
@@ -58,10 +60,11 @@ export class SignatureController {
   @RequireRoles("professional", "admin")
   @Post("documents/:id/sign")
   signDocument(
-    @CurrentPrincipal() principal: { professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Param("id") id: string,
     @Body() input: { provider?: string }
   ) {
+    ensureRecentStepUp(principal, "sign_document");
     return this.signatureService.signDocument({
       professionalId: principal.professionalId ?? "",
       documentId: id,

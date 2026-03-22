@@ -15,6 +15,7 @@ import { AuthGuard } from "../auth/auth.guard";
 import { RequireRoles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
 import type { AccessPrincipal } from "../auth/auth.types";
+import { ensureRecentStepUp } from "../auth/step-up.util";
 import { DeliveryService } from "../delivery/delivery.service";
 import {
   CreateExamRequestDto,
@@ -217,6 +218,7 @@ export class DocumentsController {
     @Param("id") id: string
   ) {
     await this.resourceAccessService.assertDocumentAccess(principal, id, "document_share_link");
+    ensureRecentStepUp(principal, "create_document_share_link");
     const shareLink = await this.deliveryService.createShareLink({
       documentId: id,
       professionalId: principal.professionalId ?? ""

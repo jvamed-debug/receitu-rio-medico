@@ -5,7 +5,8 @@ import {
   BiometricEnrollmentInput,
   LoginInput,
   RefreshInput,
-  RegisterInput
+  RegisterInput,
+  StepUpInput
 } from "./auth.types";
 
 @Controller()
@@ -25,6 +26,14 @@ export class AuthController {
   @Post("auth/refresh")
   refresh(@Body() input: RefreshInput) {
     return this.authService.refresh(input);
+  }
+
+  @Post("auth/step-up")
+  stepUp(
+    @Headers("authorization") authorization: string | undefined,
+    @Body() input: StepUpInput
+  ) {
+    return this.authService.stepUp(authorization, input);
   }
 
   @Post("auth/biometric/enroll")

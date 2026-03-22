@@ -5,6 +5,7 @@ export interface AuthTokenPayload {
   email: string;
   roles: string[];
   professionalId?: string;
+  stepUpUntil?: number;
   type: "access" | "refresh";
   exp: number;
 }

@@ -13,6 +13,10 @@ export interface RefreshInput {
   refreshToken: string;
 }
 
+export interface StepUpInput {
+  password: string;
+}
+
 export interface BiometricEnrollmentInput {
   platform: "ios" | "android";
   publicKey: string;
@@ -22,4 +26,5 @@ export interface AccessPrincipal {
   userId: string;
   professionalId?: string;
   roles: string[];
+  stepUpUntil?: number;
 }

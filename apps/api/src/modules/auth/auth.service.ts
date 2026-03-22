@@ -8,17 +8,20 @@ import { ProfessionalStatus, SignatureProvider, UserRole } from "@prisma/client"
 import { PrismaService } from "../../persistence/prisma.service";
 import { hashPassword, verifyPassword } from "./auth.crypto";
 import { signToken, verifyToken } from "./auth.tokens";
+import { ensureRecentStepUp } from "./step-up.util";
 import type {
   BiometricEnrollmentInput,
   LoginInput,
   RefreshInput,
-  RegisterInput
+  RegisterInput,
+  StepUpInput
 } from "./auth.types";
 
 @Injectable()
 export class AuthService {
   private readonly accessTokenTtlMs = 1000 * 60 * 60;
   private readonly refreshTokenTtlMs = 1000 * 60 * 60 * 24 * 15;
+  private readonly stepUpTtlMs = 1000 * 60 * 10;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -93,6 +96,31 @@ export class AuthService {
     return this.issueTokens(user.id, user.email, [mapRole(user.role)], user.professionalProfile?.id);
   }
 
+  async stepUp(authorization: string | undefined, input: StepUpInput) {
+    const principal = await this.getPrincipalFromAuthorization(authorization);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: principal.userId },
+      include: {
+        professionalProfile: true
+      }
+    });
+
+    if (!user || !verifyPassword(input.password, user.passwordHash)) {
+      throw new UnauthorizedException("Credenciais invalidas para elevacao de sessao");
+    }
+
+    return this.issueTokens(
+      user.id,
+      user.email,
+      [mapRole(user.role)],
+      user.professionalProfile?.id,
+      {
+        stepUpUntil: Date.now() + this.stepUpTtlMs
+      }
+    );
+  }
+
   enrollBiometric(input: BiometricEnrollmentInput) {
     return {
       enrolled: true,
@@ -120,6 +148,7 @@ export class AuthService {
       email: user.email,
       fullName: user.fullName,
       roles: principal.roles,
+      stepUpUntil: principal.stepUpUntil,
       professionalProfile: user.professionalProfile
     };
   }
@@ -129,6 +158,7 @@ export class AuthService {
     input: Record<string, unknown>
   ) {
     const principal = await this.getPrincipalFromAuthorization(authorization);
+    ensureRecentStepUp(principal, "update_professional_profile");
 
     const user = await this.prisma.user.findUnique({
       where: { id: principal.userId },
@@ -169,6 +199,7 @@ export class AuthService {
     input: Record<string, unknown>
   ) {
     const principal = await this.getPrincipalFromAuthorization(authorization);
+    ensureRecentStepUp(principal, "configure_signature_method");
 
     const user = await this.prisma.user.findUnique({
       where: { id: principal.userId },
@@ -217,7 +248,8 @@ export class AuthService {
     return {
       userId: payload.sub,
       roles: payload.roles,
-      professionalId: payload.professionalId
+      professionalId: payload.professionalId,
+      stepUpUntil: payload.stepUpUntil
     };
   }
 
@@ -225,7 +257,10 @@ export class AuthService {
     userId: string,
     email: string,
     roles: string[],
-    professionalId?: string
+    professionalId?: string,
+    options?: {
+      stepUpUntil?: number;
+    }
   ) {
     const accessToken = signToken(
       {
@@ -233,6 +268,7 @@ export class AuthService {
         email,
         roles,
         professionalId,
+        stepUpUntil: options?.stepUpUntil,
         type: "access",
         exp: Date.now() + this.accessTokenTtlMs
       },

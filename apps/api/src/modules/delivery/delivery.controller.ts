@@ -4,6 +4,7 @@ import { ResourceAccessService } from "../access/resource-access.service";
 import { AuthGuard } from "../auth/auth.guard";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
 import type { AccessPrincipal } from "../auth/auth.types";
+import { ensureRecentStepUp } from "../auth/step-up.util";
 import { DeliveryService } from "./delivery.service";
 
 @UseGuards(AuthGuard)
@@ -42,6 +43,7 @@ export class DeliveryController {
       id,
       "document_share_links_revoke"
     );
+    ensureRecentStepUp(principal, "revoke_document_share_links");
     return this.deliveryService.revokeShareLinks(id);
   }
 }

@@ -12,15 +12,17 @@ if (specFiles.length === 0) {
   process.exit(0);
 }
 
-const result = spawnSync(process.execPath, ["--test", ...specFiles], {
-  stdio: "inherit"
-});
+for (const specFile of specFiles.sort()) {
+  const result = spawnSync(process.execPath, ["--test", specFile], {
+    stdio: "inherit"
+  });
 
-if (typeof result.status === "number") {
-  process.exit(result.status);
+  if (result.status !== 0) {
+    process.exit(typeof result.status === "number" ? result.status : 1);
+  }
 }
 
-process.exit(1);
+process.exit(0);
 
 function collectSpecs(directory, output) {
   for (const entry of readdirSync(directory)) {
