@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 
 import { ResourceAccessService } from "../access/resource-access.service";
 import { AuthGuard } from "../auth/auth.guard";
@@ -30,5 +30,28 @@ export class DeliveryController {
       "document_delivery_events_read"
     );
     return this.deliveryService.listByDocument(id);
+  }
+
+  @Post("documents/:id/share-links/revoke")
+  async revokeShareLinks(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      id,
+      "document_share_links_revoke"
+    );
+    return this.deliveryService.revokeShareLinks(id);
+  }
+}
+
+@Controller("delivery/share")
+export class PublicDeliveryController {
+  constructor(private readonly deliveryService: DeliveryService) {}
+
+  @Get(":token")
+  resolveShareLink(@Param("token") token: string) {
+    return this.deliveryService.resolveShareLink(token);
   }
 }

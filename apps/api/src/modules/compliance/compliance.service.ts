@@ -22,6 +22,9 @@ type DocumentCompliancePolicy = {
   requiresActiveProfessional: boolean;
   requiresConfiguredSignature: boolean;
   blocksEditingAfterIssue: boolean;
+  externalShareAllowed: boolean;
+  shareLinkTtlHours: number;
+  shareLinkMaxUses: number;
 };
 
 const policies: Record<ClinicalDocumentType, DocumentCompliancePolicy> = {
@@ -31,7 +34,10 @@ const policies: Record<ClinicalDocumentType, DocumentCompliancePolicy> = {
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
-    blocksEditingAfterIssue: true
+    blocksEditingAfterIssue: true,
+    externalShareAllowed: true,
+    shareLinkTtlHours: 24,
+    shareLinkMaxUses: 3
   },
   "exam-request": {
     documentType: "exam-request",
@@ -39,7 +45,10 @@ const policies: Record<ClinicalDocumentType, DocumentCompliancePolicy> = {
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
-    blocksEditingAfterIssue: true
+    blocksEditingAfterIssue: true,
+    externalShareAllowed: true,
+    shareLinkTtlHours: 72,
+    shareLinkMaxUses: 5
   },
   "medical-certificate": {
     documentType: "medical-certificate",
@@ -47,7 +56,10 @@ const policies: Record<ClinicalDocumentType, DocumentCompliancePolicy> = {
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
-    blocksEditingAfterIssue: true
+    blocksEditingAfterIssue: true,
+    externalShareAllowed: true,
+    shareLinkTtlHours: 48,
+    shareLinkMaxUses: 3
   },
   "free-document": {
     documentType: "free-document",
@@ -55,7 +67,10 @@ const policies: Record<ClinicalDocumentType, DocumentCompliancePolicy> = {
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
-    blocksEditingAfterIssue: true
+    blocksEditingAfterIssue: true,
+    externalShareAllowed: false,
+    shareLinkTtlHours: 12,
+    shareLinkMaxUses: 1
   }
 };
 
@@ -222,6 +237,46 @@ export class ComplianceService {
       document,
       professional,
       provider: configuredProvider
+    };
+  }
+
+  async validateBeforeExternalShare(input: {
+    documentId: string;
+    professionalId: string;
+  }) {
+    const document = await this.prisma.clinicalDocument.findUnique({
+      where: { id: input.documentId }
+    });
+
+    if (!document) {
+      throw new NotFoundException("Documento nao encontrado");
+    }
+
+    if (document.authorProfessionalId !== input.professionalId) {
+      throw new BadRequestException("Documento nao pertence ao profissional autenticado");
+    }
+
+    const policy = this.getPolicy(prismaTypeToDomain[document.type]);
+
+    if (!policy.externalShareAllowed) {
+      throw new BadRequestException(
+        "Este tipo documental nao permite compartilhamento externo por link"
+      );
+    }
+
+    if (
+      document.status !== DocumentStatus.SIGNED &&
+      document.status !== DocumentStatus.ISSUED &&
+      document.status !== DocumentStatus.DELIVERED
+    ) {
+      throw new BadRequestException(
+        "Documento precisa estar assinado ou emitido antes do compartilhamento externo"
+      );
+    }
+
+    return {
+      document,
+      policy
     };
   }
 }

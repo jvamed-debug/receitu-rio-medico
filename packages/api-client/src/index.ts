@@ -156,6 +156,29 @@ export interface DeliveryEmailResponse {
 export interface ShareLinkResponse {
   documentId: string;
   url: string;
+  status: string;
+  expiresAt: string;
+  maxUses: number;
+}
+
+export interface SharedDocumentResponse {
+  tokenId: string;
+  purpose: string;
+  expiresAt: string;
+  remainingUses: number;
+  document: {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    issuedAt?: string | null;
+    artifact?: {
+      id: string;
+      storageKey: string;
+      sha256: string;
+      createdAt: string;
+    } | null;
+  };
 }
 
 export interface SignatureWindowResponse {
@@ -315,6 +338,13 @@ export class ApiClient {
 
   createShareLink(id: string) {
     return this.post<ShareLinkResponse>(`/documents/${id}/deliver/share-link`, {});
+  }
+
+  revokeShareLinks(id: string) {
+    return this.post<{ documentId: string; revoked: number }>(
+      `/delivery/documents/${id}/share-links/revoke`,
+      {}
+    );
   }
 
   getHistory() {

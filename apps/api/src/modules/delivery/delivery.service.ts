@@ -3,12 +3,17 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import { createHash, randomBytes } from "node:crypto";
 
 import { PrismaService } from "../../persistence/prisma.service";
+import { ComplianceService } from "../compliance/compliance.service";
 
 @Injectable()
 export class DeliveryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly complianceService: ComplianceService
+  ) {}
 
   channels() {
     return ["email", "share-link", "mobile-native-share"];
@@ -49,16 +54,34 @@ export class DeliveryService {
     };
   }
 
-  async createShareLink(input: { documentId: string }) {
-    const document = await this.prisma.clinicalDocument.findUnique({
-      where: { id: input.documentId }
+  async createShareLink(input: { documentId: string; professionalId: string }) {
+    const { document, policy } = await this.complianceService.validateBeforeExternalShare({
+      documentId: input.documentId,
+      professionalId: input.professionalId
     });
 
-    if (!document) {
-      throw new NotFoundException("Documento nao encontrado");
-    }
-
-    const shareUrl = `https://example.local/documents/${input.documentId}/share`;
+    const plainToken = randomBytes(24).toString("base64url");
+    const tokenHash = this.hashToken(plainToken);
+    const expiresAt = new Date(Date.now() + policy.shareLinkTtlHours * 60 * 60 * 1000);
+    const shareToken = await this.prisma.documentShareToken.create({
+      data: {
+        documentId: input.documentId,
+        tokenHash,
+        purpose: "document_secure_share",
+        expiresAt,
+        maxUses: policy.shareLinkMaxUses,
+        createdByUserId: document.authorProfessionalId,
+        metadata: {
+          channel: "share-link",
+          documentType: document.type,
+          policy: {
+            ttlHours: policy.shareLinkTtlHours,
+            maxUses: policy.shareLinkMaxUses
+          }
+        }
+      }
+    });
+    const shareUrl = `${this.getPublicBaseUrl()}/api/delivery/share/${plainToken}`;
     const deliveryEvent = await this.prisma.deliveryEvent.create({
       data: {
         documentId: input.documentId,
@@ -66,7 +89,10 @@ export class DeliveryService {
         target: shareUrl,
         status: "generated",
         metadata: {
-          linkType: "secure-share"
+          linkType: "secure-share",
+          shareTokenId: shareToken.id,
+          expiresAt: expiresAt.toISOString(),
+          maxUses: shareToken.maxUses
         }
       }
     });
@@ -76,7 +102,89 @@ export class DeliveryService {
       documentId: input.documentId,
       url: shareUrl,
       status: deliveryEvent.status,
+      expiresAt: expiresAt.toISOString(),
+      maxUses: shareToken.maxUses,
       createdAt: deliveryEvent.createdAt.toISOString()
+    };
+  }
+
+  async resolveShareLink(token: string) {
+    const shareToken = await this.prisma.documentShareToken.findUnique({
+      where: {
+        tokenHash: this.hashToken(token)
+      },
+      include: {
+        document: {
+          include: {
+            pdfArtifact: true
+          }
+        }
+      }
+    });
+
+    if (!shareToken) {
+      throw new NotFoundException("Link seguro nao encontrado");
+    }
+
+    if (shareToken.revokedAt) {
+      throw new BadRequestException("Link seguro revogado");
+    }
+
+    if (shareToken.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException("Link seguro expirado");
+    }
+
+    if (shareToken.usedCount >= shareToken.maxUses) {
+      throw new BadRequestException("Link seguro excedeu o limite de acessos");
+    }
+
+    await this.prisma.documentShareToken.update({
+      where: { id: shareToken.id },
+      data: {
+        usedCount: {
+          increment: 1
+        },
+        lastUsedAt: new Date()
+      }
+    });
+
+    return {
+      tokenId: shareToken.id,
+      purpose: shareToken.purpose,
+      expiresAt: shareToken.expiresAt.toISOString(),
+      remainingUses: Math.max(shareToken.maxUses - shareToken.usedCount - 1, 0),
+      document: {
+        id: shareToken.document.id,
+        title: shareToken.document.title,
+        type: shareToken.document.type,
+        status: shareToken.document.status,
+        issuedAt: shareToken.document.issuedAt?.toISOString() ?? null,
+        artifact: shareToken.document.pdfArtifact
+          ? {
+              id: shareToken.document.pdfArtifact.id,
+              storageKey: shareToken.document.pdfArtifact.storageKey,
+              sha256: shareToken.document.pdfArtifact.sha256,
+              createdAt: shareToken.document.pdfArtifact.createdAt.toISOString()
+            }
+          : null
+      }
+    };
+  }
+
+  async revokeShareLinks(documentId: string) {
+    const result = await this.prisma.documentShareToken.updateMany({
+      where: {
+        documentId,
+        revokedAt: null
+      },
+      data: {
+        revokedAt: new Date()
+      }
+    });
+
+    return {
+      documentId,
+      revoked: result.count
     };
   }
 
@@ -94,5 +202,17 @@ export class DeliveryService {
       metadata: event.metadata,
       createdAt: event.createdAt.toISOString()
     }));
+  }
+
+  private hashToken(token: string) {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  private getPublicBaseUrl() {
+    return (
+      process.env.API_PUBLIC_URL ??
+      process.env.APP_PUBLIC_URL ??
+      `http://localhost:${process.env.PORT ?? "3001"}`
+    );
   }
 }

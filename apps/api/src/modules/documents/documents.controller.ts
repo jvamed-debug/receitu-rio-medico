@@ -218,7 +218,8 @@ export class DocumentsController {
   ) {
     await this.resourceAccessService.assertDocumentAccess(principal, id, "document_share_link");
     const shareLink = await this.deliveryService.createShareLink({
-      documentId: id
+      documentId: id,
+      professionalId: principal.professionalId ?? ""
     });
     await this.auditService.log({
       actorUserId: principal.userId,

@@ -118,6 +118,7 @@ model ClinicalDocument {
   authorProfessional    ProfessionalProfile  @relation(fields: [authorProfessionalId], references: [id], onDelete: Restrict)
   signatures            SignatureSession[]
   deliveries            DeliveryEvent[]
+  shareTokens           DocumentShareToken[]
   pdfArtifact           PdfArtifact?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
@@ -180,6 +181,24 @@ model DeliveryEvent {
   metadata    Json?
   createdAt   DateTime          @default(now())
   document    ClinicalDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model DocumentShareToken {
+  id              String            @id @default(cuid())
+  documentId      String
+  tokenHash       String            @unique
+  purpose         String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  maxUses         Int               @default(1)
+  usedCount       Int               @default(0)
+  createdByUserId String?
+  lastUsedAt      DateTime?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  document        ClinicalDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, expiresAt])
 }
 
 model AuditLog {

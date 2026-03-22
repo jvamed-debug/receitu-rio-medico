@@ -8,6 +8,9 @@ export function DeliveryPanel({ documentId }: { documentId?: string }) {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareMeta, setShareMeta] = useState<{ expiresAt: string; maxUses: number } | null>(
+    null
+  );
 
   async function sendEmail() {
     if (!selectedDocumentId || !email) {
@@ -29,7 +32,11 @@ export function DeliveryPanel({ documentId }: { documentId?: string }) {
     const api = createBrowserApiClient();
     const result = await api.createShareLink(selectedDocumentId);
     setShareLink(result.url);
-    setMessage("Link seguro gerado com sucesso.");
+    setShareMeta({
+      expiresAt: result.expiresAt,
+      maxUses: result.maxUses
+    });
+    setMessage("Link seguro gerado com expiracao e limite de acessos.");
   }
 
   return (
@@ -61,9 +68,17 @@ export function DeliveryPanel({ documentId }: { documentId?: string }) {
       </div>
       {message ? <div style={{ color: "var(--primary)", fontWeight: 700 }}>{message}</div> : null}
       {shareLink ? (
-        <a href={shareLink} target="_blank" rel="noreferrer" style={{ color: "var(--primary)" }}>
-          {shareLink}
-        </a>
+        <div style={{ display: "grid", gap: 8 }}>
+          <a href={shareLink} target="_blank" rel="noreferrer" style={{ color: "var(--primary)" }}>
+            {shareLink}
+          </a>
+          {shareMeta ? (
+            <small style={{ color: "#51606f" }}>
+              Expira em {new Date(shareMeta.expiresAt).toLocaleString("pt-BR")} com ate{" "}
+              {shareMeta.maxUses} acessos.
+            </small>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );
