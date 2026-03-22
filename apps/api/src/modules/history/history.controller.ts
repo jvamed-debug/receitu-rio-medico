@@ -1,26 +1,30 @@
 import { Controller, Get, Param, UseGuards } from "@nestjs/common";
 
+import { ResourceAccessService } from "../access/resource-access.service";
 import { AuthGuard } from "../auth/auth.guard";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
+import type { AccessPrincipal } from "../auth/auth.types";
 import { HistoryService } from "./history.service";
 
 @UseGuards(AuthGuard)
 @Controller()
 export class HistoryController {
-  constructor(private readonly historyService: HistoryService) {}
+  constructor(
+    private readonly historyService: HistoryService,
+    private readonly resourceAccessService: ResourceAccessService
+  ) {}
 
   @Get("history")
-  history(
-    @CurrentPrincipal() principal: { professionalId?: string; roles?: string[] }
-  ) {
+  history(@CurrentPrincipal() principal: AccessPrincipal) {
     return this.historyService.getHistory(scopeProfessionalId(principal));
   }
 
   @Get("patients/:id/history")
-  patientHistory(
-    @CurrentPrincipal() principal: { professionalId?: string; roles?: string[] },
+  async patientHistory(
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Param("id") id: string
   ) {
+    await this.resourceAccessService.assertPatientAccess(principal, id, "patient_history_read");
     return this.historyService.getPatientHistory(id, scopeProfessionalId(principal));
   }
 }

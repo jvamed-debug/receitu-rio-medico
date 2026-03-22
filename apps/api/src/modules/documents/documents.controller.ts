@@ -9,10 +9,12 @@ import {
 } from "@nestjs/common";
 
 import { AuditService } from "../audit/audit.service";
+import { ResourceAccessService } from "../access/resource-access.service";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
 import { AuthGuard } from "../auth/auth.guard";
 import { RequireRoles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
+import type { AccessPrincipal } from "../auth/auth.types";
 import { DeliveryService } from "../delivery/delivery.service";
 import {
   CreateExamRequestDto,
@@ -28,20 +30,19 @@ export class DocumentsController {
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly auditService: AuditService,
-    private readonly deliveryService: DeliveryService
+    private readonly deliveryService: DeliveryService,
+    private readonly resourceAccessService: ResourceAccessService
   ) {}
 
   @Get()
-  list(
-    @CurrentPrincipal() principal: { professionalId?: string; roles?: string[] }
-  ) {
+  list(@CurrentPrincipal() principal: AccessPrincipal) {
     return this.documentsService.listForProfessional(scopeProfessionalId(principal));
   }
 
   @RequireRoles("professional", "admin")
   @Post("prescriptions")
   async createPrescription(
-    @CurrentPrincipal() principal: { userId: string; professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Body() input: CreatePrescriptionDto
   ) {
     ensureProfessionalPrincipal(principal);
@@ -68,7 +69,7 @@ export class DocumentsController {
   @RequireRoles("professional", "admin")
   @Post("exam-requests")
   async createExamRequest(
-    @CurrentPrincipal() principal: { userId: string; professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Body() input: CreateExamRequestDto
   ) {
     ensureProfessionalPrincipal(principal);
@@ -95,7 +96,7 @@ export class DocumentsController {
   @RequireRoles("professional", "admin")
   @Post("certificates")
   async createMedicalCertificate(
-    @CurrentPrincipal() principal: { userId: string; professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Body() input: CreateMedicalCertificateDto
   ) {
     ensureProfessionalPrincipal(principal);
@@ -122,7 +123,7 @@ export class DocumentsController {
   @RequireRoles("professional", "admin")
   @Post("free")
   async createFreeDocument(
-    @CurrentPrincipal() principal: { userId: string; professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Body() input: CreateFreeDocumentDto
   ) {
     ensureProfessionalPrincipal(principal);
@@ -147,16 +148,18 @@ export class DocumentsController {
   }
 
   @Get(":id")
-  getById(@Param("id") id: string) {
+  async getById(@CurrentPrincipal() principal: AccessPrincipal, @Param("id") id: string) {
+    await this.resourceAccessService.assertDocumentAccess(principal, id, "document_read");
     return this.documentsService.getById(id);
   }
 
   @RequireRoles("professional", "admin")
   @Post(":id/duplicate")
   async duplicate(
-    @CurrentPrincipal() principal: { userId: string; professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Param("id") id: string
   ) {
+    await this.resourceAccessService.assertDocumentAccess(principal, id, "document_duplicate");
     const duplicateDocument = await this.documentsService.duplicate(id);
     await this.auditService.log({
       actorUserId: principal.userId,
@@ -175,16 +178,18 @@ export class DocumentsController {
   }
 
   @Get(":id/pdf")
-  getPdf(@Param("id") id: string) {
+  async getPdf(@CurrentPrincipal() principal: AccessPrincipal, @Param("id") id: string) {
+    await this.resourceAccessService.assertDocumentAccess(principal, id, "document_pdf_preview");
     return this.documentsService.getPdfPreview(id);
   }
 
   @Post(":id/deliver/email")
   async deliverByEmail(
-    @CurrentPrincipal() principal: { userId: string; professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Param("id") id: string,
     @Body() input: { email: string }
   ) {
+    await this.resourceAccessService.assertDocumentAccess(principal, id, "document_deliver_email");
     const deliveryEvent = await this.deliveryService.deliverByEmail({
       documentId: id,
       email: input.email
@@ -208,9 +213,10 @@ export class DocumentsController {
 
   @Post(":id/deliver/share-link")
   async createShareLink(
-    @CurrentPrincipal() principal: { userId: string; professionalId?: string },
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Param("id") id: string
   ) {
+    await this.resourceAccessService.assertDocumentAccess(principal, id, "document_share_link");
     const shareLink = await this.deliveryService.createShareLink({
       documentId: id
     });

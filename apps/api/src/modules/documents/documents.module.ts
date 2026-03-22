@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AccessModule } from "../access/access.module";
 import { AuthModule } from "../auth/auth.module";
 import { AuditModule } from "../audit/audit.module";
 import { ComplianceModule } from "../compliance/compliance.module";
@@ -8,7 +9,7 @@ import { DocumentsController } from "./documents.controller";
 import { DocumentsService } from "./documents.service";
 
 @Module({
-  imports: [AuthModule, AuditModule, ComplianceModule, DeliveryModule],
+  imports: [AccessModule, AuthModule, AuditModule, ComplianceModule, DeliveryModule],
   controllers: [DocumentsController],
   providers: [DocumentsService],
   exports: [DocumentsService]

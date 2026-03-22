@@ -8,7 +8,7 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test dist/**/*.spec.js",
+    "test": "node ./scripts/run-node-tests.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

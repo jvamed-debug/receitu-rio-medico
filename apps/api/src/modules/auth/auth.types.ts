@@ -17,3 +17,9 @@ export interface BiometricEnrollmentInput {
   platform: "ios" | "android";
   publicKey: string;
 }
+
+export interface AccessPrincipal {
+  userId: string;
+  professionalId?: string;
+  roles: string[];
+}

@@ -77,6 +77,7 @@ model ProfessionalProfile {
   status               ProfessionalStatus @default(PENDING_VALIDATION)
   user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents            ClinicalDocument[]
+  primaryPatients      Patient[]          @relation("PrimaryProfessionalPatients")
   signatureSessions    SignatureSession[]
   auditLogs            AuditLog[]
   createdAt            DateTime           @default(now())
@@ -92,9 +93,13 @@ model Patient {
   phone      String?
   email      String?
   notes      String?
+  primaryProfessionalId String?
   documents  ClinicalDocument[]
+  primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
+
+  @@index([primaryProfessionalId])
 }
 
 model ClinicalDocument {
