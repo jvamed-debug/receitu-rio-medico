@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Req,
   UseGuards
 } from "@nestjs/common";
 
@@ -62,13 +63,23 @@ export class SignatureController {
   signDocument(
     @CurrentPrincipal() principal: AccessPrincipal,
     @Param("id") id: string,
-    @Body() input: { provider?: string }
+    @Body() input: { provider?: string },
+    @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> }
   ) {
     ensureRecentStepUp(principal, "sign_document");
     return this.signatureService.signDocument({
       professionalId: principal.professionalId ?? "",
       documentId: id,
-      provider: input.provider
+      provider: input.provider,
+      requestContext: {
+        ip: request.ip,
+        userAgent: Array.isArray(request.headers["user-agent"])
+          ? request.headers["user-agent"][0]
+          : request.headers["user-agent"],
+        origin: Array.isArray(request.headers.origin)
+          ? request.headers.origin[0]
+          : request.headers.origin
+      }
     });
   }
 

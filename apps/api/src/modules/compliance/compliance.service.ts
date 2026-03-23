@@ -17,60 +17,95 @@ type SignatureLevel = "advanced" | "qualified";
 
 type DocumentCompliancePolicy = {
   documentType: ClinicalDocumentType;
+  policyVersion: string;
   signatureLevel: SignatureLevel;
   temporaryWindowAllowed: boolean;
   requiresActiveProfessional: boolean;
   requiresConfiguredSignature: boolean;
+  requiresCouncilType: boolean;
+  requiresCouncilState: boolean;
+  requiresDocumentNumber: boolean;
+  requiresRqe: boolean;
   blocksEditingAfterIssue: boolean;
   externalShareAllowed: boolean;
   shareLinkTtlHours: number;
   shareLinkMaxUses: number;
+  titleMinLength: number;
+  retentionCategory: "clinical_record" | "medical_certificate" | "prescription";
 };
 
 const policies: Record<ClinicalDocumentType, DocumentCompliancePolicy> = {
   prescription: {
     documentType: "prescription",
+    policyVersion: "2026.03",
     signatureLevel: "qualified",
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
+    requiresCouncilType: true,
+    requiresCouncilState: true,
+    requiresDocumentNumber: true,
+    requiresRqe: false,
     blocksEditingAfterIssue: true,
     externalShareAllowed: true,
     shareLinkTtlHours: 24,
-    shareLinkMaxUses: 3
+    shareLinkMaxUses: 3,
+    titleMinLength: 3,
+    retentionCategory: "prescription"
   },
   "exam-request": {
     documentType: "exam-request",
+    policyVersion: "2026.03",
     signatureLevel: "advanced",
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
+    requiresCouncilType: true,
+    requiresCouncilState: true,
+    requiresDocumentNumber: true,
+    requiresRqe: false,
     blocksEditingAfterIssue: true,
     externalShareAllowed: true,
     shareLinkTtlHours: 72,
-    shareLinkMaxUses: 5
+    shareLinkMaxUses: 5,
+    titleMinLength: 3,
+    retentionCategory: "clinical_record"
   },
   "medical-certificate": {
     documentType: "medical-certificate",
+    policyVersion: "2026.03",
     signatureLevel: "advanced",
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
+    requiresCouncilType: true,
+    requiresCouncilState: true,
+    requiresDocumentNumber: true,
+    requiresRqe: false,
     blocksEditingAfterIssue: true,
     externalShareAllowed: true,
     shareLinkTtlHours: 48,
-    shareLinkMaxUses: 3
+    shareLinkMaxUses: 3,
+    titleMinLength: 3,
+    retentionCategory: "medical_certificate"
   },
   "free-document": {
     documentType: "free-document",
+    policyVersion: "2026.03",
     signatureLevel: "advanced",
     temporaryWindowAllowed: true,
     requiresActiveProfessional: true,
     requiresConfiguredSignature: true,
+    requiresCouncilType: true,
+    requiresCouncilState: true,
+    requiresDocumentNumber: true,
+    requiresRqe: false,
     blocksEditingAfterIssue: true,
     externalShareAllowed: false,
     shareLinkTtlHours: 12,
-    shareLinkMaxUses: 1
+    shareLinkMaxUses: 1,
+    titleMinLength: 3,
+    retentionCategory: "clinical_record"
   }
 };
 
@@ -104,8 +139,15 @@ export class ComplianceService {
       issues.push("Profissional autor obrigatorio para emissao do documento");
     }
 
-    if (!String(input.title ?? "").trim() || String(input.title ?? "").trim().length < 3) {
-      issues.push("Titulo do documento deve ter pelo menos 3 caracteres");
+    const policy = this.getPolicy(documentType);
+
+    if (
+      !String(input.title ?? "").trim() ||
+      String(input.title ?? "").trim().length < policy.titleMinLength
+    ) {
+      issues.push(
+        `Titulo do documento deve ter pelo menos ${policy.titleMinLength} caracteres`
+      );
     }
 
     switch (documentType) {
@@ -152,13 +194,13 @@ export class ComplianceService {
       throw new BadRequestException({
         message: "Documento em desconformidade com a politica minima de compliance",
         issues,
-        policy: this.getPolicy(documentType)
+        policy
       });
     }
 
     return {
       status: "ready_for_review" as const,
-      policy: this.getPolicy(documentType)
+      policy
     };
   }
 
@@ -232,6 +274,8 @@ export class ComplianceService {
       );
     }
 
+    this.validateProfessionalReadiness(professional, policy);
+
     return {
       policy,
       document,
@@ -278,5 +322,73 @@ export class ComplianceService {
       document,
       policy
     };
+  }
+
+  buildSignatureComplianceRecord(input: {
+    policy: DocumentCompliancePolicy;
+    provider: SignatureProvider;
+    professional: {
+      id: string;
+      status: ProfessionalStatus;
+      councilType: string;
+      councilState: string;
+      documentNumber: string;
+      rqe: string | null;
+      signatureValidatedAt: Date | null;
+    };
+  }) {
+    return {
+      policyVersion: input.policy.policyVersion,
+      signatureLevel: input.policy.signatureLevel,
+      retentionCategory: input.policy.retentionCategory,
+      provider: input.provider,
+      professional: {
+        id: input.professional.id,
+        status: input.professional.status,
+        councilType: input.professional.councilType,
+        councilState: input.professional.councilState,
+        documentNumber: input.professional.documentNumber,
+        rqe: input.professional.rqe ?? undefined,
+        signatureValidatedAt:
+          input.professional.signatureValidatedAt?.toISOString() ?? undefined
+      },
+      evaluatedAt: new Date().toISOString()
+    };
+  }
+
+  private validateProfessionalReadiness(
+    professional: {
+      documentNumber: string;
+      councilType: string;
+      councilState: string;
+      rqe: string | null;
+    },
+    policy: DocumentCompliancePolicy
+  ) {
+    const issues: string[] = [];
+
+    if (policy.requiresDocumentNumber && !professional.documentNumber?.trim()) {
+      issues.push("Numero profissional obrigatorio para este tipo documental");
+    }
+
+    if (policy.requiresCouncilType && !professional.councilType?.trim()) {
+      issues.push("Conselho profissional obrigatorio para este tipo documental");
+    }
+
+    if (policy.requiresCouncilState && !professional.councilState?.trim()) {
+      issues.push("UF do conselho obrigatoria para este tipo documental");
+    }
+
+    if (policy.requiresRqe && !professional.rqe?.trim()) {
+      issues.push("RQE obrigatorio para este tipo documental");
+    }
+
+    if (issues.length > 0) {
+      throw new BadRequestException({
+        message: "Perfil profissional incompleto para emissao regulada",
+        issues,
+        policy
+      });
+    }
   }
 }

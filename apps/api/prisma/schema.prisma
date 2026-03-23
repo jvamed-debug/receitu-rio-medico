@@ -212,7 +212,12 @@ model SignatureSession {
   documentId      String
   provider        SignatureProvider
   status          SignatureSessionStatus @default(PENDING)
+  signatureLevel  String?
+  policyVersion   String?
+  providerReference String?
+  evidence        Json?
   expiresAt       DateTime?
+  signedAt        DateTime?
   createdAt       DateTime               @default(now())
   professional    ProfessionalProfile    @relation(fields: [professionalId], references: [id], onDelete: Restrict)
   document        ClinicalDocument       @relation(fields: [documentId], references: [id], onDelete: Restrict)

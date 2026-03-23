@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import {
   DocumentStatus,
+  Prisma,
   SignatureProvider,
   SignatureSessionStatus
 } from "@prisma/client";
@@ -35,6 +36,9 @@ export class SignatureService {
     professionalId: string;
     documentId: string;
     provider: string;
+    signatureLevel?: "advanced" | "qualified";
+    policyVersion?: string;
+    evidence?: Record<string, unknown>;
     expiresAt?: Date;
   }) {
     const provider =
@@ -47,6 +51,9 @@ export class SignatureService {
         professionalId: input.professionalId,
         documentId: input.documentId,
         provider,
+        signatureLevel: input.signatureLevel,
+        policyVersion: input.policyVersion,
+        evidence: input.evidence as unknown as Prisma.InputJsonValue,
         status: SignatureSessionStatus.PENDING,
         expiresAt: input.expiresAt
       }
@@ -56,6 +63,8 @@ export class SignatureService {
       id: session.id,
       documentId: session.documentId,
       provider: session.provider,
+      signatureLevel: session.signatureLevel,
+      policyVersion: session.policyVersion,
       status: session.status,
       expiresAt: session.expiresAt?.toISOString() ?? null,
       createdAt: session.createdAt.toISOString()
@@ -114,22 +123,46 @@ export class SignatureService {
     professionalId: string;
     documentId: string;
     provider?: string;
+    requestContext?: {
+      ip?: string;
+      userAgent?: string;
+      origin?: string;
+    };
   }) {
     const compliance = await this.complianceService.validateBeforeSignature(input);
     const document = compliance.document;
+    const provider = compliance.provider ?? SignatureProvider.ICP_BRASIL_VENDOR;
+    const complianceRecord = this.complianceService.buildSignatureComplianceRecord({
+      policy: compliance.policy,
+      provider,
+      professional: compliance.professional
+    });
 
     const activeWindow = this.getActiveWindow(input.professionalId);
     const session = await this.createSession({
       professionalId: input.professionalId,
       documentId: input.documentId,
-      provider: compliance.provider ?? input.provider ?? "ICP_BRASIL_VENDOR",
+      provider,
+      signatureLevel: compliance.policy.signatureLevel,
+      policyVersion: compliance.policy.policyVersion,
+      evidence: {
+        ...complianceRecord,
+        requestContext: {
+          ip: input.requestContext?.ip ?? undefined,
+          userAgent: input.requestContext?.userAgent ?? undefined,
+          origin: input.requestContext?.origin ?? undefined
+        },
+        temporaryWindowUsed: activeWindow != null
+      },
       expiresAt: activeWindow ? new Date(activeWindow.validUntil) : undefined
     });
 
     await this.prisma.signatureSession.update({
       where: { id: session.id },
       data: {
-        status: SignatureSessionStatus.SIGNED
+        status: SignatureSessionStatus.SIGNED,
+        signedAt: new Date(),
+        providerReference: `sigref-${session.id}`
       }
     });
 
@@ -150,11 +183,18 @@ export class SignatureService {
       action: "document_signed",
       origin: "api.signature",
       metadata: {
-        provider: compliance.provider ?? input.provider ?? "ICP_BRASIL_VENDOR",
+        provider,
         sessionId: session.id,
         usedWindow: activeWindow != null,
         pdfArtifactId: pdfArtifact.id,
-        signatureLevel: compliance.policy.signatureLevel
+        signatureLevel: compliance.policy.signatureLevel,
+        policyVersion: compliance.policy.policyVersion,
+        retentionCategory: compliance.policy.retentionCategory,
+        requestContext: {
+          ip: input.requestContext?.ip ?? undefined,
+          userAgent: input.requestContext?.userAgent ?? undefined,
+          origin: input.requestContext?.origin ?? undefined
+        }
       }
     });
 
@@ -209,8 +249,13 @@ export class SignatureService {
     return sessions.map((session) => ({
       id: session.id,
       provider: session.provider,
+      signatureLevel: session.signatureLevel,
+      policyVersion: session.policyVersion,
       status: session.status,
+      signedAt: session.signedAt?.toISOString() ?? null,
       expiresAt: session.expiresAt?.toISOString() ?? null,
+      providerReference: session.providerReference ?? null,
+      evidence: session.evidence ?? null,
       createdAt: session.createdAt.toISOString()
     }));
   }

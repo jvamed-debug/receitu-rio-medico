@@ -366,7 +366,20 @@ export class ApiClient {
   }
 
   listDocumentSignatures(id: string) {
-    return this.get(`/documents/${id}/signatures`);
+    return this.get<
+      Array<{
+        id: string;
+        provider: string;
+        signatureLevel?: string | null;
+        policyVersion?: string | null;
+        status: string;
+        signedAt?: string | null;
+        expiresAt?: string | null;
+        providerReference?: string | null;
+        evidence?: Record<string, unknown> | null;
+        createdAt: string;
+      }>
+    >(`/documents/${id}/signatures`);
   }
 
   deliverDocumentByEmail(id: string, email: string) {
