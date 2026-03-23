@@ -21,4 +21,4 @@ apps/mobile/.flutter-plugins
 apps/mobile/.flutter-plugins-dependencies
 infra/docker/data/
 tmp/
-
+*.tsbuildinfo
