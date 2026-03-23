@@ -173,29 +173,35 @@ test("gera analytics por periodo e profissional", async () => {
         {
           id: "apt-1",
           professionalId: "prof-1",
+          organizationId: "org-1",
           status: "COMPLETED",
           telehealth: true,
           appointmentAt: new Date("2026-03-20T10:00:00.000Z"),
           billingEntries: [{ status: "PAID", amountCents: 10000 }],
-          professional: { user: { fullName: "Dra. Ana" } }
+          professional: { user: { fullName: "Dra. Ana" } },
+          organization: { id: "org-1", name: "Clinica Azul" }
         },
         {
           id: "apt-2",
           professionalId: "prof-1",
+          organizationId: "org-1",
           status: "NO_SHOW",
           telehealth: false,
           appointmentAt: new Date("2026-03-20T14:00:00.000Z"),
           billingEntries: [{ status: "PENDING", amountCents: 5000 }],
-          professional: { user: { fullName: "Dra. Ana" } }
+          professional: { user: { fullName: "Dra. Ana" } },
+          organization: { id: "org-1", name: "Clinica Azul" }
         },
         {
           id: "apt-3",
           professionalId: "prof-2",
+          organizationId: "org-2",
           status: "CONFIRMED",
           telehealth: false,
           appointmentAt: new Date("2026-03-21T09:00:00.000Z"),
           billingEntries: [],
-          professional: { user: { fullName: "Dr. Bruno" } }
+          professional: { user: { fullName: "Dr. Bruno" } },
+          organization: { id: "org-2", name: "Clinica Verde" }
         }
       ]
     }
@@ -220,6 +226,10 @@ test("gera analytics por periodo e profissional", async () => {
   assert.equal(result.periods.length, 2);
   assert.equal(result.professionals[0]?.professionalName, "Dra. Ana");
   assert.equal(result.professionals[0]?.paidCents, 10000);
+  assert.equal(result.organizations[0]?.organizationName, "Clinica Azul");
+  assert.equal(result.organizations[0]?.total, 2);
+  assert.equal(result.cohorts[0]?.cohort, "2026-03");
+  assert.equal(result.cohorts[0]?.paidCents, 10000);
   assert.equal(result.funnel.scheduledToConfirmedRate, 33.3);
   assert.equal(result.funnel.confirmedToCompletedRate, 100);
   assert.equal(result.funnel.completedToPaidRate, 100);

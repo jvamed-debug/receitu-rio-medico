@@ -316,29 +316,44 @@ test("consolida analytics documentais por tipo e status", async () => {
     {
       clinicalDocument: {
         findMany: async () => [
-          {
-            id: "doc-1",
-            type: DocumentType.PRESCRIPTION,
-            status: DocumentStatus.DELIVERED,
-            createdAt: new Date("2026-03-20T10:00:00.000Z"),
-            issuedAt: new Date("2026-03-20T11:00:00.000Z")
-          },
-          {
-            id: "doc-2",
-            type: DocumentType.EXAM_REQUEST,
-            status: DocumentStatus.ISSUED,
-            createdAt: new Date("2026-03-20T12:00:00.000Z"),
-            issuedAt: new Date("2026-03-20T13:00:00.000Z")
-          },
-          {
-            id: "doc-3",
-            type: DocumentType.FREE_DOCUMENT,
-            status: DocumentStatus.DRAFT,
-            createdAt: new Date("2026-03-21T09:00:00.000Z"),
-            issuedAt: null
-          }
-        ]
-      }
+                {
+                    id: "doc-1",
+                    organizationId: "org-1",
+                    type: DocumentType.PRESCRIPTION,
+                    status: DocumentStatus.DELIVERED,
+                    createdAt: new Date("2026-03-20T10:00:00.000Z"),
+                    issuedAt: new Date("2026-03-20T11:00:00.000Z"),
+                    organization: {
+                      id: "org-1",
+                      name: "Clinica Azul"
+                    }
+                },
+                {
+                    id: "doc-2",
+                    organizationId: "org-1",
+                    type: DocumentType.EXAM_REQUEST,
+                    status: DocumentStatus.ISSUED,
+                    createdAt: new Date("2026-03-20T12:00:00.000Z"),
+                    issuedAt: new Date("2026-03-20T13:00:00.000Z"),
+                    organization: {
+                      id: "org-1",
+                      name: "Clinica Azul"
+                    }
+                },
+                {
+                    id: "doc-3",
+                    organizationId: "org-2",
+                    type: DocumentType.FREE_DOCUMENT,
+                    status: DocumentStatus.DRAFT,
+                    createdAt: new Date("2026-03-21T09:00:00.000Z"),
+                    issuedAt: null,
+                    organization: {
+                      id: "org-2",
+                      name: "Clinica Verde"
+                    }
+                }
+            ]
+        }
     } as never,
     {} as never,
     {} as never
@@ -359,4 +374,8 @@ test("consolida analytics documentais por tipo e status", async () => {
   assert.equal(analytics.byType.length, 3);
   assert.equal(analytics.byStatus[0]?.total, 1);
   assert.equal(analytics.recentDays.length, 2);
+  assert.equal(analytics.organizations[0]?.organizationName, "Clinica Azul");
+  assert.equal(analytics.organizations[0]?.issued, 2);
+  assert.equal(analytics.cohorts[0]?.cohort, "2026-03");
+  assert.equal(analytics.cohorts[0]?.delivered, 1);
 });

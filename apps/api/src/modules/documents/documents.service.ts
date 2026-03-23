@@ -200,6 +200,14 @@ export class DocumentsService {
           ...(input.dateTo ? { lte: new Date(input.dateTo) } : {})
         }
       },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
       orderBy: {
         createdAt: "asc"
       }
@@ -208,6 +216,27 @@ export class DocumentsService {
     const byType = new Map<string, { total: number; signed: number; issued: number; delivered: number }>();
     const byStatus = new Map<string, { status: string; total: number }>();
     const recentDays = new Map<string, { created: number; issued: number; delivered: number }>();
+    const organizationMap = new Map<
+      string,
+      {
+        organizationId?: string;
+        organizationName?: string;
+        total: number;
+        signed: number;
+        issued: number;
+        delivered: number;
+      }
+    >();
+    const cohortMap = new Map<
+      string,
+      {
+        cohort: string;
+        total: number;
+        signed: number;
+        issued: number;
+        delivered: number;
+      }
+    >();
 
     const summary = documents.reduce(
       (acc, document) => {
@@ -245,6 +274,35 @@ export class DocumentsService {
         }
         recentDays.set(dayKey, dayBucket);
 
+        const organizationKey = document.organizationId ?? "unassigned";
+        const organizationBucket = organizationMap.get(organizationKey) ?? {
+          organizationId: document.organizationId ?? undefined,
+          organizationName: document.organization?.name ?? "Sem organizacao",
+          total: 0,
+          signed: 0,
+          issued: 0,
+          delivered: 0
+        };
+        organizationBucket.total += 1;
+        if (hasReachedSignedStage(document)) organizationBucket.signed += 1;
+        if (hasReachedIssuedStage(document)) organizationBucket.issued += 1;
+        if (document.status === DocumentStatus.DELIVERED) organizationBucket.delivered += 1;
+        organizationMap.set(organizationKey, organizationBucket);
+
+        const cohortKey = document.createdAt.toISOString().slice(0, 7);
+        const cohortBucket = cohortMap.get(cohortKey) ?? {
+          cohort: cohortKey,
+          total: 0,
+          signed: 0,
+          issued: 0,
+          delivered: 0
+        };
+        cohortBucket.total += 1;
+        if (hasReachedSignedStage(document)) cohortBucket.signed += 1;
+        if (hasReachedIssuedStage(document)) cohortBucket.issued += 1;
+        if (document.status === DocumentStatus.DELIVERED) cohortBucket.delivered += 1;
+        cohortMap.set(cohortKey, cohortBucket);
+
         return acc;
       },
       {
@@ -277,6 +335,21 @@ export class DocumentsService {
           created: number;
           issued: number;
           delivered: number;
+        }>,
+        organizations: [] as Array<{
+          organizationId?: string;
+          organizationName?: string;
+          total: number;
+          signed: number;
+          issued: number;
+          delivered: number;
+        }>,
+        cohorts: [] as Array<{
+          cohort: string;
+          total: number;
+          signed: number;
+          issued: number;
+          delivered: number;
         }>
       }
     );
@@ -290,6 +363,12 @@ export class DocumentsService {
       day,
       ...values
     }));
+    summary.organizations = [...organizationMap.values()].sort(
+      (left, right) => right.total - left.total
+    );
+    summary.cohorts = [...cohortMap.values()].sort((left, right) =>
+      left.cohort.localeCompare(right.cohort)
+    );
     summary.funnel = {
       createdToSignedRate: toRate(summary.signed, summary.total),
       signedToIssuedRate: toRate(summary.issued, summary.signed),
@@ -513,6 +592,11 @@ function toRate(numerator: number, denominator: number) {
 }
 
 function hasReachedSignedStage(document: {
+  organizationId?: string | null;
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
   status: DocumentStatus;
   issuedAt: Date | null;
 }) {
@@ -525,6 +609,11 @@ function hasReachedSignedStage(document: {
 }
 
 function hasReachedIssuedStage(document: {
+  organizationId?: string | null;
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
   status: DocumentStatus;
   issuedAt: Date | null;
 }) {

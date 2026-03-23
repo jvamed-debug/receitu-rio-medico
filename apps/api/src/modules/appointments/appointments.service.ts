@@ -106,6 +106,12 @@ export class AppointmentsService {
     const appointments = await this.prisma.appointment.findMany({
       where: buildAppointmentScope(principal, filters),
       include: {
+        organization: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
         professional: {
           select: {
             user: {
@@ -140,6 +146,26 @@ export class AppointmentsService {
         total: number;
         completed: number;
         noShow: number;
+        paidCents: number;
+      }
+    >();
+    const organizationMap = new Map<
+      string,
+      {
+        organizationId?: string;
+        organizationName?: string;
+        total: number;
+        completed: number;
+        noShow: number;
+        paidCents: number;
+      }
+    >();
+    const cohortMap = new Map<
+      string,
+      {
+        cohort: string;
+        total: number;
+        completed: number;
         paidCents: number;
       }
     >();
@@ -180,6 +206,29 @@ export class AppointmentsService {
         if (appointment.status === "COMPLETED") professionalBucket.completed += 1;
         if (appointment.status === "NO_SHOW") professionalBucket.noShow += 1;
 
+        const organizationKey = appointment.organizationId ?? "unassigned";
+        const organizationBucket = organizationMap.get(organizationKey) ?? {
+          organizationId: appointment.organizationId ?? undefined,
+          organizationName: appointment.organization?.name ?? "Sem organizacao",
+          total: 0,
+          completed: 0,
+          noShow: 0,
+          paidCents: 0
+        };
+        organizationBucket.total += 1;
+        if (appointment.status === "COMPLETED") organizationBucket.completed += 1;
+        if (appointment.status === "NO_SHOW") organizationBucket.noShow += 1;
+
+        const cohortKey = appointment.appointmentAt.toISOString().slice(0, 7);
+        const cohortBucket = cohortMap.get(cohortKey) ?? {
+          cohort: cohortKey,
+          total: 0,
+          completed: 0,
+          paidCents: 0
+        };
+        cohortBucket.total += 1;
+        if (appointment.status === "COMPLETED") cohortBucket.completed += 1;
+
         const appointmentPaid = appointment.billingEntries.some(
           (billing) => billing.status === "PAID"
         );
@@ -195,11 +244,15 @@ export class AppointmentsService {
             acc.billingPaidCents += billing.amountCents;
             periodBucket.paidCents += billing.amountCents;
             professionalBucket.paidCents += billing.amountCents;
+            organizationBucket.paidCents += billing.amountCents;
+            cohortBucket.paidCents += billing.amountCents;
           }
         }
 
         periodMap.set(periodKey, periodBucket);
         professionalMap.set(appointment.professionalId, professionalBucket);
+        organizationMap.set(organizationKey, organizationBucket);
+        cohortMap.set(cohortKey, cohortBucket);
 
         return acc;
       },
@@ -223,7 +276,9 @@ export class AppointmentsService {
           completedToPaidRate: 0
         },
         periods: [],
-        professionals: []
+        professionals: [],
+        organizations: [],
+        cohorts: []
       }
     );
 
@@ -233,6 +288,12 @@ export class AppointmentsService {
     }));
     summary.professionals = [...professionalMap.values()].sort(
       (left, right) => right.total - left.total
+    );
+    summary.organizations = [...organizationMap.values()].sort(
+      (left, right) => right.total - left.total
+    );
+    summary.cohorts = [...cohortMap.values()].sort((left, right) =>
+      left.cohort.localeCompare(right.cohort)
     );
     summary.funnel = {
       scheduledToConfirmedRate: toRate(summary.confirmed, summary.scheduled || summary.total),
@@ -450,6 +511,10 @@ function mapAppointmentRecord(appointment: {
   patient?: {
     fullName: string;
   };
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
   billingEntries?: Array<{
     id: string;
     appointmentId: string;

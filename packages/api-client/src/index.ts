@@ -198,6 +198,21 @@ export interface ClinicalDocumentAnalyticsSnapshot {
     issued: number;
     delivered: number;
   }>;
+  organizations: Array<{
+    organizationId?: string;
+    organizationName?: string;
+    total: number;
+    signed: number;
+    issued: number;
+    delivered: number;
+  }>;
+  cohorts: Array<{
+    cohort: string;
+    total: number;
+    signed: number;
+    issued: number;
+    delivered: number;
+  }>;
 }
 
 export interface PrescriptionItemInput {

@@ -28,6 +28,7 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 5. blindar leitura por recurso e conter IDOR interno
 - 19. agenda clinica inicial
 - 24. multitenancy institucional basico
+- 23. analytics clinico-operacional baseline
 
 ### Em progresso forte
 
@@ -47,15 +48,14 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 20. financeiro
 - 21. comunicacao
 - 22. integracao farmaceutica
-- 23. analytics
 - 25. observabilidade
 - 26. filas, eventos e operacao segura
 
 ### Proximos da fila
 
-- 23. fechar analytics clinico-operacional por tenant e cohort
 - 10. fechar versionamento e contratos documentais mais rigidos
 - 12. aprofundar evolucao clinica longitudinal
+- 18. ampliar graduacao institucional do CDS
 
 ## Checklist dos 26 passos
 
@@ -483,7 +483,7 @@ Observacao:
 
 ### 23. Analytics
 
-Status: em progresso avancado
+Status: concluido no baseline analitico atual
 
 Ja entregue:
 
@@ -503,11 +503,14 @@ Ja entregue:
   - criado para assinado
   - assinado para emitido
   - emitido para entregue
+- comparativo por organizacao em agenda e documentos
+- coortes mensais em agenda e documentos
 
 Falta para fechar:
 
-- visao por tenant e comparativo entre organizacoes
-- cohort e tendencia longitudinal
+- comparativos historicos entre janelas
+- cohort assistencial mais sofisticada por paciente e desfecho
+- exportacao para BI externo e consultas analiticas mais pesadas
 
 ### 24. Multitenancy
 
@@ -588,15 +591,15 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 23: fechar analytics clinico-operacional por tenant e cohort
-2. passo 10: fechar versionamento e contratos documentais mais rigidos
-3. passo 12: aprofundar evolucao clinica longitudinal
+1. passo 10: fechar versionamento e contratos documentais mais rigidos
+2. passo 12: aprofundar evolucao clinica longitudinal
+3. passo 18: ampliar graduacao institucional do CDS
 
 ### Bloco seguinte
 
-4. aprofundar passo 18 com fonte clinica homologada e graduacao mais fina
-5. ampliar analytics documentais e assistenciais por coorte e desfecho
-6. endurecer o restante do lifecycle institucional com aceite e expiracao automatica
+4. ampliar analytics documentais e assistenciais por coorte e desfecho
+5. endurecer o restante do lifecycle institucional com aceite e expiracao automatica
+6. aprofundar observabilidade e exportacao analitica
 
 ### Bloco posterior
 

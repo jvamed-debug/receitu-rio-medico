@@ -224,7 +224,7 @@ export default async function DashboardPage() {
               style={{
                 display: "grid",
                 gap: 18,
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)"
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))"
               }}
             >
               <div style={{ display: "grid", gap: 10 }}>
@@ -255,6 +255,35 @@ export default async function DashboardPage() {
                 )}
               </div>
               <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Por organizacao</h3>
+                {documentAnalytics.organizations.length > 0 ? (
+                  documentAnalytics.organizations.map((entry) => (
+                    <article
+                      key={entry.organizationId ?? entry.organizationName ?? "sem-org"}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {entry.organizationName ?? "Sem organizacao"}
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {entry.total} criados | {entry.issued} emitidos | {entry.delivered} entregues
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Ainda nao ha comparativo documental por organizacao.
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
                 <h3 style={{ margin: 0 }}>Serie recente</h3>
                 {documentAnalytics.recentDays.length > 0 ? (
                   documentAnalytics.recentDays.map((entry) => (
@@ -280,6 +309,33 @@ export default async function DashboardPage() {
                 ) : (
                   <div style={{ color: "var(--muted)" }}>
                     Sem serie documental consolidada no periodo.
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Coortes mensais</h3>
+                {documentAnalytics.cohorts.length > 0 ? (
+                  documentAnalytics.cohorts.map((entry) => (
+                    <article
+                      key={entry.cohort}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{formatCohort(entry.cohort)}</div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {entry.total} criados | {entry.issued} emitidos | {entry.delivered} entregues
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Sem coorte documental consolidada.
                   </div>
                 )}
               </div>
@@ -365,7 +421,7 @@ export default async function DashboardPage() {
               style={{
                 display: "grid",
                 gap: 18,
-                gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)"
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))"
               }}
             >
               <div style={{ display: "grid", gap: 10 }}>
@@ -405,6 +461,43 @@ export default async function DashboardPage() {
                 )}
               </div>
               <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Por organizacao</h3>
+                {analytics.organizations.length > 0 ? (
+                  analytics.organizations.map((organization) => (
+                    <article
+                      key={organization.organizationId ?? organization.organizationName ?? "sem-org"}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {organization.organizationName ?? "Sem organizacao"}
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {organization.total} consultas | {organization.completed} concluidas |{" "}
+                        {organization.noShow} faltas
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        Receita:{" "}
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL"
+                        }).format(organization.paidCents / 100)}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Nenhum tenant com dados no periodo.
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
                 <h3 style={{ margin: 0 }}>Profissionais</h3>
                 {analytics.professionals.length > 0 ? (
                   analytics.professionals.map((professional) => (
@@ -438,6 +531,40 @@ export default async function DashboardPage() {
                 ) : (
                   <div style={{ color: "var(--muted)" }}>
                     Nenhum profissional com eventos no periodo.
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Coortes mensais</h3>
+                {analytics.cohorts.length > 0 ? (
+                  analytics.cohorts.map((cohort) => (
+                    <article
+                      key={cohort.cohort}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{formatCohort(cohort.cohort)}</div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {cohort.total} consultas | {cohort.completed} concluidas
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        Receita:{" "}
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL"
+                        }).format(cohort.paidCents / 100)}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Sem coorte operacional consolidada.
                   </div>
                 )}
               </div>
@@ -645,6 +772,18 @@ export default async function DashboardPage() {
       </section>
     </Shell>
   );
+}
+
+function formatCohort(value: string) {
+  const [year, month] = value.split("-");
+  if (!year || !month) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(`${year}-${month}-01T12:00:00Z`));
 }
 
 function FinanceCard({

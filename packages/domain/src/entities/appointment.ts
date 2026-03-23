@@ -100,6 +100,22 @@ export interface AppointmentAnalyticsProfessionalSummary {
   paidCents: number;
 }
 
+export interface AppointmentAnalyticsOrganizationSummary {
+  organizationId?: string;
+  organizationName?: string;
+  total: number;
+  completed: number;
+  noShow: number;
+  paidCents: number;
+}
+
+export interface AppointmentAnalyticsCohortSummary {
+  cohort: string;
+  total: number;
+  completed: number;
+  paidCents: number;
+}
+
 export interface AppointmentAnalyticsSnapshot {
   range: {
     dateFrom?: string;
@@ -121,6 +137,8 @@ export interface AppointmentAnalyticsSnapshot {
   };
   periods: AppointmentAnalyticsPeriodPoint[];
   professionals: AppointmentAnalyticsProfessionalSummary[];
+  organizations: AppointmentAnalyticsOrganizationSummary[];
+  cohorts: AppointmentAnalyticsCohortSummary[];
 }
 
 export interface AppointmentBillingWebhookEventSummary {
