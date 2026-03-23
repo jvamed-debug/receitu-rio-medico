@@ -21,3 +21,18 @@ export interface Appointment {
   updatedAt: string;
   patientName?: string;
 }
+
+export type AppointmentReminderStatus = "pending" | "sent" | "failed" | "cancelled";
+
+export interface AppointmentReminder {
+  id: string;
+  appointmentId: string;
+  channel: "email" | "sms" | "whatsapp";
+  status: AppointmentReminderStatus;
+  target?: string;
+  scheduledFor: string;
+  sentAt?: string;
+  message: string;
+  createdAt: string;
+  updatedAt: string;
+}

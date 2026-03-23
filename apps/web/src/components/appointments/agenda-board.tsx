@@ -1,6 +1,11 @@
 "use client";
 
-import { ApiClient, type Appointment, type PatientSummary } from "@receituario/api-client";
+import {
+  ApiClient,
+  type Appointment,
+  type AppointmentReminder,
+  type PatientSummary
+} from "@receituario/api-client";
 import { useState } from "react";
 
 import { getBrowserApiBaseUrl } from "../../lib/browser-api";
@@ -22,12 +27,19 @@ export function AgendaBoard({
   patients: PatientSummary[];
 }) {
   const [appointments, setAppointments] = useState(initialAppointments);
+  const [remindersByAppointment, setRemindersByAppointment] = useState<
+    Record<string, AppointmentReminder[]>
+  >({});
   const [patientId, setPatientId] = useState(patients[0]?.id ?? "");
   const [title, setTitle] = useState("Consulta ambulatorial");
   const [appointmentAt, setAppointmentAt] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [notes, setNotes] = useState("");
   const [telehealth, setTelehealth] = useState(false);
+  const [reminderChannel, setReminderChannel] = useState<"email" | "sms" | "whatsapp">(
+    "whatsapp"
+  );
+  const [reminderDateTime, setReminderDateTime] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -78,6 +90,65 @@ export function AgendaBoard({
         error instanceof Error
           ? error.message
           : "Falha ao atualizar status da consulta."
+      );
+    }
+  }
+
+  async function loadReminders(appointmentId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const reminders = await api.listAppointmentReminders(appointmentId);
+      setRemindersByAppointment((current) => ({
+        ...current,
+        [appointmentId]: reminders
+      }));
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Falha ao carregar lembretes da consulta."
+      );
+    }
+  }
+
+  async function createReminder(appointmentId: string) {
+    if (!reminderDateTime) {
+      setMessage("Informe data e hora do lembrete.");
+      return;
+    }
+
+    try {
+      const api = createBrowserApiClient();
+      const reminder = await api.createAppointmentReminder(appointmentId, {
+        channel: reminderChannel,
+        scheduledFor: new Date(reminderDateTime).toISOString()
+      });
+      setRemindersByAppointment((current) => ({
+        ...current,
+        [appointmentId]: [...(current[appointmentId] ?? []), reminder]
+      }));
+      setMessage("Lembrete agendado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao agendar lembrete."
+      );
+    }
+  }
+
+  async function sendReminder(appointmentId: string, reminderId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const sent = await api.sendAppointmentReminder(appointmentId, reminderId);
+      setRemindersByAppointment((current) => ({
+        ...current,
+        [appointmentId]: (current[appointmentId] ?? []).map((item) =>
+          item.id === reminderId ? sent : item
+        )
+      }));
+      setMessage("Lembrete enviado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao enviar lembrete."
       );
     }
   }
@@ -161,6 +232,55 @@ export function AgendaBoard({
                 {appointment.notes ? (
                   <div style={{ marginTop: 10, color: "var(--muted)" }}>{appointment.notes}</div>
                 ) : null}
+                <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <button type="button" style={secondaryButtonStyle} onClick={() => loadReminders(appointment.id)}>
+                      Ver lembretes
+                    </button>
+                    <select
+                      value={reminderChannel}
+                      onChange={(event) =>
+                        setReminderChannel(event.target.value as "email" | "sms" | "whatsapp")
+                      }
+                      style={inputStyle}
+                    >
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="sms">SMS</option>
+                      <option value="email">E-mail</option>
+                    </select>
+                    <input
+                      type="datetime-local"
+                      value={reminderDateTime}
+                      onChange={(event) => setReminderDateTime(event.target.value)}
+                      style={inputStyle}
+                    />
+                    <button type="button" style={secondaryButtonStyle} onClick={() => createReminder(appointment.id)}>
+                      Agendar lembrete
+                    </button>
+                  </div>
+                  {(remindersByAppointment[appointment.id] ?? []).length > 0 ? (
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {(remindersByAppointment[appointment.id] ?? []).map((reminder) => (
+                        <div key={reminder.id} style={reminderRowStyle}>
+                          <div>
+                            <strong>{reminder.channel}</strong> | {reminder.status} |{" "}
+                            {new Date(reminder.scheduledFor).toLocaleString("pt-BR")}
+                          </div>
+                          <div style={{ color: "var(--muted)" }}>{reminder.target ?? "sem destino"}</div>
+                          {reminder.status === "pending" ? (
+                            <button
+                              type="button"
+                              style={secondaryButtonStyle}
+                              onClick={() => sendReminder(appointment.id, reminder.id)}
+                            >
+                              Enviar agora
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </article>
             ))
           ) : (
@@ -228,9 +348,24 @@ const buttonStyle = {
   cursor: "pointer"
 };
 
+const secondaryButtonStyle = {
+  ...buttonStyle,
+  background: "#dbeaf9",
+  color: "#0d3b72"
+};
+
 const cardStyle = {
   borderRadius: 16,
   border: "1px solid #d4e1ef",
   padding: 18,
   background: "#f8fbff"
+};
+
+const reminderRowStyle = {
+  borderRadius: 12,
+  border: "1px solid #d4e1ef",
+  padding: 12,
+  display: "grid",
+  gap: 6,
+  background: "white"
 };

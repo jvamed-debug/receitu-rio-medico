@@ -1,5 +1,9 @@
-import type { Appointment, ClinicalDocument } from "@receituario/domain";
-export type { Appointment } from "@receituario/domain";
+import type {
+  Appointment,
+  AppointmentReminder,
+  ClinicalDocument
+} from "@receituario/domain";
+export type { Appointment, AppointmentReminder } from "@receituario/domain";
 import type {
   AuthTokens,
   LoginRequest,
@@ -344,6 +348,25 @@ export class ApiClient {
     }
   ) {
     return this.patch<Appointment>(`/appointments/${id}/status`, input);
+  }
+
+  listAppointmentReminders(id: string) {
+    return this.get<AppointmentReminder[]>(`/appointments/${id}/reminders`);
+  }
+
+  createAppointmentReminder(
+    id: string,
+    input: {
+      channel: "email" | "sms" | "whatsapp";
+      scheduledFor: string;
+      message?: string;
+    }
+  ) {
+    return this.post<AppointmentReminder>(`/appointments/${id}/reminders`, input);
+  }
+
+  sendAppointmentReminder(id: string, reminderId: string) {
+    return this.post<AppointmentReminder>(`/appointments/${id}/reminders/${reminderId}/send`, {});
   }
 
   getPatient(id: string) {
