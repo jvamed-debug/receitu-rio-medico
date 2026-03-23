@@ -265,12 +265,16 @@ Ja entregue:
 - endpoint publico de callback para provider
 - sincronizacao manual de sessao remota por status
 - endpoint protegido para reconciliar sessao pendente
+- readiness operacional do provider
+- verificacao de callback com modo HMAC opcional
+- sincronizacao em lote de sessoes pendentes
 
 Falta para fechar:
 
 - provider real
 - credenciais e contratos de homologacao
 - homologacao ponta a ponta com retorno assinado do provider
+- healthcheck e troubleshooting alinhados ao provider homologado
 
 ### 14. Criar trilha probatoria
 

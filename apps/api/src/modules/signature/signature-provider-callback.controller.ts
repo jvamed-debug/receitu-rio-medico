@@ -5,20 +5,22 @@ import {
   Post,
   UnauthorizedException
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 
+import { SignatureProviderGateway } from "./signature-provider.gateway";
 import { SignatureService } from "./signature.service";
 
 @Controller("signature/providers")
 export class SignatureProviderCallbackController {
   constructor(
     private readonly signatureService: SignatureService,
-    private readonly configService: ConfigService
+    private readonly signatureProviderGateway: SignatureProviderGateway
   ) {}
 
   @Post("callback")
   receiveCallback(
     @Headers("x-signature-callback-secret") secret: string | undefined,
+    @Headers("x-signature-callback-timestamp") timestamp: string | undefined,
+    @Headers("x-signature-callback-signature") signature: string | undefined,
     @Body()
     input: {
       sessionId: string;
@@ -28,11 +30,14 @@ export class SignatureProviderCallbackController {
       evidence?: Record<string, unknown>;
     }
   ) {
-    const expectedSecret =
-      this.configService.get<string>("SIGNATURE_PROVIDER_CALLBACK_SECRET") ??
-      "receituario-signature-callback";
+    const callbackAuthorized = this.signatureProviderGateway.verifyCallback({
+      secret,
+      timestamp,
+      signature,
+      payload: input
+    });
 
-    if (!secret || secret !== expectedSecret) {
+    if (!callbackAuthorized) {
       throw new UnauthorizedException("Callback de assinatura nao autorizado");
     }
 

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 
 import { SignatureProvider } from "@prisma/client";
 
@@ -128,4 +129,85 @@ test("gateway remoto normaliza status de assinatura", async () => {
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test("gateway readiness remoto reporta configuracao e health", async () => {
+  const originalFetch = global.fetch;
+
+  global.fetch = (async () => {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: "healthy"
+      })
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const gateway = new SignatureProviderGateway({
+      get: (key: string) => {
+        switch (key) {
+          case "SIGNATURE_PROVIDER_MODE":
+            return "remote";
+          case "SIGNATURE_PROVIDER_BASE_URL":
+            return "https://signature.vendor.example";
+          case "SIGNATURE_PROVIDER_API_KEY":
+            return "secret";
+          case "SIGNATURE_PROVIDER_CALLBACK_HMAC_SECRET":
+            return "hmac-secret";
+          case "API_PUBLIC_URL":
+            return "https://api.receituario.app";
+          default:
+            return undefined;
+        }
+      }
+    } as never);
+
+    const result = await gateway.getReadiness({
+      provider: SignatureProvider.ICP_BRASIL_VENDOR
+    });
+
+    assert.equal(result.configured, true);
+    assert.equal(result.connectivity.status, "ok");
+    assert.equal(result.callbackVerificationMode, "hmac");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("gateway verifyCallback aceita hmac valido", async () => {
+  const gateway = new SignatureProviderGateway({
+    get: (key: string) => {
+      switch (key) {
+        case "SIGNATURE_PROVIDER_CALLBACK_HMAC_SECRET":
+          return "hmac-secret";
+        case "SIGNATURE_PROVIDER_CALLBACK_MAX_AGE_SECONDS":
+          return "300";
+        default:
+          return undefined;
+      }
+    }
+  } as never);
+
+  const payload = {
+    sessionId: "sig-1",
+    status: "signed",
+    externalReference: "ref-1"
+  };
+  const timestamp = String(Date.now());
+  const content =
+    `${timestamp}.{"externalReference":"ref-1","sessionId":"sig-1","status":"signed"}`;
+  const signature = createHmac("sha256", "hmac-secret")
+    .update(content)
+    .digest("hex");
+
+  assert.equal(
+    gateway.verifyCallback({
+      timestamp,
+      signature,
+      payload
+    }),
+    true
+  );
 });

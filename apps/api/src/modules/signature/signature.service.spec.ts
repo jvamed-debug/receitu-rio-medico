@@ -324,3 +324,52 @@ test("syncSessionStatus finaliza sessao quando provider remoto retorna signed", 
   assert.equal(result.status, DocumentStatus.ISSUED);
   assert.equal(updatedDocument, true);
 });
+
+test("syncPendingSessions processa sessoes pendentes com limite", async () => {
+  const service = createService(
+    {
+      signatureSession: {
+        findMany: async () => [
+          {
+            id: "sig-pending-1",
+            documentId: "doc-1",
+            professionalId: "prof-1",
+            provider: SignatureProvider.ICP_BRASIL_VENDOR,
+            policyVersion: "2026.03",
+            signatureLevel: "qualified",
+            providerReference: "remote-sig-1",
+            evidence: {},
+            status: SignatureSessionStatus.PENDING,
+            signedAt: null
+          }
+        ],
+        findUnique: async () => ({
+          id: "sig-pending-1",
+          documentId: "doc-1",
+          professionalId: "prof-1",
+          provider: SignatureProvider.ICP_BRASIL_VENDOR,
+          policyVersion: "2026.03",
+          signatureLevel: "qualified",
+          providerReference: "remote-sig-1",
+          evidence: {},
+          status: SignatureSessionStatus.PENDING,
+          signedAt: null
+        })
+      }
+    },
+    undefined,
+    {
+      getStatus: async () => ({
+        status: "pending",
+        externalReference: "remote-sig-1",
+        providerStatus: "processing",
+        evidence: { providerMode: "remote" }
+      })
+    }
+  );
+
+  const result = await service.syncPendingSessions({ limit: 1 });
+
+  assert.equal(result.processed, 1);
+  assert.equal(result.results[0]?.status, "pending");
+});

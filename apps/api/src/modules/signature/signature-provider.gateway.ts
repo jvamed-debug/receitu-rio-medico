@@ -4,10 +4,12 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SignatureProvider } from "@prisma/client";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type {
   SignatureProviderExecutionInput,
   SignatureProviderExecutionResult,
+  SignatureProviderReadinessResult,
   SignatureProviderStatusResult
 } from "./signature-provider.port";
 
@@ -45,6 +47,157 @@ export class SignatureProviderGateway {
           "Provider de assinatura nao suportado"
         );
     }
+  }
+
+  async getReadiness(input: {
+    provider: SignatureProvider;
+  }): Promise<SignatureProviderReadinessResult> {
+    const mode = this.getProviderMode();
+    const checkedAt = new Date().toISOString();
+    const baseUrl = this.configService.get<string>("SIGNATURE_PROVIDER_BASE_URL");
+    const apiKey = this.configService.get<string>("SIGNATURE_PROVIDER_API_KEY");
+    const callbackSecret = this.configService.get<string>(
+      "SIGNATURE_PROVIDER_CALLBACK_SECRET"
+    );
+    const callbackHmacSecret = this.configService.get<string>(
+      "SIGNATURE_PROVIDER_CALLBACK_HMAC_SECRET"
+    );
+    const callbackBaseUrl = this.configService.get<string>("API_PUBLIC_URL");
+    const issues: string[] = [];
+
+    if (!callbackBaseUrl) {
+      issues.push("API_PUBLIC_URL nao configurada para callback publico");
+    }
+
+    if (mode === "mock") {
+      return {
+        mode,
+        provider: input.provider,
+        checkedAt,
+        configured: true,
+        callbackVerificationMode: callbackHmacSecret ? "hmac" : "shared-secret",
+        capabilities: {
+          createSignature: true,
+          statusLookup: true,
+          callbackSupport: true,
+          hmacVerification: Boolean(callbackHmacSecret)
+        },
+        connectivity: {
+          status: "mock"
+        },
+        issues,
+        metadata: {
+          providerMode: "mock"
+        }
+      };
+    }
+
+    if (!baseUrl || !apiKey) {
+      issues.push("SIGNATURE_PROVIDER_BASE_URL ou SIGNATURE_PROVIDER_API_KEY ausentes");
+    }
+
+    if (!callbackSecret && !callbackHmacSecret) {
+      issues.push("Nenhum mecanismo de verificacao de callback configurado");
+    }
+
+    if (issues.length > 0) {
+      return {
+        mode,
+        provider: input.provider,
+        checkedAt,
+        configured: false,
+        callbackVerificationMode: callbackHmacSecret ? "hmac" : "shared-secret",
+        capabilities: {
+          createSignature: false,
+          statusLookup: false,
+          callbackSupport: Boolean(callbackBaseUrl),
+          hmacVerification: Boolean(callbackHmacSecret)
+        },
+        connectivity: {
+          status: "unavailable"
+        },
+        issues,
+        metadata: {
+          providerMode: "remote"
+        }
+      };
+    }
+
+    const healthResult = await this.checkRemoteHealth(baseUrl!, apiKey!);
+
+    if (healthResult.status !== "ok") {
+      issues.push(
+        healthResult.status === "degraded"
+          ? "Provider de assinatura retornou estado degradado"
+          : "Provider de assinatura indisponivel para homologacao"
+      );
+    }
+
+    return {
+      mode,
+      provider: input.provider,
+      checkedAt,
+      configured: true,
+      callbackVerificationMode: callbackHmacSecret ? "hmac" : "shared-secret",
+      capabilities: {
+        createSignature: true,
+        statusLookup: true,
+        callbackSupport: true,
+        hmacVerification: Boolean(callbackHmacSecret)
+      },
+      connectivity: {
+        status: healthResult.status,
+        httpStatus: healthResult.httpStatus
+      },
+      issues,
+      metadata: {
+        providerMode: "remote",
+        providerHealth: healthResult.providerHealth ?? null
+      }
+    };
+  }
+
+  verifyCallback(input: {
+    secret?: string;
+    timestamp?: string;
+    signature?: string;
+    payload: Record<string, unknown>;
+  }) {
+    const expectedSecret =
+      this.configService.get<string>("SIGNATURE_PROVIDER_CALLBACK_SECRET") ??
+      "receituario-signature-callback";
+    const callbackHmacSecret = this.configService.get<string>(
+      "SIGNATURE_PROVIDER_CALLBACK_HMAC_SECRET"
+    );
+    const maxAgeSeconds = Number(
+      this.configService.get<string>("SIGNATURE_PROVIDER_CALLBACK_MAX_AGE_SECONDS") ??
+        "300"
+    );
+
+    if (callbackHmacSecret) {
+      if (!input.timestamp || !input.signature) {
+        return false;
+      }
+
+      const timestampMs = Number(input.timestamp);
+
+      if (!Number.isFinite(timestampMs)) {
+        return false;
+      }
+
+      if (Math.abs(Date.now() - timestampMs) > maxAgeSeconds * 1000) {
+        return false;
+      }
+
+      const content = `${input.timestamp}.${stableStringify(input.payload)}`;
+      const expectedSignature = createHmac("sha256", callbackHmacSecret)
+        .update(content)
+        .digest("hex");
+
+      return safeCompare(expectedSignature, input.signature);
+    }
+
+    return Boolean(input.secret && input.secret === expectedSecret);
   }
 
   private async signWithIcpBrasilVendor(
@@ -274,7 +427,52 @@ export class SignatureProviderGateway {
   private getProviderMode() {
     return (
       this.configService.get<string>("SIGNATURE_PROVIDER_MODE") ?? "mock"
-    ).toLowerCase();
+    ).toLowerCase() as "mock" | "remote";
+  }
+
+  private async checkRemoteHealth(baseUrl: string, apiKey: string) {
+    const timeoutMs = Number(
+      this.configService.get<string>("SIGNATURE_PROVIDER_TIMEOUT_MS") ?? "10000"
+    );
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/health`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${apiKey}`
+        },
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        return {
+          status: response.status >= 500 ? "unavailable" : "degraded",
+          httpStatus: response.status
+        } as const;
+      }
+
+      const payload = (await response.json()) as {
+        status?: string;
+        health?: string;
+      };
+      const providerHealth = (payload.health ?? payload.status ?? "ok").toLowerCase();
+
+      return {
+        status: ["ok", "healthy", "ready"].includes(providerHealth)
+          ? "ok"
+          : "degraded",
+        httpStatus: response.status,
+        providerHealth
+      } as const;
+    } catch {
+      return {
+        status: "unavailable"
+      } as const;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }
 
@@ -314,4 +512,33 @@ function normalizeRemoteProviderStatus(
     providerStatus: normalizedStatus,
     evidence: payload.evidence ?? {}
   };
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+
+  return `{${entries
+    .map(([key, nestedValue]) => `${JSON.stringify(key)}:${stableStringify(nestedValue)}`)
+    .join(",")}}`;
+}
+
+function safeCompare(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(leftBuffer, rightBuffer);
 }

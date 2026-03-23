@@ -30,3 +30,23 @@ export type SignatureProviderStatusResult = {
   providerStatus?: string;
   evidence: Record<string, unknown>;
 };
+
+export type SignatureProviderReadinessResult = {
+  mode: "mock" | "remote";
+  provider: SignatureProvider;
+  checkedAt: string;
+  configured: boolean;
+  callbackVerificationMode: "shared-secret" | "hmac";
+  capabilities: {
+    createSignature: boolean;
+    statusLookup: boolean;
+    callbackSupport: boolean;
+    hmacVerification: boolean;
+  };
+  connectivity: {
+    status: "mock" | "ok" | "degraded" | "unavailable";
+    httpStatus?: number;
+  };
+  issues: string[];
+  metadata: Record<string, unknown>;
+};

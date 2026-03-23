@@ -419,6 +419,32 @@ export class SignatureService {
     };
   }
 
+  async syncPendingSessions(input: {
+    limit?: number;
+  }) {
+    const sessions = await this.prisma.signatureSession.findMany({
+      where: {
+        status: SignatureSessionStatus.PENDING
+      },
+      orderBy: {
+        createdAt: "asc"
+      },
+      take: Math.min(Math.max(input.limit ?? 20, 1), 100)
+    });
+
+    const results = [];
+
+    for (const session of sessions) {
+      const result = await this.syncSessionStatus({ sessionId: session.id });
+      results.push(result);
+    }
+
+    return {
+      processed: results.length,
+      results
+    };
+  }
+
   async ensurePdfArtifact(documentId: string) {
     const existingArtifact = await this.prisma.pdfArtifact.findUnique({
       where: { documentId }

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Query,
   Param,
   Post,
   Req,
@@ -15,6 +16,8 @@ import { RequireRoles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
 import { ensureRecentStepUp } from "../auth/step-up.util";
 import { ResourceAccessService } from "../access/resource-access.service";
+import { SignatureProvider } from "@prisma/client";
+import { SignatureProviderGateway } from "./signature-provider.gateway";
 import { SignatureService } from "./signature.service";
 
 @UseGuards(AuthGuard, RolesGuard)
@@ -22,7 +25,8 @@ import { SignatureService } from "./signature.service";
 export class SignatureController {
   constructor(
     private readonly signatureService: SignatureService,
-    private readonly resourceAccessService: ResourceAccessService
+    private readonly resourceAccessService: ResourceAccessService,
+    private readonly signatureProviderGateway: SignatureProviderGateway
   ) {}
 
   @RequireRoles("professional", "admin")
@@ -123,5 +127,24 @@ export class SignatureController {
       "signature_session_sync"
     );
     return this.signatureService.syncSessionStatus({ sessionId: id });
+  }
+
+  @RequireRoles("admin", "compliance")
+  @Get("signature/provider/readiness")
+  getProviderReadiness(@Query("provider") provider?: string) {
+    return this.signatureProviderGateway.getReadiness({
+      provider:
+        provider === "GOVBR_VENDOR"
+          ? SignatureProvider.GOVBR_VENDOR
+          : SignatureProvider.ICP_BRASIL_VENDOR
+    });
+  }
+
+  @RequireRoles("admin", "compliance")
+  @Post("signature/sessions/sync-pending")
+  syncPendingSessions(@Body() input: { limit?: number }) {
+    return this.signatureService.syncPendingSessions({
+      limit: input.limit
+    });
   }
 }
