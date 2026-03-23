@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
 import { AuditModule } from "./modules/audit/audit.module";
@@ -11,6 +11,8 @@ import { HealthModule } from "./modules/health/health.module";
 import { HistoryModule } from "./modules/history/history.module";
 import { PatientsModule } from "./modules/patients/patients.module";
 import { ProfessionalsModule } from "./modules/professionals/professionals.module";
+import { ObservabilityModule } from "./modules/observability/observability.module";
+import { RequestContextMiddleware } from "./modules/observability/request-context.middleware";
 import { SignatureModule } from "./modules/signature/signature.module";
 import { TemplatesModule } from "./modules/templates/templates.module";
 import { PersistenceModule } from "./persistence/persistence.module";
@@ -23,6 +25,7 @@ import { PersistenceModule } from "./persistence/persistence.module";
     PersistenceModule,
     HealthModule,
     AuthModule,
+    ObservabilityModule,
     ProfessionalsModule,
     PatientsModule,
     ComplianceModule,
@@ -35,4 +38,8 @@ import { PersistenceModule } from "./persistence/persistence.module";
     BrandingModule
   ]
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestContextMiddleware).forRoutes("*");
+  }
+}

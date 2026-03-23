@@ -2,10 +2,14 @@ import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 
 import { PrismaService } from "../../persistence/prisma.service";
+import { RequestContextService } from "../observability/request-context.service";
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly requestContextService: RequestContextService
+  ) {}
 
   async log(input: {
     actorUserId?: string;
@@ -24,7 +28,10 @@ export class AuditService {
         entityType: input.entityType,
         entityId: input.entityId,
         action: input.action,
-        correlationId: input.correlationId ?? `corr-${Date.now()}`,
+        correlationId:
+          input.correlationId ??
+          this.requestContextService.getCorrelationId() ??
+          `corr-${Date.now()}`,
         origin: input.origin,
         metadata: input.metadata ?? {}
       }
