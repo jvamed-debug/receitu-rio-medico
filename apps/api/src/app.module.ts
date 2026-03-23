@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
 import { AuditModule } from "./modules/audit/audit.module";
+import { AppointmentsModule } from "./modules/appointments/appointments.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BrandingModule } from "./modules/branding/branding.module";
 import { ComplianceModule } from "./modules/compliance/compliance.module";
@@ -26,6 +27,7 @@ import { PersistenceModule } from "./persistence/persistence.module";
     HealthModule,
     AuthModule,
     ObservabilityModule,
+    AppointmentsModule,
     ProfessionalsModule,
     PatientsModule,
     ComplianceModule,

@@ -1,4 +1,5 @@
-import type { ClinicalDocument } from "@receituario/domain";
+import type { Appointment, ClinicalDocument } from "@receituario/domain";
+export type { Appointment } from "@receituario/domain";
 import type {
   AuthTokens,
   LoginRequest,
@@ -121,6 +122,15 @@ export interface CreateTemplateInput {
   name: string;
   type: "prescription" | "exam-request" | "medical-certificate" | "free-document";
   structure?: Record<string, unknown>;
+}
+
+export interface CreateAppointmentInput {
+  patientId: string;
+  title: string;
+  appointmentAt: string;
+  durationMinutes?: number;
+  notes?: string;
+  telehealth?: boolean;
 }
 
 export interface HealthStatus {
@@ -316,6 +326,24 @@ export class ApiClient {
 
   listPatients() {
     return this.get<PatientSummary[]>("/patients");
+  }
+
+  listAppointments() {
+    return this.get<Appointment[]>("/appointments");
+  }
+
+  createAppointment(input: CreateAppointmentInput) {
+    return this.post<Appointment>("/appointments", input);
+  }
+
+  updateAppointmentStatus(
+    id: string,
+    input: {
+      status: Appointment["status"];
+      notes?: string;
+    }
+  ) {
+    return this.patch<Appointment>(`/appointments/${id}/status`, input);
   }
 
   getPatient(id: string) {

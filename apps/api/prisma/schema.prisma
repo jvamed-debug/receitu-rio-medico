@@ -50,6 +50,15 @@ enum SignatureSessionStatus {
   FAILED
 }
 
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
 model User {
   id                 String               @id @default(cuid())
   email              String               @unique
@@ -80,6 +89,7 @@ model ProfessionalProfile {
   primaryOrganization  Organization?      @relation("PrimaryOrganizationProfiles", fields: [primaryOrganizationId], references: [id], onDelete: SetNull)
   memberships          OrganizationMembership[]
   documents            ClinicalDocument[]
+  appointments         Appointment[]
   primaryPatients      Patient[]          @relation("PrimaryProfessionalPatients")
   reviewedClinicalProfiles PatientClinicalProfile[]
   signatureSessions    SignatureSession[]
@@ -96,6 +106,7 @@ model Organization {
   primaryProfiles    ProfessionalProfile[]    @relation("PrimaryOrganizationProfiles")
   patients           Patient[]
   documents          ClinicalDocument[]
+  appointments       Appointment[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 }
@@ -127,6 +138,7 @@ model Patient {
   primaryProfessionalId String?
   clinicalProfile PatientClinicalProfile?
   documents  ClinicalDocument[]
+  appointments Appointment[]
   organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
   createdAt  DateTime           @default(now())
@@ -134,6 +146,28 @@ model Patient {
 
   @@index([primaryProfessionalId])
   @@index([organizationId])
+}
+
+model Appointment {
+  id                    String               @id @default(cuid())
+  organizationId        String?
+  patientId             String
+  professionalId        String
+  title                 String
+  status                AppointmentStatus    @default(SCHEDULED)
+  appointmentAt         DateTime
+  durationMinutes       Int                  @default(30)
+  notes                 String?
+  telehealth            Boolean              @default(false)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  organization          Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  patient               Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional          ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, appointmentAt])
+  @@index([professionalId, appointmentAt])
+  @@index([patientId, appointmentAt])
 }
 
 model PatientClinicalProfile {

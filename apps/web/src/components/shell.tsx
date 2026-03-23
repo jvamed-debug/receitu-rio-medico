@@ -4,6 +4,7 @@ import { LogoutButton } from "./auth/logout-button";
 
 const navItems = [
   ["Dashboard", "/dashboard"],
+  ["Agenda", "/agenda"],
   ["Onboarding", "/onboarding"],
   ["Assinatura", "/signature-validation"],
   ["Novo documento", "/documents/new"],
