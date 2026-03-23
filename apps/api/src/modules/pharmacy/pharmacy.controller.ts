@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from "@nestjs/common";
 
 import { ResourceAccessService } from "../access/resource-access.service";
 import { AuthGuard } from "../auth/auth.guard";
@@ -17,27 +17,37 @@ export class PharmacyController {
   @Post("prescriptions/:documentId/quote")
   async quotePrescription(
     @CurrentPrincipal() principal: AccessPrincipal,
-    @Param("documentId") documentId: string
+    @Param("documentId") documentId: string,
+    @Body()
+    input: {
+      routeStrategy?: "best-value" | "lowest-price" | "fastest";
+      preferredPartnerKey?: string;
+    }
   ) {
     await this.resourceAccessService.assertDocumentAccess(
       principal,
       documentId,
       "prescription_quote"
     );
-    return this.pharmacyService.quotePrescription(documentId);
+    return this.pharmacyService.quotePrescriptionWithRouting(documentId, input ?? {});
   }
 
   @Post("prescriptions/:documentId/orders")
   async createPrescriptionOrder(
     @CurrentPrincipal() principal: AccessPrincipal,
-    @Param("documentId") documentId: string
+    @Param("documentId") documentId: string,
+    @Body()
+    input: {
+      routeStrategy?: "best-value" | "lowest-price" | "fastest";
+      preferredPartnerKey?: string;
+    }
   ) {
     await this.resourceAccessService.assertDocumentAccess(
       principal,
       documentId,
       "prescription_order_create"
     );
-    return this.pharmacyService.createOrderForPrescription(documentId);
+    return this.pharmacyService.createOrderForPrescription(documentId, input ?? {});
   }
 
   @Post("orders/:orderId/sync")
@@ -66,5 +76,17 @@ export class PharmacyController {
       "prescription_order_read"
     );
     return this.pharmacyService.getOrder(orderId);
+  }
+
+  @Post("orders/sync-pending")
+  async syncPendingOrders(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Body() input: { limit?: number }
+  ) {
+    if (!principal.roles.includes("admin") && !principal.roles.includes("compliance")) {
+      throw new ForbiddenException("Sincronizacao pendente restrita a perfis operacionais");
+    }
+
+    return this.pharmacyService.syncPendingOrders(input ?? {});
   }
 }

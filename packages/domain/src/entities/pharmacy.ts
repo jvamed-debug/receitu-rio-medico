@@ -10,10 +10,25 @@ export interface PharmacyQuoteLine {
   leadTimeDays?: number;
 }
 
+export interface PharmacyPartnerOffer {
+  partnerKey: string;
+  partnerName: string;
+  checkoutUrl?: string;
+  partnerOrderUrl?: string;
+  totalPriceCents: number;
+  currency: string;
+  availableItems: number;
+  unavailableItems: number;
+  leadTimeDays?: number;
+  warnings: string[];
+}
+
 export interface PharmacyQuote {
   provider: string;
   providerMode?: "mock" | "remote";
   quoteId: string;
+  selectedPartnerKey?: string;
+  routeStrategy?: "best-value" | "lowest-price" | "fastest";
   checkoutUrl?: string;
   partnerOrderUrl?: string;
   totalPriceCents: number;
@@ -21,6 +36,7 @@ export interface PharmacyQuote {
   unavailableItems: number;
   availableItems: number;
   warnings: string[];
+  alternatives?: PharmacyPartnerOffer[];
   sourceReference?: string;
   items: PharmacyQuoteLine[];
   createdAt: string;
@@ -40,7 +56,9 @@ export interface PharmacyOrder {
   documentId: string;
   provider: string;
   providerMode?: "mock" | "remote";
+  partnerKey?: string;
   quoteId: string;
+  routeStrategy?: "best-value" | "lowest-price" | "fastest";
   status: PharmacyOrderStatus;
   externalReference?: string;
   checkoutUrl?: string;

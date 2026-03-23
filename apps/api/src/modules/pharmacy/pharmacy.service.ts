@@ -15,6 +15,16 @@ export class PharmacyService {
   ) {}
 
   async quotePrescription(documentId: string): Promise<PharmacyQuote> {
+    return this.quotePrescriptionWithRouting(documentId, {});
+  }
+
+  async quotePrescriptionWithRouting(
+    documentId: string,
+    input: {
+      routeStrategy?: "best-value" | "lowest-price" | "fastest";
+      preferredPartnerKey?: string;
+    }
+  ): Promise<PharmacyQuote> {
     const document = await this.documentsService.getById(documentId);
 
     if (document.type !== "prescription") {
@@ -23,6 +33,8 @@ export class PharmacyService {
 
     const quote = await this.pharmacyProviderGateway.quotePrescription({
       documentId,
+      routeStrategy: input.routeStrategy,
+      preferredPartnerKey: input.preferredPartnerKey,
       items: document.items.map((item: PrescriptionDocument["items"][number]) => ({
         medicationName: item.medicationName,
         quantity: item.quantity
@@ -35,11 +47,19 @@ export class PharmacyService {
     };
   }
 
-  async createOrderForPrescription(documentId: string): Promise<PharmacyOrder> {
-    const quote = await this.quotePrescription(documentId);
+  async createOrderForPrescription(
+    documentId: string,
+    input: {
+      routeStrategy?: "best-value" | "lowest-price" | "fastest";
+      preferredPartnerKey?: string;
+    } = {}
+  ): Promise<PharmacyOrder> {
+    const quote = await this.quotePrescriptionWithRouting(documentId, input);
     const order = await this.pharmacyProviderGateway.createOrderFromQuote({
       documentId,
-      quote
+      quote,
+      routeStrategy: input.routeStrategy,
+      preferredPartnerKey: input.preferredPartnerKey
     });
 
     const created = await this.prisma.pharmacyOrder.create({
@@ -47,6 +67,11 @@ export class PharmacyService {
         documentId,
         provider: order.provider,
         providerMode: order.providerMode,
+        metadata: {
+          ...(order.metadata ?? {}),
+          partnerKey: order.partnerKey ?? quote.selectedPartnerKey ?? null,
+          routeStrategy: order.routeStrategy ?? quote.routeStrategy ?? null
+        } as never,
         quoteId: order.quoteId,
         status: toPrismaOrderStatus(order.status),
         externalReference: order.externalReference,
@@ -55,8 +80,7 @@ export class PharmacyService {
         totalPriceCents: order.totalPriceCents,
         currency: order.currency,
         items: order.items as never,
-        warnings: order.warnings as never,
-        metadata: (order.metadata ?? {}) as never
+        warnings: order.warnings as never
       }
     });
 
@@ -123,6 +147,35 @@ export class PharmacyService {
 
     return toDomainOrder(updated);
   }
+
+  async syncPendingOrders(input: { limit?: number }) {
+    const orders = await this.prisma.pharmacyOrder.findMany({
+      where: {
+        status: {
+          in: [
+            PharmacyOrderStatus.PENDING,
+            PharmacyOrderStatus.CHECKOUT_READY,
+            PharmacyOrderStatus.ORDER_PLACED
+          ]
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      },
+      take: Math.min(Math.max(input.limit ?? 20, 1), 100)
+    });
+
+    const results: PharmacyOrder[] = [];
+
+    for (const order of orders) {
+      results.push(await this.syncOrder(order.id));
+    }
+
+    return {
+      processed: results.length,
+      results
+    };
+  }
 }
 
 function normalizeWarnings(quote: PharmacyQuote) {
@@ -184,7 +237,19 @@ function toDomainOrder(order: {
       order.providerMode === "mock" || order.providerMode === "remote"
         ? order.providerMode
         : undefined,
+    partnerKey:
+      order.metadata &&
+      typeof order.metadata === "object" &&
+      typeof (order.metadata as Record<string, unknown>).partnerKey === "string"
+        ? ((order.metadata as Record<string, unknown>).partnerKey as string)
+        : undefined,
     quoteId: order.quoteId,
+    routeStrategy:
+      order.metadata &&
+      typeof order.metadata === "object" &&
+      typeof (order.metadata as Record<string, unknown>).routeStrategy === "string"
+        ? ((order.metadata as Record<string, unknown>).routeStrategy as PharmacyOrder["routeStrategy"])
+        : undefined,
     status: order.status.toLowerCase() as PharmacyOrder["status"],
     externalReference: order.externalReference ?? undefined,
     checkoutUrl: order.checkoutUrl ?? undefined,

@@ -604,8 +604,24 @@ export class ApiClient {
     return this.post<PharmacyQuote>(`/pharmacy/prescriptions/${documentId}/quote`, {});
   }
 
-  createPrescriptionOrder(documentId: string) {
-    return this.post<PharmacyOrder>(`/pharmacy/prescriptions/${documentId}/orders`, {});
+  createPrescriptionQuoteWithRouting(
+    documentId: string,
+    input: {
+      routeStrategy?: "best-value" | "lowest-price" | "fastest";
+      preferredPartnerKey?: string;
+    }
+  ) {
+    return this.post<PharmacyQuote>(`/pharmacy/prescriptions/${documentId}/quote`, input);
+  }
+
+  createPrescriptionOrder(
+    documentId: string,
+    input?: {
+      routeStrategy?: "best-value" | "lowest-price" | "fastest";
+      preferredPartnerKey?: string;
+    }
+  ) {
+    return this.post<PharmacyOrder>(`/pharmacy/prescriptions/${documentId}/orders`, input ?? {});
   }
 
   getPharmacyOrder(orderId: string) {
@@ -614,6 +630,13 @@ export class ApiClient {
 
   syncPharmacyOrder(orderId: string) {
     return this.post<PharmacyOrder>(`/pharmacy/orders/${orderId}/sync`, {});
+  }
+
+  syncPendingPharmacyOrders(input?: { limit?: number }) {
+    return this.post<{ processed: number; results: PharmacyOrder[] }>(
+      "/pharmacy/orders/sync-pending",
+      input ?? {}
+    );
   }
 
   listPendingCdsOverrideReviews() {

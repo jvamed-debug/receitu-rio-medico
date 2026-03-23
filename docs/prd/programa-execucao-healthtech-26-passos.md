@@ -438,12 +438,14 @@ Ja entregue:
 - criacao de pedido farmaceutico a partir da prescricao
 - persistencia e leitura de pedido farmaceutico
 - sincronizacao de status do pedido
+- roteamento por parceiro e estrategia de selecao
+- ofertas alternativas na cotacao
+- sincronizacao em lote de pedidos pendentes
 
 Falta para fechar:
 
 - provider real
-- roteamento para rede/farmacia
-- disponibilidade e status de pedido
+- disponibilidade e status de pedido com parceiro homologado
 - pedidos e conciliacao de status por parceiro
 
 ### 23. Analytics
