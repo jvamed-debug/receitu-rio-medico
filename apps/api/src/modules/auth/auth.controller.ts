@@ -61,4 +61,12 @@ export class AuthController {
   ) {
     return this.authService.createSignatureMethod(authorization, input);
   }
+
+  @Post("me/organization/switch")
+  switchOrganization(
+    @Headers("authorization") authorization: string | undefined,
+    @Body() input: { organizationId: string }
+  ) {
+    return this.authService.switchOrganization(authorization, input.organizationId);
+  }
 }

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { createHash } from "node:crypto";
-import { CdsOverrideReviewStatus, DocumentType, Prisma } from "@prisma/client";
+import { CdsOverrideReviewStatus, DocumentStatus, DocumentType, Prisma } from "@prisma/client";
 import type {
   ClinicalDocument,
   ClinicalDocumentType,
@@ -181,6 +181,112 @@ export class DocumentsService {
     });
 
     return documents.map(toDomainDocument);
+  }
+
+  async analytics(input: {
+    authorProfessionalId?: string;
+    organizationId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    const documents = await this.prisma.clinicalDocument.findMany({
+      where: {
+        ...(input.authorProfessionalId ? { authorProfessionalId: input.authorProfessionalId } : {}),
+        ...(input.organizationId
+          ? { OR: [{ organizationId: input.organizationId }, { organizationId: null }] }
+          : {}),
+        createdAt: {
+          ...(input.dateFrom ? { gte: new Date(input.dateFrom) } : {}),
+          ...(input.dateTo ? { lte: new Date(input.dateTo) } : {})
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    const byType = new Map<string, { total: number; signed: number; issued: number; delivered: number }>();
+    const byStatus = new Map<string, { status: string; total: number }>();
+    const recentDays = new Map<string, { created: number; issued: number; delivered: number }>();
+
+    const summary = documents.reduce(
+      (acc, document) => {
+        acc.total += 1;
+        if (document.status === DocumentStatus.SIGNED) acc.signed += 1;
+        if (document.status === DocumentStatus.ISSUED) acc.issued += 1;
+        if (document.status === DocumentStatus.DELIVERED) acc.delivered += 1;
+
+        const typeKey = document.type.toLowerCase();
+        const typeBucket = byType.get(typeKey) ?? {
+          total: 0,
+          signed: 0,
+          issued: 0,
+          delivered: 0
+        };
+        typeBucket.total += 1;
+        if (document.status === DocumentStatus.SIGNED) typeBucket.signed += 1;
+        if (document.status === DocumentStatus.ISSUED) typeBucket.issued += 1;
+        if (document.status === DocumentStatus.DELIVERED) typeBucket.delivered += 1;
+        byType.set(typeKey, typeBucket);
+
+        const statusKey = document.status.toLowerCase();
+        const statusBucket = byStatus.get(statusKey) ?? { status: statusKey, total: 0 };
+        statusBucket.total += 1;
+        byStatus.set(statusKey, statusBucket);
+
+        const dayKey = document.createdAt.toISOString().slice(0, 10);
+        const dayBucket = recentDays.get(dayKey) ?? { created: 0, issued: 0, delivered: 0 };
+        dayBucket.created += 1;
+        if (document.issuedAt) {
+          dayBucket.issued += 1;
+        }
+        if (document.status === DocumentStatus.DELIVERED) {
+          dayBucket.delivered += 1;
+        }
+        recentDays.set(dayKey, dayBucket);
+
+        return acc;
+      },
+      {
+        range: {
+          dateFrom: input.dateFrom,
+          dateTo: input.dateTo
+        },
+        total: 0,
+        signed: 0,
+        issued: 0,
+        delivered: 0,
+        byType: [] as Array<{
+          type: string;
+          total: number;
+          signed: number;
+          issued: number;
+          delivered: number;
+        }>,
+        byStatus: [] as Array<{
+          status: string;
+          total: number;
+        }>,
+        recentDays: [] as Array<{
+          day: string;
+          created: number;
+          issued: number;
+          delivered: number;
+        }>
+      }
+    );
+
+    summary.byType = [...byType.entries()].map(([type, values]) => ({
+      type,
+      ...values
+    }));
+    summary.byStatus = [...byStatus.values()].sort((left, right) => right.total - left.total);
+    summary.recentDays = [...recentDays.entries()].map(([day, values]) => ({
+      day,
+      ...values
+    }));
+
+    return summary;
   }
 
   private async createDocument(

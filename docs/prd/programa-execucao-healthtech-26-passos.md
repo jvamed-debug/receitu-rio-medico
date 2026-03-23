@@ -494,6 +494,7 @@ Ja entregue:
 - visao por profissional
 - serie diaria de consultas e receita
 - snapshots operacionais de assinatura, pagamentos, lembretes e farmacia
+- analytics documental por tipo, status e serie recente no dashboard
 
 Falta para fechar:
 
@@ -513,12 +514,16 @@ Ja entregue:
 - `organizationId` em pacientes, documentos e appointments
 - scoping por organizacao na agenda e no core
 - governanca clinica inicial por tenant e papel no CDS
+- governanca institucional basica na UI
+- listagem de organizacoes do profissional
+- memberships da organizacao ativa
+- troca de organizacao ativa com renovacao de token
 
 Falta para fechar:
 
 - governanca completa por tenant
 - politicas institucionais mais fortes
-- administracao de memberships pela UI
+- lifecycle mais rico de memberships e convites
 
 ## Trilha 7: Escala e governanca
 
@@ -566,8 +571,8 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 23: analytics clinico-operacional mais forte
-2. passo 24: governanca institucional na UI
+1. passo 24: governanca institucional na UI
+2. passo 23: fechar analytics clinico-operacional por tenant e cohort
 3. passo 10: fechar versionamento e contratos documentais mais rigidos
 
 ### Bloco seguinte

@@ -304,6 +304,70 @@ export class AuthService {
     };
   }
 
+  async switchOrganization(authorization: string | undefined, organizationId: string) {
+    const principal = await this.getPrincipalFromAuthorization(authorization);
+
+    if (!principal.professionalId) {
+      throw new UnauthorizedException("Perfil profissional nao vinculado a sessao");
+    }
+
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        organizationId,
+        professionalId: principal.professionalId
+      },
+      include: {
+        professional: {
+          include: {
+            user: true
+          }
+        }
+      }
+    });
+
+    if (!membership) {
+      throw new UnauthorizedException("Organizacao nao vinculada a sessao atual");
+    }
+
+    await this.prisma.professionalProfile.update({
+      where: { id: principal.professionalId },
+      data: {
+        primaryOrganizationId: organizationId
+      }
+    });
+
+    await this.prisma.organizationMembership.updateMany({
+      where: {
+        professionalId: principal.professionalId
+      },
+      data: {
+        isDefault: false
+      }
+    });
+
+    await this.prisma.organizationMembership.update({
+      where: {
+        organizationId_professionalId: {
+          organizationId,
+          professionalId: principal.professionalId
+        }
+      },
+      data: {
+        isDefault: true
+      }
+    });
+
+    return this.issueTokens(
+      membership.professional.user.id,
+      membership.professional.user.email,
+      [mapRole(membership.professional.user.role)],
+      principal.professionalId,
+      {
+        organizationId
+      }
+    );
+  }
+
   private async getPrincipalFromAuthorization(authorization?: string) {
     const token = authorization?.replace(/^Bearer\s+/i, "");
 

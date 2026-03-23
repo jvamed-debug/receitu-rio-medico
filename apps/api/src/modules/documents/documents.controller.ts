@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UnauthorizedException,
   UseGuards
 } from "@nestjs/common";
@@ -41,6 +42,23 @@ export class DocumentsController {
       scopeProfessionalId(principal),
       principal.organizationId
     );
+  }
+
+  @Get("analytics")
+  analytics(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Query()
+    query?: {
+      dateFrom?: string;
+      dateTo?: string;
+    }
+  ) {
+    return this.documentsService.analytics({
+      authorProfessionalId: scopeProfessionalId(principal),
+      organizationId: principal.organizationId,
+      dateFrom: query?.dateFrom,
+      dateTo: query?.dateTo
+    });
   }
 
   @RequireRoles("professional", "admin")

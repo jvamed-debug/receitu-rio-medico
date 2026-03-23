@@ -15,6 +15,7 @@ const navItems = [
   ["Templates", "/templates"],
   ["Pacientes", "/patients"],
   ["Historico", "/history"],
+  ["Organizacao", "/organization"],
   ["PDF", "/pdf-preview"],
   ["Envio", "/delivery"],
   ["Configuracoes", "/settings"]

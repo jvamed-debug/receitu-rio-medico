@@ -109,6 +109,56 @@ export interface OrganizationSummary {
   slug: string;
 }
 
+export interface OrganizationMembershipSummary {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  professionalId: string;
+  professionalName: string;
+  professionalEmail?: string;
+  membershipRole: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface OrganizationDetail {
+  id: string;
+  name: string;
+  slug: string;
+  membershipRole?: string;
+  memberCount: number;
+  professionalCount: number;
+}
+
+export interface ClinicalDocumentAnalyticsSnapshot {
+  range: {
+    dateFrom?: string;
+    dateTo?: string;
+  };
+  total: number;
+  signed: number;
+  issued: number;
+  delivered: number;
+  byType: Array<{
+    type: string;
+    total: number;
+    signed: number;
+    issued: number;
+    delivered: number;
+  }>;
+  byStatus: Array<{
+    status: string;
+    total: number;
+  }>;
+  recentDays: Array<{
+    day: string;
+    created: number;
+    issued: number;
+    delivered: number;
+  }>;
+}
+
 export interface PrescriptionItemInput {
   medicationName: string;
   activeIngredient?: string;
@@ -195,6 +245,11 @@ export interface AppointmentAnalyticsQuery {
   dateFrom?: string;
   dateTo?: string;
   professionalId?: string;
+}
+
+export interface ClinicalDocumentAnalyticsQuery {
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export interface HealthStatus {
@@ -595,6 +650,12 @@ export class ApiClient {
     return this.get<PatientTimelineResponse>(`/patients/${id}/timeline`);
   }
 
+  getClinicalDocumentAnalytics(query?: ClinicalDocumentAnalyticsQuery) {
+    return this.get<ClinicalDocumentAnalyticsSnapshot>(
+      `/documents/analytics${buildQueryString(query)}`
+    );
+  }
+
   listDocuments() {
     return this.get<ClinicalDocument[]>("/documents");
   }
@@ -791,6 +852,43 @@ export class ApiClient {
 
   listTemplateFavorites() {
     return this.get<TemplateFavoriteSummary[]>("/templates/favorites");
+  }
+
+  listMyOrganizations() {
+    return this.get<OrganizationSummary[]>("/organizations");
+  }
+
+  getCurrentOrganization() {
+    return this.get<OrganizationDetail>("/organizations/current");
+  }
+
+  listCurrentOrganizationMemberships() {
+    return this.get<OrganizationMembershipSummary[]>("/organizations/current/memberships");
+  }
+
+  addOrganizationMembershipByEmail(input: {
+    email: string;
+    membershipRole?: string;
+    isDefault?: boolean;
+  }) {
+    return this.post<OrganizationMembershipSummary>("/organizations/current/memberships", input);
+  }
+
+  updateOrganizationMembership(
+    membershipId: string,
+    input: {
+      membershipRole?: string;
+      isDefault?: boolean;
+    }
+  ) {
+    return this.patch<OrganizationMembershipSummary>(
+      `/organizations/current/memberships/${membershipId}`,
+      input
+    );
+  }
+
+  switchOrganization(organizationId: string) {
+    return this.post<AuthTokens>("/me/organization/switch", { organizationId });
   }
 
   saveTemplateFavorite(input: {

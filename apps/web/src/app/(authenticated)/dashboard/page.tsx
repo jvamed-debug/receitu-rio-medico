@@ -49,12 +49,29 @@ async function loadAppointmentAnalytics() {
   }
 }
 
+async function loadDocumentAnalytics() {
+  const api = createApiClient();
+  const today = new Date();
+  const dateTo = today.toISOString();
+  const dateFrom = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    return await api.getClinicalDocumentAnalytics({
+      dateFrom,
+      dateTo
+    });
+  } catch {
+    return null;
+  }
+}
+
 export default async function DashboardPage() {
-  const [health, agenda, operations, analytics] = await Promise.all([
+  const [health, agenda, operations, analytics, documentAnalytics] = await Promise.all([
     loadHealth(),
     loadAppointmentsSummary(),
     loadAppointmentOperations(),
-    loadAppointmentAnalytics()
+    loadAppointmentAnalytics(),
+    loadDocumentAnalytics()
   ]);
 
   const cards = [
@@ -129,6 +146,122 @@ export default async function DashboardPage() {
         ) : (
           <div style={{ color: "var(--muted)" }}>
             Nao foi possivel carregar o resumo financeiro da agenda.
+          </div>
+        )}
+      </section>
+
+      <section
+        style={{
+          marginTop: 24,
+          background: "white",
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Producao documental dos ultimos 30 dias</h2>
+        {documentAnalytics ? (
+          <div style={{ display: "grid", gap: 18 }}>
+            <div
+              style={{
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+              }}
+            >
+              <FinanceCard
+                label="Documentos criados"
+                amount={documentAnalytics.total}
+                detail="volume total no periodo"
+                countMode
+              />
+              <FinanceCard
+                label="Assinados"
+                amount={documentAnalytics.signed}
+                detail="documentos com assinatura registrada"
+                countMode
+              />
+              <FinanceCard
+                label="Emitidos"
+                amount={documentAnalytics.issued}
+                detail="prontos para circulacao"
+                countMode
+              />
+              <FinanceCard
+                label="Entregues"
+                amount={documentAnalytics.delivered}
+                detail="com rastreabilidade de entrega"
+                countMode
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gap: 18,
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)"
+              }}
+            >
+              <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Por tipo documental</h3>
+                {documentAnalytics.byType.length > 0 ? (
+                  documentAnalytics.byType.map((entry) => (
+                    <article
+                      key={entry.type}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{entry.type}</div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {entry.total} criados | {entry.issued} emitidos | {entry.delivered} entregues
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Ainda nao ha producao documental no periodo filtrado.
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Serie recente</h3>
+                {documentAnalytics.recentDays.length > 0 ? (
+                  documentAnalytics.recentDays.map((entry) => (
+                    <article
+                      key={entry.day}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {new Date(`${entry.day}T12:00:00Z`).toLocaleDateString("pt-BR")}
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {entry.created} criados | {entry.issued} emitidos | {entry.delivered} entregues
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Sem serie documental consolidada no periodo.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: "var(--muted)" }}>
+            Nao foi possivel carregar os analytics documentais.
           </div>
         )}
       </section>
