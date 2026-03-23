@@ -10,7 +10,9 @@ import type {
   PharmacyOrder,
   PharmacyOperationsSnapshot,
   PharmacyProviderReadinessResponse,
-  PharmacyQuote
+  PharmacyQuote,
+  PatientEncounter,
+  PatientTimelineEntry
 } from "@receituario/domain";
 export type {
   Appointment,
@@ -23,7 +25,9 @@ export type {
   PharmacyOrder,
   PharmacyOperationsSnapshot,
   PharmacyProviderReadinessResponse,
-  PharmacyQuote
+  PharmacyQuote,
+  PatientEncounter,
+  PatientTimelineEntry
 } from "@receituario/domain";
 import type {
   AuthTokens,
@@ -213,6 +217,11 @@ export interface HistoryResponse {
 export interface PatientHistoryResponse {
   patientId: string;
   items: ClinicalDocument[];
+}
+
+export interface PatientTimelineResponse {
+  patientId: string;
+  items: PatientTimelineEntry[];
 }
 
 export interface DocumentPdfPreview {
@@ -547,6 +556,33 @@ export class ApiClient {
 
   updatePatientClinicalProfile(id: string, input: PatientClinicalProfile) {
     return this.patch<PatientClinicalProfile>(`/patients/${id}/clinical-profile`, input);
+  }
+
+  listPatientEncounters(id: string) {
+    return this.get<PatientEncounter[]>(`/patients/${id}/encounters`);
+  }
+
+  createPatientEncounter(
+    id: string,
+    input: {
+      type:
+        | "consultation"
+        | "follow_up"
+        | "telehealth"
+        | "triage"
+        | "procedure"
+        | "clinical_note";
+      title: string;
+      summary?: string;
+      notes?: string;
+      occurredAt?: string;
+    }
+  ) {
+    return this.post<PatientEncounter>(`/patients/${id}/encounters`, input);
+  }
+
+  getPatientTimeline(id: string) {
+    return this.get<PatientTimelineResponse>(`/patients/${id}/timeline`);
   }
 
   listDocuments() {

@@ -91,6 +91,15 @@ enum PharmacyOrderStatus {
   FAILED
 }
 
+enum EncounterType {
+  CONSULTATION
+  FOLLOW_UP
+  TELEHEALTH
+  TRIAGE
+  PROCEDURE
+  CLINICAL_NOTE
+}
+
 model User {
   id                 String               @id @default(cuid())
   email              String               @unique
@@ -124,6 +133,7 @@ model ProfessionalProfile {
   appointments         Appointment[]
   primaryPatients      Patient[]          @relation("PrimaryProfessionalPatients")
   reviewedClinicalProfiles PatientClinicalProfile[]
+  encounters           PatientEncounter[]
   signatureSessions    SignatureSession[]
   requestedCdsOverrideReviews CdsOverrideReview[] @relation("RequestedCdsOverrideReviews")
   reviewedCdsOverrideReviews CdsOverrideReview[]  @relation("ReviewedCdsOverrideReviews")
@@ -141,6 +151,7 @@ model Organization {
   patients           Patient[]
   documents          ClinicalDocument[]
   appointments       Appointment[]
+  encounters         PatientEncounter[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 }
@@ -173,6 +184,7 @@ model Patient {
   clinicalProfile PatientClinicalProfile?
   documents  ClinicalDocument[]
   appointments Appointment[]
+  encounters   PatientEncounter[]
   organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
   createdAt  DateTime           @default(now())
@@ -285,6 +297,28 @@ model PatientClinicalProfile {
   reviewedByProfessional ProfessionalProfile? @relation(fields: [reviewedByProfessionalId], references: [id], onDelete: SetNull)
 
   @@index([reviewedByProfessionalId, reviewedAt])
+}
+
+model PatientEncounter {
+  id               String              @id @default(cuid())
+  patientId        String
+  organizationId   String?
+  professionalId   String
+  type             EncounterType       @default(CLINICAL_NOTE)
+  title            String
+  summary          String?
+  notes            String?
+  occurredAt       DateTime
+  metadata         Json?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  patient          Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization     Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  professional     ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, occurredAt])
+  @@index([organizationId, occurredAt])
+  @@index([professionalId, occurredAt])
 }
 
 model ClinicalDocument {

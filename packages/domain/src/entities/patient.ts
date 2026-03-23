@@ -12,6 +12,42 @@ export interface Patient {
   updatedAt: string;
 }
 
+export type PatientEncounterType =
+  | "consultation"
+  | "follow_up"
+  | "telehealth"
+  | "triage"
+  | "procedure"
+  | "clinical_note";
+
+export interface PatientEncounter {
+  id: string;
+  patientId: string;
+  organizationId?: string;
+  professionalId: string;
+  type: PatientEncounterType;
+  title: string;
+  summary?: string;
+  notes?: string;
+  occurredAt: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PatientTimelineEntry {
+  id: string;
+  sourceType: "encounter" | "document" | "appointment";
+  sourceId: string;
+  patientId: string;
+  title: string;
+  subtitle?: string;
+  occurredAt: string;
+  status?: string;
+  summary?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface PatientClinicalProfile {
   allergies: PatientAllergy[];
   conditions: PatientCondition[];

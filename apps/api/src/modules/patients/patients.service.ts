@@ -1,6 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import type { Patient, PatientClinicalProfile } from "@receituario/domain";
+import type {
+  Patient,
+  PatientClinicalProfile,
+  PatientEncounter,
+  PatientTimelineEntry
+} from "@receituario/domain";
 
 import { PrismaService } from "../../persistence/prisma.service";
 import type { AccessPrincipal } from "../auth/auth.types";
@@ -95,6 +100,131 @@ export class PatientsService {
 
     return mapClinicalProfile(profile);
   }
+
+  async listEncounters(patientId: string) {
+    const encounters = await this.prisma.patientEncounter.findMany({
+      where: {
+        patientId
+      },
+      orderBy: {
+        occurredAt: "desc"
+      }
+    });
+
+    return encounters.map(mapEncounter);
+  }
+
+  async createEncounter(
+    patientId: string,
+    input: {
+      type?: PatientEncounter["type"];
+      title: string;
+      summary?: string;
+      notes?: string;
+      occurredAt?: string;
+    },
+    principal: AccessPrincipal
+  ) {
+    if (!principal.professionalId) {
+      throw new ForbiddenException("Encounter clinico exige profissional autenticado");
+    }
+
+    const encounter = await this.prisma.patientEncounter.create({
+      data: {
+        patientId,
+        organizationId: principal.organizationId,
+        professionalId: principal.professionalId,
+        type: toEncounterType(input.type),
+        title: input.title,
+        summary: input.summary ?? null,
+        notes: input.notes ?? null,
+        occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date()
+      }
+    });
+
+    return mapEncounter(encounter);
+  }
+
+  async getTimeline(patientId: string) {
+    const [encounters, documents, appointments] = await Promise.all([
+      this.prisma.patientEncounter.findMany({
+        where: {
+          patientId
+        },
+        orderBy: {
+          occurredAt: "desc"
+        }
+      }),
+      this.prisma.clinicalDocument.findMany({
+        where: {
+          patientId
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 50
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          patientId
+        },
+        orderBy: {
+          appointmentAt: "desc"
+        },
+        take: 50
+      })
+    ]);
+
+    const items: PatientTimelineEntry[] = [
+      ...encounters.map<PatientTimelineEntry>((encounter) => ({
+        id: `encounter:${encounter.id}`,
+        sourceType: "encounter",
+        sourceId: encounter.id,
+        patientId: encounter.patientId,
+        title: encounter.title,
+        subtitle: encounter.type.toLowerCase(),
+        occurredAt: encounter.occurredAt.toISOString(),
+        summary: encounter.summary ?? encounter.notes ?? undefined,
+        metadata:
+          encounter.metadata && typeof encounter.metadata === "object"
+            ? (encounter.metadata as Record<string, unknown>)
+            : undefined
+      })),
+      ...documents.map<PatientTimelineEntry>((document) => ({
+        id: `document:${document.id}`,
+        sourceType: "document",
+        sourceId: document.id,
+        patientId: document.patientId,
+        title: document.title,
+        subtitle: document.type.toLowerCase(),
+        occurredAt: (document.issuedAt ?? document.createdAt).toISOString(),
+        status: document.status.toLowerCase(),
+        summary: summarizeDocumentPayload(document.payload),
+        metadata: {
+          layoutVersion: document.layoutVersion
+        }
+      })),
+      ...appointments.map<PatientTimelineEntry>((appointment) => ({
+        id: `appointment:${appointment.id}`,
+        sourceType: "appointment",
+        sourceId: appointment.id,
+        patientId: appointment.patientId,
+        title: appointment.title,
+        subtitle: appointment.telehealth ? "telehealth" : "appointment",
+        occurredAt: appointment.appointmentAt.toISOString(),
+        status: appointment.status.toLowerCase(),
+        summary: appointment.notes ?? undefined,
+        metadata: {
+          durationMinutes: appointment.durationMinutes
+        }
+      }))
+    ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+
+    return {
+      patientId,
+      items
+    };
+  }
 }
 
 function mapPatientRecord(
@@ -149,4 +279,80 @@ function mapClinicalProfile(profile: {
     reviewedByProfessionalId: profile.reviewedByProfessionalId ?? undefined,
     reviewedAt: profile.reviewedAt?.toISOString()
   };
+}
+
+function mapEncounter(encounter: {
+  id: string;
+  patientId: string;
+  organizationId: string | null;
+  professionalId: string;
+  type: string;
+  title: string;
+  summary: string | null;
+  notes: string | null;
+  occurredAt: Date;
+  metadata: Prisma.JsonValue | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): PatientEncounter {
+  return {
+    id: encounter.id,
+    patientId: encounter.patientId,
+    organizationId: encounter.organizationId ?? undefined,
+    professionalId: encounter.professionalId,
+    type: encounter.type.toLowerCase() as PatientEncounter["type"],
+    title: encounter.title,
+    summary: encounter.summary ?? undefined,
+    notes: encounter.notes ?? undefined,
+    occurredAt: encounter.occurredAt.toISOString(),
+    metadata:
+      encounter.metadata && typeof encounter.metadata === "object"
+        ? (encounter.metadata as Record<string, unknown>)
+        : undefined,
+    createdAt: encounter.createdAt.toISOString(),
+    updatedAt: encounter.updatedAt.toISOString()
+  };
+}
+
+function toEncounterType(type?: PatientEncounter["type"]) {
+  switch (type) {
+    case "consultation":
+      return "CONSULTATION" as const;
+    case "follow_up":
+      return "FOLLOW_UP" as const;
+    case "telehealth":
+      return "TELEHEALTH" as const;
+    case "triage":
+      return "TRIAGE" as const;
+    case "procedure":
+      return "PROCEDURE" as const;
+    default:
+      return "CLINICAL_NOTE" as const;
+  }
+}
+
+function summarizeDocumentPayload(payload: Prisma.JsonValue) {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const record = payload as Record<string, unknown>;
+
+  if (Array.isArray(record.items)) {
+    return `${record.items.length} item(ns) registrados`;
+  }
+
+  if (Array.isArray(record.requestedExams)) {
+    return `${record.requestedExams.length} exame(s) solicitados`;
+  }
+
+  if (typeof record.purpose === "string") {
+    return record.purpose;
+  }
+
+  if (typeof record.body === "string") {
+    return record.body.slice(0, 140);
+  }
+
+  return undefined;
 }

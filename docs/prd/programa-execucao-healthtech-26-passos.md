@@ -191,10 +191,11 @@ Ja entregue:
 - plano de cuidado
 - resumo clinico
 - agenda, cobranca, lembretes e teleconsulta
+- `PatientEncounter` estruturado
+- timeline consolidada com encounters, documentos e consultas
 
 Falta para fechar:
 
-- encounters
 - timeline clinica mais formal
 - problemas e eventos com estrutura longitudinal
 
@@ -243,10 +244,11 @@ Ja entregue:
 - perfil clinico estruturado
 - historico por paciente
 - vinculo entre paciente, documentos e agenda
+- encounters com registro clinico rapido
+- timeline assistencial consolidada no perfil do paciente
 
 Falta para fechar:
 
-- timeline real do atendimento
 - evolucao clinica
 - encounters e consolidacao longitudinal
 
@@ -539,7 +541,7 @@ Falta para fechar:
 
 1. passo 13: provider real de assinatura e homologacao ponta a ponta
 2. passo 22: provider farmaceutico real, rede parceira e conciliacao de pedidos
-3. passo 18: CDS com interacoes graves e regras mais finas por especialidade
+3. passo 18: CDS com regras finas por tenant, papel e fonte clinica homologada
 
 ### Bloco seguinte
 

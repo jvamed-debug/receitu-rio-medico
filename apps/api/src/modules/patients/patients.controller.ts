@@ -46,4 +46,49 @@ export class PatientsController {
     );
     return this.patientsService.upsertClinicalProfile(id, input, principal);
   }
+
+  @Get(":id/encounters")
+  async listEncounters(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertPatientAccess(principal, id, "patient_encounter_read");
+    return this.patientsService.listEncounters(id);
+  }
+
+  @Post(":id/encounters")
+  async createEncounter(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Body()
+    input: {
+      type?:
+        | "consultation"
+        | "follow_up"
+        | "telehealth"
+        | "triage"
+        | "procedure"
+        | "clinical_note";
+      title: string;
+      summary?: string;
+      notes?: string;
+      occurredAt?: string;
+    }
+  ) {
+    await this.resourceAccessService.assertPatientAccess(
+      principal,
+      id,
+      "patient_encounter_create"
+    );
+    return this.patientsService.createEncounter(id, input, principal);
+  }
+
+  @Get(":id/timeline")
+  async getTimeline(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertPatientAccess(principal, id, "patient_timeline_read");
+    return this.patientsService.getTimeline(id);
+  }
 }

@@ -1,4 +1,5 @@
 import { ClinicalProfileEditor } from "../../../../components/patients/clinical-profile-editor";
+import { PatientEncounterEditor } from "../../../../components/patients/patient-encounter-editor";
 import { DocumentList } from "../../../../components/documents/document-list";
 import { PageSection } from "../../../../components/page-section";
 import { Shell } from "../../../../components/shell";
@@ -13,9 +14,11 @@ export default async function PatientProfilePage({
 }) {
   const { id } = await params;
   const api = await createServerApiClient();
-  const [patient, history] = await Promise.all([
+  const [patient, history, encounters, timeline] = await Promise.all([
     api.getPatient(id).catch(() => null),
-    api.getPatientHistory(id).catch(() => ({ patientId: id, items: [] }))
+    api.getPatientHistory(id).catch(() => ({ patientId: id, items: [] })),
+    api.listPatientEncounters(id).catch(() => []),
+    api.getPatientTimeline(id).catch(() => ({ patientId: id, items: [] }))
   ]);
 
   return (
@@ -74,6 +77,51 @@ export default async function PatientProfilePage({
           patientId={id}
           initialProfile={patient?.clinicalProfile}
         />
+        <PatientEncounterEditor patientId={id} initialEncounters={encounters} />
+        <PageSection
+          title="Timeline assistencial"
+          description="Consolidacao inicial de encounters, consultas e documentos do paciente."
+        >
+          <div style={{ display: "grid", gap: 12 }}>
+            {timeline.items.length > 0 ? (
+              timeline.items.map((item) => (
+                <article
+                  key={item.id}
+                  style={{
+                    borderRadius: 16,
+                    border: "1px solid #d4e1ef",
+                    padding: 16,
+                    background: "#f8fbff"
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      flexWrap: "wrap"
+                    }}
+                  >
+                    <strong>{item.title}</strong>
+                    <span style={{ color: "var(--muted)" }}>
+                      {new Date(item.occurredAt).toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 6, color: "var(--muted)" }}>
+                    {[item.sourceType, item.subtitle, item.status].filter(Boolean).join(" | ")}
+                  </div>
+                  {item.summary ? (
+                    <div style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>{item.summary}</div>
+                  ) : null}
+                </article>
+              ))
+            ) : (
+              <div style={{ color: "var(--muted)" }}>
+                Sem eventos na timeline ainda.
+              </div>
+            )}
+          </div>
+        </PageSection>
         <DocumentList title="Historico do paciente" documents={history.items} />
       </div>
     </Shell>
