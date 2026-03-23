@@ -3,7 +3,12 @@ import {
   NotFoundException,
   UnauthorizedException
 } from "@nestjs/common";
-import type { Appointment, AppointmentSummary } from "@receituario/domain";
+import type {
+  Appointment,
+  AppointmentBillingWebhookEventSummary,
+  AppointmentOperationsSnapshot,
+  AppointmentSummary
+} from "@receituario/domain";
 
 import { PrismaService } from "../../persistence/prisma.service";
 import type { AccessPrincipal } from "../auth/auth.types";
@@ -84,6 +89,63 @@ export class AppointmentsService {
         billingPaidCents: 0
       }
     );
+  }
+
+  async operations(principal: AccessPrincipal): Promise<AppointmentOperationsSnapshot> {
+    const scope = buildAppointmentScope(principal);
+    const appointments = await this.prisma.appointment.findMany({
+      where: scope,
+      select: {
+        id: true
+      }
+    });
+    const appointmentIds = appointments.map((appointment) => appointment.id);
+
+    if (appointmentIds.length === 0) {
+      return {
+        failedReminders: 0,
+        remindersAwaitingRetry: 0,
+        webhookFailures: 0,
+        pendingWebhookProcessing: 0,
+        recentWebhookEvents: []
+      };
+    }
+
+    const [failedReminders, retryableReminders, recentWebhookEvents] = await Promise.all([
+      this.prisma.appointmentReminder.count({
+        where: {
+          appointmentId: { in: appointmentIds },
+          status: "FAILED"
+        }
+      }),
+      this.prisma.appointmentReminder.count({
+        where: {
+          appointmentId: { in: appointmentIds },
+          status: "FAILED",
+          nextAttemptAt: {
+            not: null
+          }
+        }
+      }),
+      this.prisma.appointmentBillingWebhookEvent.findMany({
+        where: {
+          appointmentId: { in: appointmentIds }
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 8
+      })
+    ]);
+
+    return {
+      failedReminders,
+      remindersAwaitingRetry: retryableReminders,
+      webhookFailures: recentWebhookEvents.filter((event) => event.resultStatus === "failed")
+        .length,
+      pendingWebhookProcessing: recentWebhookEvents.filter((event) => !event.processedAt).length,
+      recentWebhookEvents: recentWebhookEvents.map(mapWebhookEventRecord)
+    };
   }
 
   async create(
@@ -277,4 +339,28 @@ function mapAppointmentRecord(appointment: {
     updatedAt: appointment.updatedAt.toISOString(),
     patientName: appointment.patient?.fullName
   } satisfies Appointment;
+}
+
+function mapWebhookEventRecord(event: {
+  id: string;
+  appointmentId: string;
+  billingId: string;
+  eventId: string | null;
+  providerReference: string | null;
+  status: string;
+  resultStatus: string | null;
+  processedAt: Date | null;
+  createdAt: Date;
+}): AppointmentBillingWebhookEventSummary {
+  return {
+    id: event.id,
+    appointmentId: event.appointmentId,
+    billingId: event.billingId,
+    eventId: event.eventId ?? undefined,
+    providerReference: event.providerReference ?? undefined,
+    status: event.status.toLowerCase() as AppointmentBillingWebhookEventSummary["status"],
+    resultStatus: event.resultStatus ?? undefined,
+    processedAt: event.processedAt?.toISOString(),
+    createdAt: event.createdAt.toISOString()
+  };
 }

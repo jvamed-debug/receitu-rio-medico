@@ -81,3 +81,23 @@ export interface AppointmentSummary {
   billingAuthorizedCents: number;
   billingPaidCents: number;
 }
+
+export interface AppointmentBillingWebhookEventSummary {
+  id: string;
+  appointmentId: string;
+  billingId: string;
+  eventId?: string;
+  providerReference?: string;
+  status: AppointmentBillingStatus;
+  resultStatus?: string;
+  processedAt?: string;
+  createdAt: string;
+}
+
+export interface AppointmentOperationsSnapshot {
+  failedReminders: number;
+  remindersAwaitingRetry: number;
+  webhookFailures: number;
+  pendingWebhookProcessing: number;
+  recentWebhookEvents: AppointmentBillingWebhookEventSummary[];
+}

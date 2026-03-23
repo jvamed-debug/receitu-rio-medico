@@ -1,6 +1,7 @@
 import type {
   Appointment,
   AppointmentBilling,
+  AppointmentOperationsSnapshot,
   AppointmentSummary,
   AppointmentReminder,
   ClinicalDocument
@@ -8,6 +9,7 @@ import type {
 export type {
   Appointment,
   AppointmentBilling,
+  AppointmentOperationsSnapshot,
   AppointmentSummary,
   AppointmentReminder
 } from "@receituario/domain";
@@ -351,6 +353,10 @@ export class ApiClient {
 
   getAppointmentSummary() {
     return this.get<AppointmentSummary>("/appointments/summary");
+  }
+
+  getAppointmentOperations() {
+    return this.get<AppointmentOperationsSnapshot>("/appointments/operations");
   }
 
   createAppointment(input: CreateAppointmentInput) {

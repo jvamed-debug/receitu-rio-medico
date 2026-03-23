@@ -23,10 +23,21 @@ async function loadAppointmentsSummary() {
   }
 }
 
+async function loadAppointmentOperations() {
+  const api = createApiClient();
+
+  try {
+    return await api.getAppointmentOperations();
+  } catch {
+    return null;
+  }
+}
+
 export default async function DashboardPage() {
-  const [health, agenda] = await Promise.all([
+  const [health, agenda, operations] = await Promise.all([
     loadHealth(),
-    loadAppointmentsSummary()
+    loadAppointmentsSummary(),
+    loadAppointmentOperations()
   ]);
 
   const cards = [
@@ -114,6 +125,98 @@ export default async function DashboardPage() {
           boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
         }}
       >
+        <h2 style={{ marginTop: 0 }}>Operacao externa</h2>
+        {operations ? (
+          <div style={{ display: "grid", gap: 18 }}>
+            <div
+              style={{
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+              }}
+            >
+              <FinanceCard
+                label="Lembretes com falha"
+                amount={operations.failedReminders}
+                detail="necessitam revisao operacional"
+                countMode
+              />
+              <FinanceCard
+                label="Retries aguardando"
+                amount={operations.remindersAwaitingRetry}
+                detail="com nova tentativa programada"
+                countMode
+              />
+              <FinanceCard
+                label="Webhooks falhos"
+                amount={operations.webhookFailures}
+                detail="eventos externos sem conciliacao"
+                countMode
+              />
+              <FinanceCard
+                label="Inbox pendente"
+                amount={operations.pendingWebhookProcessing}
+                detail="eventos recebidos e ainda nao fechados"
+                countMode
+              />
+            </div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <h3 style={{ margin: 0 }}>Eventos recentes de cobranca</h3>
+              {operations.recentWebhookEvents.length > 0 ? (
+                operations.recentWebhookEvents.map((event) => (
+                  <article
+                    key={event.id}
+                    style={{
+                      borderRadius: 14,
+                      border: "1px solid #d9e8f5",
+                      padding: 14,
+                      background: "#f8fbff",
+                      display: "grid",
+                      gap: 6
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>
+                      Cobranca {event.billingId} | {event.status}
+                    </div>
+                    <div style={{ color: "var(--muted)" }}>
+                      Consulta {event.appointmentId}
+                      {event.providerReference ? ` | ref ${event.providerReference}` : ""}
+                      {event.eventId ? ` | evento ${event.eventId}` : ""}
+                    </div>
+                    <div style={{ color: "var(--muted)" }}>
+                      Recebido em {new Date(event.createdAt).toLocaleString("pt-BR")}
+                      {event.processedAt
+                        ? ` | processado em ${new Date(event.processedAt).toLocaleString("pt-BR")}`
+                        : " | aguardando processamento"}
+                    </div>
+                    <div style={{ fontWeight: 700 }}>
+                      Resultado: {event.resultStatus ?? "pendente"}
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <div style={{ color: "var(--muted)" }}>
+                  Nenhum evento externo de cobranca registrado ainda.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: "var(--muted)" }}>
+            Nao foi possivel carregar a operacao externa da agenda.
+          </div>
+        )}
+      </section>
+
+      <section
+        style={{
+          marginTop: 24,
+          background: "white",
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
+        }}
+      >
         <h2 style={{ marginTop: 0 }}>Saude da API</h2>
         {health ? (
           <div style={{ display: "grid", gap: 12 }}>
@@ -158,11 +261,13 @@ export default async function DashboardPage() {
 function FinanceCard({
   label,
   amount,
-  detail
+  detail,
+  countMode
 }: {
   label: string;
   amount: number;
   detail: string;
+  countMode?: boolean;
 }) {
   return (
     <article
@@ -175,10 +280,12 @@ function FinanceCard({
     >
       <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
       <div style={{ fontSize: 28, marginTop: 10 }}>
-        {new Intl.NumberFormat("pt-BR", {
-          style: "currency",
-          currency: "BRL"
-        }).format(amount / 100)}
+        {countMode
+          ? String(amount)
+          : new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL"
+            }).format(amount / 100)}
       </div>
       <div style={{ color: "var(--muted)", marginTop: 8 }}>{detail}</div>
     </article>

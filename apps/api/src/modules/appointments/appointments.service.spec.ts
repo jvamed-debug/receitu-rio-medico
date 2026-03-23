@@ -109,3 +109,57 @@ test("resume agenda com cobrancas e lembretes", async () => {
   assert.equal(result.billingAuthorizedCents, 8000);
   assert.equal(result.billingPaidCents, 12000);
 });
+
+test("gera snapshot operacional com falhas de lembrete e eventos de webhook", async () => {
+  const service = new AppointmentsService({
+    appointment: {
+      findMany: async () => [{ id: "apt-1" }, { id: "apt-2" }]
+    },
+    appointmentReminder: {
+      count: async ({
+        where
+      }: {
+        where: { status: string; nextAttemptAt?: { not: null }; appointmentId: { in: string[] } };
+      }) => (where.nextAttemptAt ? 1 : 2)
+    },
+    appointmentBillingWebhookEvent: {
+      findMany: async () => [
+        {
+          id: "evt-1",
+          appointmentId: "apt-1",
+          billingId: "bill-1",
+          eventId: "provider-1",
+          providerReference: "pay-1",
+          status: "PAID",
+          resultStatus: "paid",
+          processedAt: new Date("2026-03-23T12:00:00.000Z"),
+          createdAt: new Date("2026-03-23T11:00:00.000Z")
+        },
+        {
+          id: "evt-2",
+          appointmentId: "apt-2",
+          billingId: "bill-2",
+          eventId: null,
+          providerReference: null,
+          status: "AUTHORIZED",
+          resultStatus: "failed",
+          processedAt: null,
+          createdAt: new Date("2026-03-23T12:30:00.000Z")
+        }
+      ]
+    }
+  } as never);
+
+  const result = await service.operations({
+    userId: "user-1",
+    professionalId: "prof-1",
+    organizationId: "org-1",
+    roles: [UserRole.PROFESSIONAL.toLowerCase()]
+  });
+
+  assert.equal(result.failedReminders, 2);
+  assert.equal(result.remindersAwaitingRetry, 1);
+  assert.equal(result.webhookFailures, 1);
+  assert.equal(result.pendingWebhookProcessing, 1);
+  assert.equal(result.recentWebhookEvents.length, 2);
+});
