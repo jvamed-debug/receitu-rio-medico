@@ -35,9 +35,26 @@ export interface PatientEncounter {
   updatedAt: string;
 }
 
+export interface PatientEvolution {
+  id: string;
+  patientId: string;
+  organizationId?: string;
+  professionalId: string;
+  encounterId?: string;
+  title: string;
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+  tags?: string[];
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PatientTimelineEntry {
   id: string;
-  sourceType: "encounter" | "document" | "appointment";
+  sourceType: "encounter" | "evolution" | "document" | "appointment";
   sourceId: string;
   patientId: string;
   title: string;

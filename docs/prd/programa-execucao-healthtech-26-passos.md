@@ -30,6 +30,7 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 24. multitenancy institucional basico
 - 23. analytics clinico-operacional baseline
 - 10. contratos documentais tipados e versionados
+- 12. prontuario longitudinal baseline
 
 ### Em progresso forte
 
@@ -38,7 +39,6 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 8. fortalecer LGPD operacional
 - 9. evoluir o modelo de dados
 - 11. criar engine de templates seria
-- 12. melhorar prontuario
 - 13. integrar provedor real ICP-Brasil
 - 14. criar trilha probatoria
 - 15. separar autenticacao e assinatura
@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 12. aprofundar evolucao clinica longitudinal
 - 18. ampliar graduacao institucional do CDS
 - 11. endurecer lifecycle institucional de templates
+- 9. aprofundar problemas e eventos clinicos estruturados
 
 ## Checklist dos 26 passos
 
@@ -250,7 +250,7 @@ Falta para fechar:
 
 ### 12. Melhorar prontuario
 
-Status: em progresso
+Status: concluido no baseline atual
 
 Ja entregue:
 
@@ -259,11 +259,16 @@ Ja entregue:
 - vinculo entre paciente, documentos e agenda
 - encounters com registro clinico rapido
 - timeline assistencial consolidada no perfil do paciente
+- evolucao clinica estruturada longitudinal
+- timeline com evolucao, encounter, consulta e documento no mesmo eixo temporal
+- editor clinico para evolucao com campos estruturados de seguimento
+- vinculacao opcional da evolucao a encounter assistencial
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- evolucao clinica
-- encounters e consolidacao longitudinal
+- problema/lista ativa mais formal com status longitudinal
+- eventos clinicos de alta granularidade e reconciliacao automatica com documentos
+- indicadores de desfecho por linha de cuidado
 
 ## Trilha 3: Assinatura e validade juridica
 

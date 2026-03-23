@@ -147,6 +147,7 @@ model ProfessionalProfile {
   primaryPatients      Patient[]          @relation("PrimaryProfessionalPatients")
   reviewedClinicalProfiles PatientClinicalProfile[]
   encounters           PatientEncounter[]
+  evolutions           PatientEvolution[]
   signatureSessions    SignatureSession[]
   requestedCdsOverrideReviews CdsOverrideReview[] @relation("RequestedCdsOverrideReviews")
   reviewedCdsOverrideReviews CdsOverrideReview[]  @relation("ReviewedCdsOverrideReviews")
@@ -167,6 +168,7 @@ model Organization {
   documents          ClinicalDocument[]
   appointments       Appointment[]
   encounters         PatientEncounter[]
+  evolutions         PatientEvolution[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 }
@@ -221,6 +223,7 @@ model Patient {
   documents  ClinicalDocument[]
   appointments Appointment[]
   encounters   PatientEncounter[]
+  evolutions   PatientEvolution[]
   organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
   createdAt  DateTime           @default(now())
@@ -346,6 +349,30 @@ model PatientEncounter {
   notes            String?
   occurredAt       DateTime
   metadata         Json?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  patient          Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization     Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  professional     ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, occurredAt])
+  @@index([organizationId, occurredAt])
+  @@index([professionalId, occurredAt])
+}
+
+model PatientEvolution {
+  id               String              @id @default(cuid())
+  patientId        String
+  organizationId   String?
+  professionalId   String
+  encounterId      String?
+  title            String
+  subjective       String?
+  objective        String?
+  assessment       String?
+  plan             String?
+  tags             Json?
+  occurredAt       DateTime
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   patient          Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)

@@ -83,6 +83,39 @@ export class PatientsController {
     return this.patientsService.createEncounter(id, input, principal);
   }
 
+  @Get(":id/evolutions")
+  async listEvolutions(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertPatientAccess(principal, id, "patient_timeline_read");
+    return this.patientsService.listEvolutions(id);
+  }
+
+  @Post(":id/evolutions")
+  async createEvolution(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Body()
+    input: {
+      encounterId?: string;
+      title: string;
+      subjective?: string;
+      objective?: string;
+      assessment?: string;
+      plan?: string;
+      tags?: string[];
+      occurredAt?: string;
+    }
+  ) {
+    await this.resourceAccessService.assertPatientAccess(
+      principal,
+      id,
+      "patient_encounter_create"
+    );
+    return this.patientsService.createEvolution(id, input, principal);
+  }
+
   @Get(":id/timeline")
   async getTimeline(
     @CurrentPrincipal() principal: AccessPrincipal,

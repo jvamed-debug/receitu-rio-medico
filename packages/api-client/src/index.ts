@@ -12,6 +12,7 @@ import type {
   PharmacyProviderReadinessResponse,
   PharmacyQuote,
   PatientEncounter,
+  PatientEvolution,
   PatientTimelineEntry
 } from "@receituario/domain";
 export type {
@@ -27,6 +28,7 @@ export type {
   PharmacyProviderReadinessResponse,
   PharmacyQuote,
   PatientEncounter,
+  PatientEvolution,
   PatientTimelineEntry
 } from "@receituario/domain";
 import type {
@@ -686,6 +688,10 @@ export class ApiClient {
     return this.get<PatientEncounter[]>(`/patients/${id}/encounters`);
   }
 
+  listPatientEvolutions(id: string) {
+    return this.get<PatientEvolution[]>(`/patients/${id}/evolutions`);
+  }
+
   createPatientEncounter(
     id: string,
     input: {
@@ -703,6 +709,22 @@ export class ApiClient {
     }
   ) {
     return this.post<PatientEncounter>(`/patients/${id}/encounters`, input);
+  }
+
+  createPatientEvolution(
+    id: string,
+    input: {
+      encounterId?: string;
+      title: string;
+      subjective?: string;
+      objective?: string;
+      assessment?: string;
+      plan?: string;
+      tags?: string[];
+      occurredAt?: string;
+    }
+  ) {
+    return this.post<PatientEvolution>(`/patients/${id}/evolutions`, input);
   }
 
   getPatientTimeline(id: string) {

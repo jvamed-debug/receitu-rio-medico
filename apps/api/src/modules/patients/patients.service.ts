@@ -4,6 +4,7 @@ import type {
   Patient,
   PatientClinicalProfile,
   PatientEncounter,
+  PatientEvolution,
   PatientTimelineEntry
 } from "@receituario/domain";
 
@@ -114,6 +115,19 @@ export class PatientsService {
     return encounters.map(mapEncounter);
   }
 
+  async listEvolutions(patientId: string) {
+    const evolutions = await this.prisma.patientEvolution.findMany({
+      where: {
+        patientId
+      },
+      orderBy: {
+        occurredAt: "desc"
+      }
+    });
+
+    return evolutions.map(mapEvolution);
+  }
+
   async createEncounter(
     patientId: string,
     input: {
@@ -145,9 +159,54 @@ export class PatientsService {
     return mapEncounter(encounter);
   }
 
+  async createEvolution(
+    patientId: string,
+    input: {
+      encounterId?: string;
+      title: string;
+      subjective?: string;
+      objective?: string;
+      assessment?: string;
+      plan?: string;
+      tags?: string[];
+      occurredAt?: string;
+    },
+    principal: AccessPrincipal
+  ) {
+    if (!principal.professionalId) {
+      throw new ForbiddenException("Evolucao clinica exige profissional autenticado");
+    }
+
+    const evolution = await this.prisma.patientEvolution.create({
+      data: {
+        patientId,
+        organizationId: principal.organizationId,
+        professionalId: principal.professionalId,
+        encounterId: input.encounterId ?? null,
+        title: input.title,
+        subjective: input.subjective ?? null,
+        objective: input.objective ?? null,
+        assessment: input.assessment ?? null,
+        plan: input.plan ?? null,
+        tags: (input.tags ?? []) as Prisma.InputJsonValue,
+        occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date()
+      }
+    });
+
+    return mapEvolution(evolution);
+  }
+
   async getTimeline(patientId: string) {
-    const [encounters, documents, appointments] = await Promise.all([
+    const [encounters, evolutions, documents, appointments] = await Promise.all([
       this.prisma.patientEncounter.findMany({
+        where: {
+          patientId
+        },
+        orderBy: {
+          occurredAt: "desc"
+        }
+      }),
+      this.prisma.patientEvolution.findMany({
         where: {
           patientId
         },
@@ -189,6 +248,22 @@ export class PatientsService {
           encounter.metadata && typeof encounter.metadata === "object"
             ? (encounter.metadata as Record<string, unknown>)
             : undefined
+      })),
+      ...evolutions.map<PatientTimelineEntry>((evolution) => ({
+        id: `evolution:${evolution.id}`,
+        sourceType: "evolution",
+        sourceId: evolution.id,
+        patientId: evolution.patientId,
+        title: evolution.title,
+        subtitle: evolution.encounterId ? "evolution-linked-encounter" : "clinical-evolution",
+        occurredAt: evolution.occurredAt.toISOString(),
+        summary: buildEvolutionSummary(evolution),
+        metadata: {
+          encounterId: evolution.encounterId ?? undefined,
+          tags: Array.isArray(evolution.tags)
+            ? evolution.tags.filter((item): item is string => typeof item === "string")
+            : []
+        }
       })),
       ...documents.map<PatientTimelineEntry>((document) => ({
         id: `document:${document.id}`,
@@ -314,6 +389,42 @@ function mapEncounter(encounter: {
   };
 }
 
+function mapEvolution(evolution: {
+  id: string;
+  patientId: string;
+  organizationId: string | null;
+  professionalId: string;
+  encounterId: string | null;
+  title: string;
+  subjective: string | null;
+  objective: string | null;
+  assessment: string | null;
+  plan: string | null;
+  tags: Prisma.JsonValue | null;
+  occurredAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}): PatientEvolution {
+  return {
+    id: evolution.id,
+    patientId: evolution.patientId,
+    organizationId: evolution.organizationId ?? undefined,
+    professionalId: evolution.professionalId,
+    encounterId: evolution.encounterId ?? undefined,
+    title: evolution.title,
+    subjective: evolution.subjective ?? undefined,
+    objective: evolution.objective ?? undefined,
+    assessment: evolution.assessment ?? undefined,
+    plan: evolution.plan ?? undefined,
+    tags: Array.isArray(evolution.tags)
+      ? evolution.tags.filter((item): item is string => typeof item === "string")
+      : undefined,
+    occurredAt: evolution.occurredAt.toISOString(),
+    createdAt: evolution.createdAt.toISOString(),
+    updatedAt: evolution.updatedAt.toISOString()
+  };
+}
+
 function toEncounterType(type?: PatientEncounter["type"]) {
   switch (type) {
     case "consultation":
@@ -337,22 +448,42 @@ function summarizeDocumentPayload(payload: Prisma.JsonValue) {
   }
 
   const record = payload as Record<string, unknown>;
+  const content =
+    record._content && typeof record._content === "object"
+      ? (record._content as Record<string, unknown>)
+      : record;
 
-  if (Array.isArray(record.items)) {
-    return `${record.items.length} item(ns) registrados`;
+  if (Array.isArray(content.items)) {
+    return `${content.items.length} item(ns) registrados`;
   }
 
-  if (Array.isArray(record.requestedExams)) {
-    return `${record.requestedExams.length} exame(s) solicitados`;
+  if (Array.isArray(content.requestedExams)) {
+    return `${content.requestedExams.length} exame(s) solicitados`;
   }
 
-  if (typeof record.purpose === "string") {
-    return record.purpose;
+  if (typeof content.purpose === "string") {
+    return content.purpose;
   }
 
-  if (typeof record.body === "string") {
-    return record.body.slice(0, 140);
+  if (typeof content.body === "string") {
+    return content.body.slice(0, 140);
   }
 
   return undefined;
+}
+
+function buildEvolutionSummary(evolution: {
+  subjective: string | null;
+  objective: string | null;
+  assessment: string | null;
+  plan: string | null;
+}) {
+  return [
+    evolution.subjective ? `S: ${evolution.subjective}` : null,
+    evolution.objective ? `O: ${evolution.objective}` : null,
+    evolution.assessment ? `A: ${evolution.assessment}` : null,
+    evolution.plan ? `P: ${evolution.plan}` : null
+  ]
+    .filter((item): item is string => Boolean(item))
+    .join("\n");
 }
