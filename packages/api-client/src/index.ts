@@ -124,6 +124,8 @@ export interface CreatePrescriptionInput {
   patientId: string;
   title: string;
   items: PrescriptionItemInput[];
+  treatmentIntent?: "acute" | "continuous" | "tapering" | "supportive";
+  followUpInstructions?: string;
   context?: {
     encounterType?: "ambulatory" | "telehealth" | "emergency" | "inpatient";
     specialty?: string;
@@ -141,6 +143,8 @@ export interface CreateExamRequestInput {
   title: string;
   requestedExams: string[];
   preparationNotes?: string;
+  indication?: string;
+  priority?: "routine" | "urgent" | "stat";
   context?: CreatePrescriptionInput["context"];
 }
 
@@ -150,6 +154,9 @@ export interface CreateMedicalCertificateInput {
   purpose: string;
   restDays?: number;
   observations?: string;
+  certificateKind?: "attendance" | "rest" | "accompaniment" | "fitness";
+  workRestrictionNotes?: string;
+  fitToReturnDate?: string;
   context?: CreatePrescriptionInput["context"];
 }
 
@@ -157,6 +164,9 @@ export interface CreateFreeDocumentInput {
   patientId: string;
   title: string;
   body: string;
+  documentKind?: "clinical-report" | "referral" | "declaration" | "opinion";
+  audience?: "patient" | "employer" | "insurer" | "specialist" | "general";
+  closingStatement?: string;
   context?: CreatePrescriptionInput["context"];
 }
 

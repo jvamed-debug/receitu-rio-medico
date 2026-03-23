@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 13. provider real de assinatura e homologacao ponta a ponta
-- 18. CDS com interacoes graves e regras mais finas por especialidade
-- 22. provider farmaceutico real, rede parceira e conciliacao de pedidos
+- 10. contratos documentais mais especificos por tipo
+- 23. analytics clinico-operacional mais forte
+- 24. governanca institucional na UI
 
 ## Checklist dos 26 passos
 
@@ -210,12 +210,17 @@ Ja entregue:
 - `cdsSummary` no contrato documental
 - schemas de criacao com `context`
 - payload versionado com metadados reservados
+- campos especificos por tipo documental:
+  - prescricao com `treatmentIntent` e `followUpInstructions`
+  - exames com `indication` e `priority`
+  - atestado com `certificateKind`, `workRestrictionNotes` e `fitToReturnDate`
+  - documento livre com `documentKind`, `audience` e `closingStatement`
 
 Falta para fechar:
 
-- contratos ainda mais especificos por tipo
 - evolucao de versionamento por layout/payload
 - menor dependencia de chaves genericas internas
+- reduzir variacao livre demais em payloads clinicos complexos
 
 ### 11. Criar engine de templates seria
 
@@ -257,6 +262,11 @@ Falta para fechar:
 ### 13. Integrar provedor real ICP-Brasil
 
 Status: em progresso
+
+Observacao:
+
+- etapa tecnicamente preparada no codigo
+- bloqueada por dependencia externa de provider, credenciais e homologacao
 
 Ja entregue:
 
@@ -411,6 +421,10 @@ Falta para fechar:
 - painel financeiro expandido
 - provider real
 
+Observacao:
+
+- integracao real depende de gateway externo e ambiente de homologacao
+
 ### 21. Comunicacao
 
 Status: em progresso
@@ -428,6 +442,10 @@ Falta para fechar:
 - provider real
 - politicas de cadencia
 - templates transacionais centralizados
+
+Observacao:
+
+- integracao real depende de provider externo e credenciais operacionais
 
 ## Trilha 6: Ecossistema e monetizacao
 
@@ -458,6 +476,11 @@ Falta para fechar:
 - disponibilidade e status de pedido com parceiro homologado
 - pedidos e conciliacao de status por parceiro
 
+Observacao:
+
+- trilha preparada internamente
+- fechamento depende de parceiro homologado e contrato de integracao
+
 ### 23. Analytics
 
 Status: em progresso avancado
@@ -470,6 +493,7 @@ Ja entregue:
 - analytics por periodo
 - visao por profissional
 - serie diaria de consultas e receita
+- snapshots operacionais de assinatura, pagamentos, lembretes e farmacia
 
 Falta para fechar:
 
@@ -488,6 +512,7 @@ Ja entregue:
 - `primaryOrganizationId`
 - `organizationId` em pacientes, documentos e appointments
 - scoping por organizacao na agenda e no core
+- governanca clinica inicial por tenant e papel no CDS
 
 Falta para fechar:
 
@@ -541,21 +566,21 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 13: provider real de assinatura e homologacao ponta a ponta
-2. passo 22: provider farmaceutico real, rede parceira e conciliacao de pedidos
-3. passo 18: CDS com regras finas por tenant, papel e fonte clinica homologada
+1. passo 23: analytics clinico-operacional mais forte
+2. passo 24: governanca institucional na UI
+3. passo 10: fechar versionamento e contratos documentais mais rigidos
 
 ### Bloco seguinte
 
-4. aprofundar passo 20 com provider real de pagamentos
-5. aprofundar passo 21 com provider real de mensageria
-6. aprofundar passo 24 com governanca institucional na UI
+4. aprofundar passo 18 com fonte clinica homologada e graduacao mais fina
+5. aprofundar passo 12 com evolucao clinica longitudinal
+6. aprofundar passo 24 com politicas institucionais mais fortes
 
 ### Bloco posterior
 
-7. aprofundar passo 22 com disponibilidade, compra e pos-compra
-8. aprofundar LGPD operacional
-9. aprofundar governanca institucional
+7. fechar passo 13 com provider real de assinatura
+8. fechar passo 20 e passo 21 com providers reais
+9. fechar passo 22 com parceiro farmaceutico homologado
 
 ## Regra de execucao
 

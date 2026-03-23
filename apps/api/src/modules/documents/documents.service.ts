@@ -476,6 +476,15 @@ function buildPreviewSections(type: DocumentType, payload: Record<string, unknow
     case DocumentType.PRESCRIPTION:
       return [
         {
+          title: "Plano terapeutico",
+          lines: [
+            payload.treatmentIntent ? `intencao: ${String(payload.treatmentIntent)}` : null,
+            payload.followUpInstructions
+              ? `seguimento: ${String(payload.followUpInstructions)}`
+              : null
+          ].filter((line): line is string => Boolean(line))
+        },
+        {
           title: "Itens prescritos",
           lines: (((payload.items as Record<string, unknown>[] | undefined) ?? []).map((item) =>
             [
@@ -498,6 +507,13 @@ function buildPreviewSections(type: DocumentType, payload: Record<string, unknow
         {
           title: "Preparo",
           lines: payload.preparationNotes ? [String(payload.preparationNotes)] : []
+        },
+        {
+          title: "Indicacao e prioridade",
+          lines: [
+            payload.indication ? `indicacao: ${String(payload.indication)}` : null,
+            payload.priority ? `prioridade: ${String(payload.priority)}` : null
+          ].filter((line): line is string => Boolean(line))
         }
       ];
     case DocumentType.MEDICAL_CERTIFICATE:
@@ -509,11 +525,29 @@ function buildPreviewSections(type: DocumentType, payload: Record<string, unknow
         {
           title: "Observacoes",
           lines: payload.observations ? [String(payload.observations)] : []
+        },
+        {
+          title: "Afastamento e restricoes",
+          lines: [
+            payload.certificateKind ? `tipo: ${String(payload.certificateKind)}` : null,
+            payload.workRestrictionNotes
+              ? `restricoes: ${String(payload.workRestrictionNotes)}`
+              : null,
+            payload.fitToReturnDate ? `retorno previsto: ${String(payload.fitToReturnDate)}` : null
+          ].filter((line): line is string => Boolean(line))
         }
       ];
     case DocumentType.FREE_DOCUMENT:
     default:
       return [
+        {
+          title: "Metadados",
+          lines: [
+            payload.documentKind ? `tipo: ${String(payload.documentKind)}` : null,
+            payload.audience ? `destinatario: ${String(payload.audience)}` : null,
+            payload.closingStatement ? `fecho: ${String(payload.closingStatement)}` : null
+          ].filter((line): line is string => Boolean(line))
+        },
         {
           title: "Conteudo",
           lines: [String(payload.body ?? "")]

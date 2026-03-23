@@ -5,6 +5,9 @@ import type {
   ClinicalDecisionSupportSummary,
   ClinicalDocumentStatus,
   ClinicalDocumentType,
+  ExamRequestDocument,
+  FreeDocument,
+  MedicalCertificateDocument,
   PrescriptionDocument
 } from "@receituario/domain";
 import {
@@ -85,14 +88,18 @@ export function toDomainDocument(document: PrismaClinicalDocument): ClinicalDocu
         type: "prescription",
         items: ((payload?.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
           ...item
-        }))
+        })),
+        treatmentIntent: payload?.treatmentIntent as PrescriptionDocument["treatmentIntent"] | undefined,
+        followUpInstructions: payload?.followUpInstructions as string | undefined
       };
     case DocumentType.EXAM_REQUEST:
       return {
         ...base,
         type: "exam-request",
         requestedExams: (payload?.requestedExams as string[] | undefined) ?? [],
-        preparationNotes: payload?.preparationNotes as string | undefined
+        preparationNotes: payload?.preparationNotes as string | undefined,
+        indication: payload?.indication as string | undefined,
+        priority: payload?.priority as ExamRequestDocument["priority"] | undefined
       };
     case DocumentType.MEDICAL_CERTIFICATE:
       return {
@@ -100,14 +107,21 @@ export function toDomainDocument(document: PrismaClinicalDocument): ClinicalDocu
         type: "medical-certificate",
         purpose: String(payload?.purpose ?? ""),
         restDays: payload?.restDays as number | undefined,
-        observations: payload?.observations as string | undefined
+        observations: payload?.observations as string | undefined,
+        certificateKind:
+          payload?.certificateKind as MedicalCertificateDocument["certificateKind"] | undefined,
+        workRestrictionNotes: payload?.workRestrictionNotes as string | undefined,
+        fitToReturnDate: payload?.fitToReturnDate as string | undefined
       };
     case DocumentType.FREE_DOCUMENT:
     default:
       return {
         ...base,
         type: "free-document",
-        body: String(payload?.body ?? "")
+        body: String(payload?.body ?? ""),
+        documentKind: payload?.documentKind as FreeDocument["documentKind"] | undefined,
+        audience: payload?.audience as FreeDocument["audience"] | undefined,
+        closingStatement: payload?.closingStatement as string | undefined
       };
   }
 }
@@ -127,6 +141,8 @@ export function buildDocumentPayload(
         ...baseMetadata,
         _cds: normalizeCdsSummary(input.cdsSummary),
         _cdsOverride: normalizeCdsOverride(input.cdsOverride),
+        treatmentIntent: (input.treatmentIntent as PrescriptionDocument["treatmentIntent"] | undefined) ?? null,
+        followUpInstructions: (input.followUpInstructions as string | undefined) ?? null,
         items: ((input.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
           id: item.id ?? null,
           medicationName: item.medicationName,
@@ -143,19 +159,29 @@ export function buildDocumentPayload(
       return {
         ...baseMetadata,
         requestedExams: ((input.requestedExams as string[] | undefined) ?? []).map(String),
-        preparationNotes: (input.preparationNotes as string | undefined) ?? null
+        preparationNotes: (input.preparationNotes as string | undefined) ?? null,
+        indication: (input.indication as string | undefined) ?? null,
+        priority: (input.priority as ExamRequestDocument["priority"] | undefined) ?? null
       };
     case "medical-certificate":
       return {
         ...baseMetadata,
         purpose: String(input.purpose ?? ""),
         restDays: (input.restDays as number | undefined) ?? null,
-        observations: (input.observations as string | undefined) ?? null
+        observations: (input.observations as string | undefined) ?? null,
+        certificateKind:
+          (input.certificateKind as MedicalCertificateDocument["certificateKind"] | undefined) ??
+          null,
+        workRestrictionNotes: (input.workRestrictionNotes as string | undefined) ?? null,
+        fitToReturnDate: (input.fitToReturnDate as string | undefined) ?? null
       };
     case "free-document":
       return {
         ...baseMetadata,
-        body: String(input.body ?? "")
+        body: String(input.body ?? ""),
+        documentKind: (input.documentKind as FreeDocument["documentKind"] | undefined) ?? null,
+        audience: (input.audience as FreeDocument["audience"] | undefined) ?? null,
+        closingStatement: (input.closingStatement as string | undefined) ?? null
       };
   }
 }

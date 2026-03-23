@@ -79,12 +79,16 @@ export interface PrescriptionItem {
 export interface PrescriptionDocument extends ClinicalDocumentBase {
   type: "prescription";
   items: PrescriptionItem[];
+  treatmentIntent?: "acute" | "continuous" | "tapering" | "supportive";
+  followUpInstructions?: string;
 }
 
 export interface ExamRequestDocument extends ClinicalDocumentBase {
   type: "exam-request";
   requestedExams: string[];
   preparationNotes?: string;
+  indication?: string;
+  priority?: "routine" | "urgent" | "stat";
 }
 
 export interface MedicalCertificateDocument extends ClinicalDocumentBase {
@@ -92,11 +96,17 @@ export interface MedicalCertificateDocument extends ClinicalDocumentBase {
   purpose: string;
   restDays?: number;
   observations?: string;
+  certificateKind?: "attendance" | "rest" | "accompaniment" | "fitness";
+  workRestrictionNotes?: string;
+  fitToReturnDate?: string;
 }
 
 export interface FreeDocument extends ClinicalDocumentBase {
   type: "free-document";
   body: string;
+  documentKind?: "clinical-report" | "referral" | "declaration" | "opinion";
+  audience?: "patient" | "employer" | "insurer" | "specialist" | "general";
+  closingStatement?: string;
 }
 
 export type ClinicalDocument =

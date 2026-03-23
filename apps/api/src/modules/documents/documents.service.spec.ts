@@ -186,3 +186,127 @@ test("reconhece override institucional quando autor tem papel privilegiado", asy
   assert.equal(createdReviewPayload?.status, "ACKNOWLEDGED");
   assert.equal(createdReviewPayload?.reviewedByProfessionalId, "prof-compliance");
 });
+
+test("persiste contrato especifico de solicitacao de exames", async () => {
+  const service = new DocumentsService(
+    {
+      clinicalDocument: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({
+          id: "doc-exam-1",
+          type: DocumentType.EXAM_REQUEST,
+          status: DocumentStatus.READY_FOR_REVIEW,
+          patientId: data.patientId,
+          authorProfessionalId: data.authorProfessionalId,
+          title: data.title,
+          payload: data.payload,
+          layoutVersion: "v1",
+          payloadHash: "hash",
+          issuedAt: null,
+          derivedFromDocumentId: null,
+          createdAt: new Date("2026-03-23T12:00:00.000Z"),
+          updatedAt: new Date("2026-03-23T12:00:00.000Z")
+        })
+      }
+    } as never,
+    {
+      validateDraft: () => ({
+        status: "ready_for_review"
+      })
+    } as never,
+    {
+      analyzePrescription: async () => ({
+        severity: "none",
+        reviewedAt: new Date().toISOString(),
+        alerts: []
+      })
+    } as never
+  );
+
+  const result = await service.createExamRequest({
+    patientId: "patient-1",
+    authorProfessionalId: "prof-1",
+    title: "Exames de seguimento",
+    requestedExams: ["Hemograma completo", "PCR"],
+    indication: "Seguimento de sindrome inflamatoria.",
+    priority: "urgent",
+    preparationNotes: "Jejum de 8 horas."
+  } as never);
+
+  assert.equal(result.type, "exam-request");
+  assert.equal(result.indication, "Seguimento de sindrome inflamatoria.");
+  assert.equal(result.priority, "urgent");
+});
+
+test("persiste contrato especifico de atestado e documento livre", async () => {
+  const payloads: Record<string, unknown>[] = [];
+
+  const service = new DocumentsService(
+    {
+      clinicalDocument: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          payloads.push(data.payload as Record<string, unknown>);
+
+          return {
+            id: `doc-${payloads.length}`,
+            type:
+              payloads.length === 1
+                ? DocumentType.MEDICAL_CERTIFICATE
+                : DocumentType.FREE_DOCUMENT,
+            status: DocumentStatus.READY_FOR_REVIEW,
+            patientId: data.patientId,
+            authorProfessionalId: data.authorProfessionalId,
+            title: data.title,
+            payload: data.payload,
+            layoutVersion: "v1",
+            payloadHash: "hash",
+            issuedAt: null,
+            derivedFromDocumentId: null,
+            createdAt: new Date("2026-03-23T13:00:00.000Z"),
+            updatedAt: new Date("2026-03-23T13:00:00.000Z")
+          };
+        }
+      }
+    } as never,
+    {
+      validateDraft: () => ({
+        status: "ready_for_review"
+      })
+    } as never,
+    {
+      analyzePrescription: async () => ({
+        severity: "none",
+        reviewedAt: new Date().toISOString(),
+        alerts: []
+      })
+    } as never
+  );
+
+  const certificate = await service.createMedicalCertificate({
+    patientId: "patient-1",
+    authorProfessionalId: "prof-1",
+    title: "Atestado medico",
+    purpose: "Afastamento temporario",
+    restDays: 3,
+    certificateKind: "rest",
+    workRestrictionNotes: "Evitar esforco fisico.",
+    fitToReturnDate: "2026-03-26T00:00:00.000Z"
+  } as never);
+
+  const freeDocument = await service.createFreeDocument({
+    patientId: "patient-1",
+    authorProfessionalId: "prof-1",
+    title: "Encaminhamento",
+    body: "Encaminho para avaliacao especializada.",
+    documentKind: "referral",
+    audience: "specialist",
+    closingStatement: "Solicito parecer e devolutiva."
+  } as never);
+
+  assert.equal(certificate.type, "medical-certificate");
+  assert.equal(certificate.certificateKind, "rest");
+  assert.equal(certificate.workRestrictionNotes, "Evitar esforco fisico.");
+  assert.equal(freeDocument.type, "free-document");
+  assert.equal(freeDocument.documentKind, "referral");
+  assert.equal(freeDocument.audience, "specialist");
+  assert.equal(freeDocument.closingStatement, "Solicito parecer e devolutiva.");
+});

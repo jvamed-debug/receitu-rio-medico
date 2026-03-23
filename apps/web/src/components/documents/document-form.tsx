@@ -42,6 +42,8 @@ type FormState = {
   title: string;
   medicationName: string;
   activeIngredient: string;
+  treatmentIntent: string;
+  followUpInstructions: string;
   dosage: string;
   route: string;
   frequency: string;
@@ -50,10 +52,18 @@ type FormState = {
   notes: string;
   requestedExams: string;
   preparationNotes: string;
+  examIndication: string;
+  examPriority: string;
   purpose: string;
   restDays: string;
   observations: string;
+  certificateKind: string;
+  workRestrictionNotes: string;
+  fitToReturnDate: string;
   body: string;
+  freeDocumentKind: string;
+  freeDocumentAudience: string;
+  closingStatement: string;
   cdsOverrideJustification: string;
 };
 
@@ -69,6 +79,8 @@ const initialState: FormState = {
   title: "",
   medicationName: "",
   activeIngredient: "",
+  treatmentIntent: "acute",
+  followUpInstructions: "",
   dosage: "",
   route: "",
   frequency: "",
@@ -77,32 +89,48 @@ const initialState: FormState = {
   notes: "",
   requestedExams: "",
   preparationNotes: "",
+  examIndication: "",
+  examPriority: "routine",
   purpose: "",
   restDays: "",
   observations: "",
+  certificateKind: "attendance",
+  workRestrictionNotes: "",
+  fitToReturnDate: "",
   body: "",
+  freeDocumentKind: "clinical-report",
+  freeDocumentAudience: "general",
+  closingStatement: "",
   cdsOverrideJustification: ""
 };
 
 const defaultValuesByKind: Record<FormKind, Partial<FormState>> = {
   prescription: {
     title: "Prescricao medica",
+    treatmentIntent: "acute",
     frequency: "Conforme orientacao medica",
     duration: "Uso conforme prescricao",
-    notes: "Retornar em caso de piora clinica ou efeitos adversos."
+    notes: "Retornar em caso de piora clinica ou efeitos adversos.",
+    followUpInstructions: "Retorno ambulatorial conforme evolucao clinica."
   },
   "exam-request": {
     title: "Solicitacao de exames laboratoriais",
+    examPriority: "routine",
+    examIndication: "Investigacao clinica inicial e acompanhamento ambulatorial.",
     preparationNotes: "Levar documento com foto e seguir orientacoes de jejum quando aplicavel."
   },
   "medical-certificate": {
     title: "Atestado medico",
+    certificateKind: "attendance",
     purpose: "Comparecimento em consulta medica",
     observations:
       "Paciente esteve em consulta nesta data, devendo manter repouso conforme avaliacao clinica."
   },
   "free-document": {
     title: "Relatorio clinico",
+    freeDocumentKind: "clinical-report",
+    freeDocumentAudience: "general",
+    closingStatement: "Permanece em acompanhamento e reavaliacao conforme necessidade clinica.",
     body:
       "Paciente em acompanhamento clinico regular, com necessidade de seguimento assistencial e reavaliacao conforme evolucao."
   }
@@ -148,6 +176,7 @@ const examPanelPresets: FormPreset[] = [
     description: "Painel inicial para triagem clinica e metabolica.",
     values: {
       title: "Solicitacao de check-up metabolico",
+      examIndication: "Check-up clinico e estratificacao metabolica inicial.",
       preparationNotes: "Jejum de 8 horas quando aplicavel."
     },
     selectedExams: [
@@ -164,7 +193,8 @@ const examPanelPresets: FormPreset[] = [
     label: "Funcao renal",
     description: "Painel laboratorial para seguimento renal e urinario.",
     values: {
-      title: "Solicitacao de avaliacao de funcao renal"
+      title: "Solicitacao de avaliacao de funcao renal",
+      examIndication: "Avaliacao de funcao renal e correlacao urinaria."
     },
     selectedExams: ["Ureia", "Creatinina", "Sodio", "Potassio", "EAS", "Urocultura"]
   },
@@ -172,7 +202,8 @@ const examPanelPresets: FormPreset[] = [
     label: "Perfil hepatico",
     description: "Exames de funcao hepatica e vias biliares.",
     values: {
-      title: "Solicitacao de perfil hepatica"
+      title: "Solicitacao de perfil hepatica",
+      examIndication: "Investigacao laboratorial de funcao hepatica."
     },
     selectedExams: ["TGO (AST)", "TGP (ALT)", "Gama GT", "Bilirrubinas"]
   },
@@ -180,7 +211,8 @@ const examPanelPresets: FormPreset[] = [
     label: "Investigacao de anemia",
     description: "Triagem inicial hematimetrica e de ferro.",
     values: {
-      title: "Solicitacao para investigacao de anemia"
+      title: "Solicitacao para investigacao de anemia",
+      examIndication: "Investigacao etiologica de anemia."
     },
     selectedExams: ["Hemograma completo", "Ferritina", "Ferro serico", "Vitamina B12"]
   },
@@ -189,6 +221,7 @@ const examPanelPresets: FormPreset[] = [
     description: "Controle glicemico, renal e metabolico.",
     values: {
       title: "Solicitacao para seguimento do diabetes mellitus",
+      examIndication: "Seguimento metabolico e de lesao de orgao-alvo no diabetes.",
       preparationNotes: "Jejum de 8 horas para glicemia e lipidograma."
     },
     selectedExams: [
@@ -204,7 +237,8 @@ const examPanelPresets: FormPreset[] = [
     label: "Perfil tireoidiano",
     description: "Investigacao inicial de disfuncao tireoidiana.",
     values: {
-      title: "Solicitacao de perfil tireoidiano"
+      title: "Solicitacao de perfil tireoidiano",
+      examIndication: "Investigacao de disfuncao tireoidiana."
     },
     selectedExams: ["TSH", "T4 livre"]
   },
@@ -212,7 +246,8 @@ const examPanelPresets: FormPreset[] = [
     label: "Risco inflamatorio",
     description: "Painel basico para suspeita de processo inflamatorio.",
     values: {
-      title: "Solicitacao de avaliacao inflamatoria"
+      title: "Solicitacao de avaliacao inflamatoria",
+      examIndication: "Investigacao de sindrome inflamatoria."
     },
     selectedExams: ["Hemograma completo", "PCR", "Ferritina"]
   }
@@ -224,6 +259,7 @@ const specialtyExamPresets: FormPreset[] = [
     description: "Painel laboratorial de apoio ao risco cardiometabolico.",
     values: {
       title: "Solicitacao de exames - avaliacao cardiometabolica",
+      examIndication: "Estratificacao cardiometabolica ambulatorial.",
       preparationNotes: "Jejum de 8 horas para lipidograma quando aplicavel."
     },
     selectedExams: [
@@ -242,6 +278,7 @@ const specialtyExamPresets: FormPreset[] = [
     description: "Triagem inicial metabolica e tireoidiana.",
     values: {
       title: "Solicitacao de exames - avaliacao endocrinologica",
+      examIndication: "Investigacao endocrinologica e metabolica inicial.",
       preparationNotes: "Jejum de 8 horas para glicemia e lipidograma."
     },
     selectedExams: [
@@ -259,7 +296,8 @@ const specialtyExamPresets: FormPreset[] = [
     label: "Nefrologia",
     description: "Avaliacao funcional renal e urinaria.",
     values: {
-      title: "Solicitacao de exames - avaliacao nefrologica"
+      title: "Solicitacao de exames - avaliacao nefrologica",
+      examIndication: "Avaliacao nefrologica e acompanhamento de funcao renal."
     },
     selectedExams: ["Ureia", "Creatinina", "Sodio", "Potassio", "EAS", "Urocultura", "Coagulograma"]
   },
@@ -268,6 +306,7 @@ const specialtyExamPresets: FormPreset[] = [
     description: "Base ampla para triagem e acompanhamento ambulatorial.",
     values: {
       title: "Solicitacao de exames - avaliacao clinica geral",
+      examIndication: "Triagem clinica ambulatorial e acompanhamento basal.",
       preparationNotes: "Jejum conforme orientacao especifica de cada exame."
     },
     selectedExams: [
@@ -288,9 +327,11 @@ const prescriptionPresets: FormPreset[] = [
     description: "Base para medicacao de manutencao.",
     values: {
       title: "Prescricao de uso continuo",
+      treatmentIntent: "continuous",
       frequency: "Uso continuo conforme orientacao medica",
       duration: "Uso continuo",
-      notes: "Nao interromper sem reavaliacao medica."
+      notes: "Nao interromper sem reavaliacao medica.",
+      followUpInstructions: "Reavaliar adesao, sintomas e eventos adversos no retorno."
     }
   },
   {
@@ -298,8 +339,10 @@ const prescriptionPresets: FormPreset[] = [
     description: "Base para uso por poucos dias com retorno se piora.",
     values: {
       title: "Prescricao para tratamento agudo",
+      treatmentIntent: "acute",
       duration: "7 dias",
-      notes: "Retornar se persistencia dos sintomas, piora ou evento adverso."
+      notes: "Retornar se persistencia dos sintomas, piora ou evento adverso.",
+      followUpInstructions: "Reavaliar ao final do ciclo ou antes em caso de agravamento."
     }
   }
 ];
@@ -310,9 +353,11 @@ const specialtyPrescriptionPresets: FormPreset[] = [
     description: "Base para prescricao ambulatorial cardiovascular.",
     values: {
       title: "Prescricao cardiologica",
+      treatmentIntent: "continuous",
       frequency: "Conforme esquema prescrito e monitorizacao clinica",
       duration: "Uso continuo",
-      notes: "Orientado retorno para reavaliacao cardiovascular programada."
+      notes: "Orientado retorno para reavaliacao cardiovascular programada.",
+      followUpInstructions: "Monitorar pressao, frequencia cardiaca e adesao terapeutica."
     }
   },
   {
@@ -320,8 +365,10 @@ const specialtyPrescriptionPresets: FormPreset[] = [
     description: "Texto-base com reforco de reavaliacao e observacao familiar.",
     values: {
       title: "Prescricao pediatrica",
+      treatmentIntent: "supportive",
       frequency: "Conforme orientacao medica e faixa etaria",
-      notes: "Responsavel orientado a observar sinais de alarme e retornar em caso de piora."
+      notes: "Responsavel orientado a observar sinais de alarme e retornar em caso de piora.",
+      followUpInstructions: "Responsavel orientado sobre reavaliacao precoce se sinais de alarme."
     }
   },
   {
@@ -329,9 +376,11 @@ const specialtyPrescriptionPresets: FormPreset[] = [
     description: "Modelo amplo para seguimento ambulatorial.",
     values: {
       title: "Prescricao de clinica medica",
+      treatmentIntent: "acute",
       frequency: "Conforme posologia prescrita",
       duration: "Uso conforme orientacao",
-      notes: "Retorno ambulatorial conforme evolucao clinica."
+      notes: "Retorno ambulatorial conforme evolucao clinica.",
+      followUpInstructions: "Manter seguimento ambulatorial com revisao de resposta clinica."
     }
   }
 ];
@@ -342,6 +391,7 @@ const medicalCertificatePresets: FormPreset[] = [
     description: "Declara comparecimento em consulta na data.",
     values: {
       title: "Atestado de comparecimento",
+      certificateKind: "attendance",
       purpose: "Comparecimento em consulta medica",
       restDays: "",
       observations: "Paciente esteve em consulta medica nesta data."
@@ -352,10 +402,12 @@ const medicalCertificatePresets: FormPreset[] = [
     description: "Texto-base para afastamento curto.",
     values: {
       title: "Atestado medico para repouso",
+      certificateKind: "rest",
       purpose: "Necessidade de afastamento temporario das atividades habituais",
       restDays: "2",
       observations:
-        "Recomenda-se repouso pelo periodo informado e retorno se persistirem sintomas."
+        "Recomenda-se repouso pelo periodo informado e retorno se persistirem sintomas.",
+      workRestrictionNotes: "Evitar atividades laborais durante o periodo indicado."
     }
   },
   {
@@ -363,6 +415,7 @@ const medicalCertificatePresets: FormPreset[] = [
     description: "Base para justificar presenca de acompanhante.",
     values: {
       title: "Declaracao de acompanhante",
+      certificateKind: "accompaniment",
       purpose: "Necessidade de acompanhante em consulta ou assistencia",
       restDays: "",
       observations:
@@ -377,10 +430,12 @@ const specialtyCertificatePresets: FormPreset[] = [
     description: "Afastamento curto com observacao clinica padronizada.",
     values: {
       title: "Atestado de clinica medica",
+      certificateKind: "rest",
       purpose: "Necessidade de afastamento temporario das atividades habituais",
       restDays: "2",
       observations:
-        "Paciente avaliado nesta data, com recomendacao de repouso e reavaliacao conforme evolucao clinica."
+        "Paciente avaliado nesta data, com recomendacao de repouso e reavaliacao conforme evolucao clinica.",
+      workRestrictionNotes: "Manter afastamento de atividades habituais no periodo indicado."
     }
   },
   {
@@ -388,10 +443,12 @@ const specialtyCertificatePresets: FormPreset[] = [
     description: "Modelo inicial mais reservado para acompanhamento especializado.",
     values: {
       title: "Atestado medico",
+      certificateKind: "rest",
       purpose: "Necessidade de afastamento temporario por avaliacao psiquiatrica",
       restDays: "7",
       observations:
-        "Paciente em seguimento especializado, com necessidade de afastamento temporario e reavaliacao medica."
+        "Paciente em seguimento especializado, com necessidade de afastamento temporario e reavaliacao medica.",
+      workRestrictionNotes: "Evitar exposicao a fatores estressores laborais no periodo indicado."
     }
   },
   {
@@ -399,10 +456,12 @@ const specialtyCertificatePresets: FormPreset[] = [
     description: "Texto-base para limitacao funcional temporaria.",
     values: {
       title: "Atestado medico ortopedico",
+      certificateKind: "rest",
       purpose: "Necessidade de afastamento temporario por limitacao funcional",
       restDays: "5",
       observations:
-        "Paciente apresenta limitacao funcional temporaria, devendo manter repouso relativo e seguir em acompanhamento."
+        "Paciente apresenta limitacao funcional temporaria, devendo manter repouso relativo e seguir em acompanhamento.",
+      workRestrictionNotes: "Evitar esforco fisico e carga excessiva ate nova avaliacao."
     }
   }
 ];
@@ -413,6 +472,9 @@ const freeDocumentPresets: FormPreset[] = [
     description: "Resumo clinico breve para continuidade assistencial.",
     values: {
       title: "Relatorio clinico sucinto",
+      freeDocumentKind: "clinical-report",
+      freeDocumentAudience: "specialist",
+      closingStatement: "Sugere-se continuidade do acompanhamento conforme avaliacao especializada.",
       body:
         "Paciente em acompanhamento nesta unidade, com quadro clinico em seguimento, evolucao documentada e necessidade de continuidade do cuidado conforme avaliacao medica."
     }
@@ -422,6 +484,9 @@ const freeDocumentPresets: FormPreset[] = [
     description: "Base para encaminhar a outra especialidade ou servico.",
     values: {
       title: "Encaminhamento medico",
+      freeDocumentKind: "referral",
+      freeDocumentAudience: "specialist",
+      closingStatement: "Solicito parecer especializado e devolutiva assistencial, se pertinente.",
       body:
         "Encaminho paciente para avaliacao especializada, com objetivo de complementar investigacao diagnostica, estratificacao de risco e definicao de conduta terapeutica."
     }
@@ -431,6 +496,9 @@ const freeDocumentPresets: FormPreset[] = [
     description: "Modelo simples de declaracao clinica.",
     values: {
       title: "Declaracao medica",
+      freeDocumentKind: "declaration",
+      freeDocumentAudience: "patient",
+      closingStatement: "Documento emitido para os devidos fins nesta data.",
       body:
         "Declaro, para os devidos fins, que o paciente encontra-se em acompanhamento medico nesta data."
     }
@@ -440,6 +508,9 @@ const freeDocumentPresets: FormPreset[] = [
     description: "Texto-base mais formal para fins administrativos.",
     values: {
       title: "Relatorio medico",
+      freeDocumentKind: "opinion",
+      freeDocumentAudience: "insurer",
+      closingStatement: "Permanece indicado seguimento conforme evolucao clinica e necessidade assistencial.",
       body:
         "Apresento relatorio medico sucinto, contendo informacoes clinicas pertinentes, historico assistencial resumido e necessidade de seguimento conforme avaliacao realizada nesta data."
     }
@@ -452,6 +523,9 @@ const legalClinicalPresets: FormPreset[] = [
     description: "Texto mais formal para justificativa assistencial e documental.",
     values: {
       title: "Relatorio medico para auditoria",
+      freeDocumentKind: "opinion",
+      freeDocumentAudience: "insurer",
+      closingStatement: "Registra-se o presente parecer para fins tecnico-assistenciais e administrativos.",
       body:
         "Apresento relatorio medico com sintese clinica objetiva, fundamentos assistenciais, historico resumido e justificativa tecnica para a conduta adotada, nos limites desta avaliacao."
     }
@@ -461,6 +535,9 @@ const legalClinicalPresets: FormPreset[] = [
     description: "Comprovacao formal de seguimento ambulatorial.",
     values: {
       title: "Declaracao de seguimento medico",
+      freeDocumentKind: "declaration",
+      freeDocumentAudience: "employer",
+      closingStatement: "Mantem-se seguimento clinico conforme necessidade assistencial.",
       body:
         "Declaro, para os devidos fins, que o paciente permanece em acompanhamento medico regular, com necessidade de seguimento conforme plano terapeutico em curso."
     }
@@ -470,6 +547,9 @@ const legalClinicalPresets: FormPreset[] = [
     description: "Base para opiniao tecnica breve e objetiva.",
     values: {
       title: "Parecer clinico",
+      freeDocumentKind: "opinion",
+      freeDocumentAudience: "specialist",
+      closingStatement: "Permaneco a disposicao para esclarecimentos tecnicos complementares.",
       body:
         "Em avaliacao clinica nesta data, emito parecer sucinto com base nos achados assistenciais disponiveis, recomendando seguimento e complementariedade conforme necessidade clinica."
     }
@@ -545,6 +625,8 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
         const payload: CreatePrescriptionInput = {
           patientId: state.patientId,
           title: state.title,
+          treatmentIntent: asPrescriptionIntent(state.treatmentIntent),
+          followUpInstructions: state.followUpInstructions || undefined,
           items: [
             {
               medicationName: state.medicationName,
@@ -588,6 +670,8 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
           title: state.title,
           requestedExams,
           preparationNotes: state.preparationNotes || undefined,
+          indication: state.examIndication || undefined,
+          priority: asExamPriority(state.examPriority),
           context: {
             encounterType: "ambulatory",
             specialty: specialtyTrack ?? undefined
@@ -603,6 +687,11 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
           purpose: state.purpose,
           restDays: state.restDays ? Number(state.restDays) : undefined,
           observations: state.observations || undefined,
+          certificateKind: asCertificateKind(state.certificateKind),
+          workRestrictionNotes: state.workRestrictionNotes || undefined,
+          fitToReturnDate: state.fitToReturnDate
+            ? new Date(`${state.fitToReturnDate}T00:00:00.000Z`).toISOString()
+            : undefined,
           context: {
             encounterType: "ambulatory",
             specialty: specialtyTrack ?? undefined
@@ -616,6 +705,9 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
           patientId: state.patientId,
           title: state.title,
           body: state.body,
+          documentKind: asFreeDocumentKind(state.freeDocumentKind),
+          audience: asFreeDocumentAudience(state.freeDocumentAudience),
+          closingStatement: state.closingStatement || undefined,
           context: {
             encounterType: "ambulatory",
             specialty: specialtyTrack ?? undefined
@@ -696,6 +788,20 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
             <PresetButtons title="Modelos rapidos" presets={prescriptionPresets} onApply={applyPreset} />
             <PresetButtons title="Sugestoes por especialidade" presets={specialtyPrescriptionPresets} onApply={applyPreset} />
             <label style={fieldStyle}>
+              <span>Intencao terapeutica</span>
+              <select
+                value={state.treatmentIntent}
+                onChange={(event) => updateField("treatmentIntent", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              >
+                <option value="acute">Tratamento agudo</option>
+                <option value="continuous">Uso continuo</option>
+                <option value="supportive">Suporte sintomatico</option>
+                <option value="tapering">Desmame / reducao gradual</option>
+              </select>
+            </label>
+            <label style={fieldStyle}>
               <span>Medicamento</span>
               <input
                 value={state.medicationName}
@@ -768,6 +874,16 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
               />
             </label>
             <label style={fieldStyle}>
+              <span>Plano de seguimento</span>
+              <textarea
+                value={state.followUpInstructions}
+                onChange={(event) => updateField("followUpInstructions", event.target.value)}
+                style={textAreaStyle}
+                disabled={submitting}
+                placeholder="Orientacoes de retorno, monitorizacao ou reavaliacao."
+              />
+            </label>
+            <label style={fieldStyle}>
               <span>Justificativa de override clinico</span>
               <textarea
                 value={state.cdsOverrideJustification}
@@ -823,6 +939,29 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
               </div>
             </div>
             <label style={fieldStyle}>
+              <span>Indicacao clinica</span>
+              <textarea
+                value={state.examIndication}
+                onChange={(event) => updateField("examIndication", event.target.value)}
+                style={textAreaStyle}
+                disabled={submitting}
+                placeholder="Hipotese diagnostica, motivo do seguimento ou objetivo da investigacao."
+              />
+            </label>
+            <label style={fieldStyle}>
+              <span>Prioridade</span>
+              <select
+                value={state.examPriority}
+                onChange={(event) => updateField("examPriority", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              >
+                <option value="routine">Rotina</option>
+                <option value="urgent">Urgente</option>
+                <option value="stat">Imediato</option>
+              </select>
+            </label>
+            <label style={fieldStyle}>
               <span>Exames personalizados</span>
               <textarea
                 value={state.requestedExams}
@@ -856,6 +995,20 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
             <PresetButtons title="Textos-base" presets={medicalCertificatePresets} onApply={applyPreset} />
             <PresetButtons title="Sugestoes por especialidade" presets={specialtyCertificatePresets} onApply={applyPreset} />
             <label style={fieldStyle}>
+              <span>Tipo de atestado</span>
+              <select
+                value={state.certificateKind}
+                onChange={(event) => updateField("certificateKind", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              >
+                <option value="attendance">Comparecimento</option>
+                <option value="rest">Repouso</option>
+                <option value="accompaniment">Acompanhante</option>
+                <option value="fitness">Aptidao / retorno</option>
+              </select>
+            </label>
+            <label style={fieldStyle}>
               <span>Finalidade</span>
               <input
                 value={state.purpose}
@@ -872,6 +1025,26 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
                 style={inputStyle}
                 disabled={submitting}
                 inputMode="numeric"
+              />
+            </label>
+            <label style={fieldStyle}>
+              <span>Restricoes ou orientacoes laborais</span>
+              <textarea
+                value={state.workRestrictionNotes}
+                onChange={(event) => updateField("workRestrictionNotes", event.target.value)}
+                style={textAreaStyle}
+                disabled={submitting}
+                placeholder="Ex.: evitar esforco fisico, repouso domiciliar, retorno progressivo."
+              />
+            </label>
+            <label style={fieldStyle}>
+              <span>Data prevista para retorno</span>
+              <input
+                type="date"
+                value={state.fitToReturnDate}
+                onChange={(event) => updateField("fitToReturnDate", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
               />
             </label>
             <label style={fieldStyle}>
@@ -898,12 +1071,51 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
             <PresetButtons title="Modelos padronizados" presets={freeDocumentPresets} onApply={applyPreset} />
             <PresetButtons title="Biblioteca juridico-clinica" presets={legalClinicalPresets} onApply={applyPreset} />
             <label style={fieldStyle}>
+              <span>Tipo documental</span>
+              <select
+                value={state.freeDocumentKind}
+                onChange={(event) => updateField("freeDocumentKind", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              >
+                <option value="clinical-report">Relatorio clinico</option>
+                <option value="referral">Encaminhamento</option>
+                <option value="declaration">Declaracao</option>
+                <option value="opinion">Parecer</option>
+              </select>
+            </label>
+            <label style={fieldStyle}>
+              <span>Destinatario</span>
+              <select
+                value={state.freeDocumentAudience}
+                onChange={(event) => updateField("freeDocumentAudience", event.target.value)}
+                style={inputStyle}
+                disabled={submitting}
+              >
+                <option value="general">Geral</option>
+                <option value="patient">Paciente</option>
+                <option value="employer">Empregador</option>
+                <option value="insurer">Operadora / auditoria</option>
+                <option value="specialist">Especialista / servico</option>
+              </select>
+            </label>
+            <label style={fieldStyle}>
               <span>Corpo do documento</span>
               <textarea
                 value={state.body}
                 onChange={(event) => updateField("body", event.target.value)}
                 style={{ ...textAreaStyle, minHeight: 220 }}
                 disabled={submitting}
+              />
+            </label>
+            <label style={fieldStyle}>
+              <span>Fecho padronizado</span>
+              <textarea
+                value={state.closingStatement}
+                onChange={(event) => updateField("closingStatement", event.target.value)}
+                style={textAreaStyle}
+                disabled={submitting}
+                placeholder="Texto final padronizado para o documento."
               />
             </label>
           </>
@@ -997,6 +1209,46 @@ function buildExamRequestItems(freeText: string, selectedCatalog: string[]) {
     .filter(Boolean);
 
   return Array.from(new Set([...selectedCatalog, ...typedItems]));
+}
+
+function asPrescriptionIntent(value: string): CreatePrescriptionInput["treatmentIntent"] {
+  if (value === "continuous" || value === "tapering" || value === "supportive") {
+    return value;
+  }
+
+  return "acute";
+}
+
+function asExamPriority(value: string): CreateExamRequestInput["priority"] {
+  if (value === "urgent" || value === "stat") {
+    return value;
+  }
+
+  return "routine";
+}
+
+function asCertificateKind(value: string): CreateMedicalCertificateInput["certificateKind"] {
+  if (value === "rest" || value === "accompaniment" || value === "fitness") {
+    return value;
+  }
+
+  return "attendance";
+}
+
+function asFreeDocumentKind(value: string): CreateFreeDocumentInput["documentKind"] {
+  if (value === "referral" || value === "declaration" || value === "opinion") {
+    return value;
+  }
+
+  return "clinical-report";
+}
+
+function asFreeDocumentAudience(value: string): CreateFreeDocumentInput["audience"] {
+  if (value === "patient" || value === "employer" || value === "insurer" || value === "specialist") {
+    return value;
+  }
+
+  return "general";
 }
 
 function specialtyPresetMatchesTrack(label: string, specialtyTrack: SpecialtyTrack) {
