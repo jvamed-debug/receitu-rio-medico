@@ -423,13 +423,15 @@ Ja entregue:
 - cotacao mock por prescricao
 - endpoint de quote no backend
 - contrato compartilhado de cotacao
+- camada anti-corruption para quote remoto
+- normalizacao de provider, disponibilidade, warnings e links de continuidade
 
 Falta para fechar:
 
 - provider real
 - roteamento para rede/farmacia
 - disponibilidade e status de pedido
-- camada anti-corruption para parceiros
+- pedidos e conciliacao de status por parceiro
 
 ### 23. Analytics
 

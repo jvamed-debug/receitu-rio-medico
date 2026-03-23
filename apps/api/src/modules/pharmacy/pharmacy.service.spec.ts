@@ -24,9 +24,15 @@ test("gera cotacao a partir de uma prescricao", async () => {
         items: Array<{ medicationName: string; quantity?: string }>;
       }) => ({
         provider: "mock-pharmacy",
+        providerMode: "mock",
         quoteId: `quote-${input.documentId}`,
+        checkoutUrl: "https://pharmacy.receituario.local/quotes/doc-1",
         totalPriceCents: 2500,
         currency: "BRL",
+        unavailableItems: 0,
+        availableItems: 1,
+        warnings: [],
+        sourceReference: "mock:doc-1",
         items: [
           {
             medicationName: input.items[0]?.medicationName ?? "",
@@ -45,4 +51,5 @@ test("gera cotacao a partir de uma prescricao", async () => {
 
   assert.equal(result.provider, "mock-pharmacy");
   assert.equal(result.items[0]?.medicationName, "Dipirona");
+  assert.equal(result.warnings.length, 0);
 });

@@ -5,6 +5,8 @@ import {
 import { ConfigService } from "@nestjs/config";
 import type { PharmacyQuote } from "@receituario/domain";
 
+import { mapRemotePharmacyQuote } from "./pharmacy-anti-corruption.mapper";
+
 @Injectable()
 export class PharmacyProviderGateway {
   constructor(private readonly configService: ConfigService) {}
@@ -53,10 +55,16 @@ export class PharmacyProviderGateway {
 
     return {
       provider: "mock-pharmacy",
+      providerMode: "mock",
       quoteId: `quote-${input.documentId}`,
       checkoutUrl: `${baseUrl.replace(/\/$/, "")}/quotes/${input.documentId}`,
+      partnerOrderUrl: `${baseUrl.replace(/\/$/, "")}/partners/mock/orders/${input.documentId}`,
       totalPriceCents,
       currency: "BRL",
+      unavailableItems: 0,
+      availableItems: items.length,
+      warnings: [],
+      sourceReference: `mock:${input.documentId}`,
       items,
       createdAt: new Date().toISOString()
     };
@@ -93,6 +101,9 @@ export class PharmacyProviderGateway {
       );
     }
 
-    return (await response.json()) as PharmacyQuote;
+    const providerName =
+      this.configService.get<string>("PHARMACY_PROVIDER_NAME") ?? "remote-pharmacy";
+
+    return mapRemotePharmacyQuote(await response.json(), providerName);
   }
 }

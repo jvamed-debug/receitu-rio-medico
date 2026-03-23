@@ -23,6 +23,9 @@ test("gateway mock de farmacia gera cotacao para prescricao", async () => {
   });
 
   assert.equal(result.provider, "mock-pharmacy");
+  assert.equal(result.providerMode, "mock");
   assert.equal(result.items.length, 1);
+  assert.equal(result.availableItems, 1);
+  assert.equal(result.unavailableItems, 0);
   assert.equal(result.checkoutUrl, "https://pharmacy.receituario.local/quotes/doc-1");
 });
