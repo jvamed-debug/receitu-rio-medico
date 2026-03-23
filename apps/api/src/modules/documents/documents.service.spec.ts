@@ -9,6 +9,9 @@ import { DocumentsService } from "./documents.service";
 test("bloqueia prescricao com alerta que exige override sem justificativa", async () => {
   const service = new DocumentsService(
     {
+      organization: {
+        findUnique: async () => null
+      },
       cdsOverrideReview: {
         create: async () => undefined
       },
@@ -56,6 +59,9 @@ test("persiste prescricao com override justificado", async () => {
 
   const service = new DocumentsService(
     {
+      organization: {
+        findUnique: async () => null
+      },
       cdsOverrideReview: {
         create: async ({ data }: { data: Record<string, unknown> }) => {
           createdReviewPayload = data;
@@ -122,6 +128,9 @@ test("reconhece override institucional quando autor tem papel privilegiado", asy
 
   const service = new DocumentsService(
     {
+      organization: {
+        findUnique: async () => null
+      },
       cdsOverrideReview: {
         create: async ({ data }: { data: Record<string, unknown> }) => {
           createdReviewPayload = data;
@@ -185,6 +194,86 @@ test("reconhece override institucional quando autor tem papel privilegiado", asy
 
   assert.equal(createdReviewPayload?.status, "ACKNOWLEDGED");
   assert.equal(createdReviewPayload?.reviewedByProfessionalId, "prof-compliance");
+});
+
+test("mantem review pendente quando politica institucional desabilita auto-reconhecimento", async () => {
+  let createdReviewPayload: Record<string, unknown> | undefined;
+
+  const service = new DocumentsService(
+    {
+      organization: {
+        findUnique: async () => ({
+          settings: {
+            overridePolicy: {
+              autoAcknowledgePrivilegedOverride: false
+            }
+          }
+        })
+      },
+      cdsOverrideReview: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          createdReviewPayload = data;
+        }
+      },
+      clinicalDocument: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({
+          id: "doc-3",
+          type: DocumentType.PRESCRIPTION,
+          status: DocumentStatus.READY_FOR_REVIEW,
+          patientId: data.patientId,
+          authorProfessionalId: data.authorProfessionalId,
+          title: data.title,
+          payload: data.payload,
+          layoutVersion: "v1",
+          payloadHash: "hash",
+          issuedAt: null,
+          derivedFromDocumentId: null,
+          createdAt: new Date("2026-03-23T11:30:00.000Z"),
+          updatedAt: new Date("2026-03-23T11:30:00.000Z")
+        })
+      }
+    } as never,
+    {
+      validateDraft: () => ({
+        status: "ready_for_review"
+      })
+    } as never,
+    {
+      analyzePrescription: async () => ({
+        severity: "high",
+        reviewedAt: new Date().toISOString(),
+        sources: ["local-rules:v1", "institutional-governance:v1"],
+        alerts: [
+          {
+            code: "interaction_warfarin_nsaid",
+            severity: "high",
+            category: "interaction",
+            message: "Interacao grave",
+            requiresOverrideJustification: true,
+            source: "institutional_policy",
+            institutionalReviewRequired: true,
+            minimumReviewerRole: "compliance"
+          }
+        ]
+      })
+    } as never
+  );
+
+  await service.createPrescription({
+    patientId: "patient-1",
+    organizationId: "org-1",
+    authorProfessionalId: "prof-compliance",
+    title: "Prescricao critica",
+    items: [{ medicationName: "Warfarina", dosage: "5mg" }],
+    requesterRoles: ["compliance"],
+    cdsOverride: {
+      justification: "Caso revisado pelo autor, mas politica exige decisao separada.",
+      acceptedAlertCodes: ["all-required"]
+    }
+  } as never);
+
+  assert.equal(createdReviewPayload?.status, "PENDING");
+  assert.equal(createdReviewPayload?.reviewedByProfessionalId, null);
 });
 
 test("persiste contrato especifico de solicitacao de exames", async () => {

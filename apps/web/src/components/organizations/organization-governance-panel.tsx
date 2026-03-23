@@ -48,7 +48,12 @@ export function OrganizationGovernancePanel({
         currentOrganization?.settings?.overridePolicy.minimumReviewerRole ?? "compliance",
       requireInstitutionalReviewForHighSeverity:
         currentOrganization?.settings?.overridePolicy.requireInstitutionalReviewForHighSeverity ??
-        true
+        true,
+      requireInstitutionalReviewForModerateInteraction:
+        currentOrganization?.settings?.overridePolicy.requireInstitutionalReviewForModerateInteraction ??
+        true,
+      autoAcknowledgePrivilegedOverride:
+        currentOrganization?.settings?.overridePolicy.autoAcknowledgePrivilegedOverride ?? true
     },
     brandingPolicy: {
       allowCustomLogo: currentOrganization?.settings?.brandingPolicy.allowCustomLogo ?? false,
@@ -252,7 +257,11 @@ export function OrganizationGovernancePanel({
         overridePolicy: {
           minimumReviewerRole: settings.overridePolicy.minimumReviewerRole,
           requireInstitutionalReviewForHighSeverity:
-            settings.overridePolicy.requireInstitutionalReviewForHighSeverity
+            settings.overridePolicy.requireInstitutionalReviewForHighSeverity,
+          requireInstitutionalReviewForModerateInteraction:
+            settings.overridePolicy.requireInstitutionalReviewForModerateInteraction,
+          autoAcknowledgePrivilegedOverride:
+            settings.overridePolicy.autoAcknowledgePrivilegedOverride
         },
         brandingPolicy: {
           allowCustomLogo: settings.brandingPolicy.allowCustomLogo,
@@ -272,7 +281,12 @@ export function OrganizationGovernancePanel({
           minimumReviewerRole:
             updated.settings?.overridePolicy.minimumReviewerRole ?? "compliance",
           requireInstitutionalReviewForHighSeverity:
-            updated.settings?.overridePolicy.requireInstitutionalReviewForHighSeverity ?? true
+            updated.settings?.overridePolicy.requireInstitutionalReviewForHighSeverity ?? true,
+          requireInstitutionalReviewForModerateInteraction:
+            updated.settings?.overridePolicy.requireInstitutionalReviewForModerateInteraction ??
+            true,
+          autoAcknowledgePrivilegedOverride:
+            updated.settings?.overridePolicy.autoAcknowledgePrivilegedOverride ?? true
         },
         brandingPolicy: {
           allowCustomLogo: updated.settings?.brandingPolicy.allowCustomLogo ?? false,
@@ -622,6 +636,38 @@ export function OrganizationGovernancePanel({
                 }
               />
               <span>Exigir revisao institucional para alertas de alta severidade</span>
+            </label>
+            <label style={checkboxLabelStyle}>
+              <input
+                type="checkbox"
+                checked={settings.overridePolicy.requireInstitutionalReviewForModerateInteraction}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    overridePolicy: {
+                      ...current.overridePolicy,
+                      requireInstitutionalReviewForModerateInteraction: event.target.checked
+                    }
+                  }))
+                }
+              />
+              <span>Exigir revisao institucional para interacoes moderadas</span>
+            </label>
+            <label style={checkboxLabelStyle}>
+              <input
+                type="checkbox"
+                checked={settings.overridePolicy.autoAcknowledgePrivilegedOverride}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    overridePolicy: {
+                      ...current.overridePolicy,
+                      autoAcknowledgePrivilegedOverride: event.target.checked
+                    }
+                  }))
+                }
+              />
+              <span>Permitir auto-reconhecimento por perfil privilegiado</span>
             </label>
           </div>
 

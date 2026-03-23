@@ -540,8 +540,20 @@ export class DocumentsService {
     const reviewRequiredByPolicy = requiredAlerts.some(
       (alert) => alert.institutionalReviewRequired
     );
+    const organizationSettings =
+      typeof enrichedInput.organizationId === "string"
+        ? await this.prisma.organization.findUnique({
+            where: { id: enrichedInput.organizationId },
+            select: { settings: true }
+          })
+        : null;
+    const overridePolicy = normalizeOverridePolicySettings(organizationSettings?.settings);
+    const allowPrivilegedAutoAcknowledge =
+      privilegedReviewer &&
+      reviewRequiredByPolicy &&
+      overridePolicy.autoAcknowledgePrivilegedOverride;
     const nextStatus =
-      privilegedReviewer && reviewRequiredByPolicy
+      allowPrivilegedAutoAcknowledge
         ? CdsOverrideReviewStatus.ACKNOWLEDGED
         : CdsOverrideReviewStatus.PENDING;
 
@@ -567,6 +579,22 @@ export class DocumentsService {
       }
     });
   }
+}
+
+function normalizeOverridePolicySettings(input: unknown) {
+  const settings =
+    input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const override =
+    settings.overridePolicy && typeof settings.overridePolicy === "object"
+      ? (settings.overridePolicy as Record<string, unknown>)
+      : {};
+
+  return {
+    autoAcknowledgePrivilegedOverride:
+      typeof override.autoAcknowledgePrivilegedOverride === "boolean"
+        ? override.autoAcknowledgePrivilegedOverride
+        : true
+  };
 }
 
 function toRate(numerator: number, denominator: number) {

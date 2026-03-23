@@ -51,6 +51,8 @@ export interface ClinicalDecisionSupportAlert {
   source?: "local_rule" | "institutional_policy";
   institutionalReviewRequired?: boolean;
   minimumReviewerRole?: "professional" | "admin" | "compliance";
+  reviewTier?: "none" | "recommended" | "required";
+  governanceReason?: string;
 }
 
 export interface ClinicalDecisionSupportSummary {

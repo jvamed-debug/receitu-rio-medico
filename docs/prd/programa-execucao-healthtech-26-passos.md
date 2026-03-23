@@ -31,6 +31,7 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 23. analytics clinico-operacional baseline
 - 10. contratos documentais tipados e versionados
 - 12. prontuario longitudinal baseline
+- 18. CDS baseline institucional concluido
 
 ### Em progresso forte
 
@@ -44,7 +45,6 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 15. separar autenticacao e assinatura
 - 16. refinar UX clinica
 - 17. criar biblioteca clinica forte
-- 18. incluir CDS basico
 - 20. financeiro
 - 21. comunicacao
 - 22. integracao farmaceutica
@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 18. ampliar graduacao institucional do CDS
 - 11. endurecer lifecycle institucional de templates
 - 9. aprofundar problemas e eventos clinicos estruturados
+- 7. fechar matriz regulatoria por tipo documental no nivel institucional
 
 ## Checklist dos 26 passos
 
@@ -375,7 +375,7 @@ Falta para fechar:
 
 ### 18. Incluir CDS basico
 
-Status: em progresso avancado
+Status: concluido no baseline institucional atual
 
 Ja entregue:
 
@@ -393,11 +393,19 @@ Ja entregue:
 - governanca institucional por organizacao e papel
 - source tagging do CDS entre regra local e politica institucional
 - reconhecimento automatico de override institucional por perfil privilegiado
+- politica institucional configuravel para:
+  - alta severidade
+  - interacoes moderadas
+  - auto-reconhecimento por perfil privilegiado
+- graduacao explicita de review com `recommended` e `required`
+- motivo de governanca por alerta
+- visibilidade operacional das revisoes pendentes no dashboard
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- graduacao mais fina de override
-- interacoes mais amplas baseadas em fonte clinica homologada
+- base de interacoes homologada externa
+- conhecimento medicamentoso mais amplo e parametrico
+- reconciliacao de protocolos clinicos por tenant
 
 ## Trilha 5: Operacao da clinica
 
@@ -604,15 +612,15 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 10: fechar versionamento e contratos documentais mais rigidos
-2. passo 12: aprofundar evolucao clinica longitudinal
-3. passo 18: ampliar graduacao institucional do CDS
+1. passo 11: endurecer lifecycle institucional de templates
+2. passo 9: aprofundar problemas e eventos clinicos estruturados
+3. passo 7: fechar matriz regulatoria institucional por tipo documental
 
 ### Bloco seguinte
 
-4. ampliar analytics documentais e assistenciais por coorte e desfecho
-5. endurecer o restante do lifecycle institucional com aceite e expiracao automatica
-6. aprofundar observabilidade e exportacao analitica
+4. aprofundar observabilidade e exportacao analitica
+5. endurecer descarte e retencao automatizados com workflow
+6. evoluir a governanca de templates oficiais por tenant
 
 ### Bloco posterior
 
@@ -624,7 +632,7 @@ Falta para fechar:
 
 Nao abrir novas frentes pesadas de ecossistema antes de concluir:
 
-- contratos mais fortes por tipo documental
-- provider real de assinatura
-- CDS basico
+- lifecycle institucional de templates
+- matriz regulatoria institucional
 - operacao segura mais madura
+- prontuario longitudinal com eventos mais estruturados

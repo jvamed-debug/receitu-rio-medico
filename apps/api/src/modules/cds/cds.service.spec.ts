@@ -13,6 +13,9 @@ test("detecta alergia e duplicidade terapeutica na prescricao", async () => {
           conditions: [{ name: "Insuficiencia renal cronica", status: "active" }]
         }
       })
+    },
+    organization: {
+      findUnique: async () => null
     }
   } as never);
 
@@ -52,6 +55,9 @@ test("detecta interacao grave e regra por especialidade", async () => {
           conditions: []
         }
       })
+    },
+    organization: {
+      findUnique: async () => null
     }
   } as never);
 
@@ -99,6 +105,18 @@ test("aplica governanca institucional por tenant e papel", async () => {
           conditions: []
         }
       })
+    },
+    organization: {
+      findUnique: async () => ({
+        settings: {
+          overridePolicy: {
+            minimumReviewerRole: "admin",
+            requireInstitutionalReviewForHighSeverity: true,
+            requireInstitutionalReviewForModerateInteraction: true,
+            autoAcknowledgePrivilegedOverride: false
+          }
+        }
+      })
     }
   } as never);
 
@@ -122,6 +140,55 @@ test("aplica governanca institucional por tenant e papel", async () => {
 
   assert.equal(interaction?.source, "institutional_policy");
   assert.equal(interaction?.institutionalReviewRequired, true);
-  assert.equal(interaction?.minimumReviewerRole, "compliance");
+  assert.equal(interaction?.minimumReviewerRole, "admin");
+  assert.equal(interaction?.reviewTier, "required");
+  assert.equal(interaction?.governanceReason, "high-severity-institutional-policy");
   assert.equal(result.sources?.includes("institutional-governance:v1"), true);
+});
+
+test("graduacao institucional moderada respeita politica da organizacao", async () => {
+  const service = new CdsService({
+    patient: {
+      findUnique: async () => ({
+        clinicalProfile: {
+          allergies: [],
+          chronicMedications: [],
+          conditions: []
+        }
+      })
+    },
+    organization: {
+      findUnique: async () => ({
+        settings: {
+          overridePolicy: {
+            minimumReviewerRole: "compliance",
+            requireInstitutionalReviewForHighSeverity: true,
+            requireInstitutionalReviewForModerateInteraction: false,
+            autoAcknowledgePrivilegedOverride: true
+          }
+        }
+      })
+    }
+  } as never);
+
+  const result = await service.analyzePrescription({
+    patientId: "patient-4",
+    organizationId: "org-1",
+    requesterRoles: ["professional"],
+    context: {
+      specialty: "Cardiologia"
+    },
+    items: [
+      {
+        medicationName: "Ibuprofeno",
+        dosage: "400mg"
+      }
+    ]
+  });
+
+  const alert = result.alerts.find((entry) => entry.code === "specialty_cardiology_nsaid_caution");
+
+  assert.equal(alert?.reviewTier, "recommended");
+  assert.equal(alert?.institutionalReviewRequired, undefined);
+  assert.equal(alert?.governanceReason, "moderate-interaction-review-recommended");
 });

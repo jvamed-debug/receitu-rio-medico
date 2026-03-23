@@ -21,28 +21,43 @@ export class CdsService {
     organizationId?: string;
     requesterRoles?: string[];
   }): Promise<ClinicalDecisionSupportSummary> {
-    const patient = await this.prisma.patient.findUnique({
-      where: { id: input.patientId },
-      include: {
-        clinicalProfile: true
-      }
-    });
+    const [patient, organization] = await Promise.all([
+      this.prisma.patient.findUnique({
+        where: { id: input.patientId },
+        include: {
+          clinicalProfile: true
+        }
+      }),
+      input.organizationId
+        ? this.prisma.organization.findUnique({
+            where: { id: input.organizationId },
+            select: { settings: true }
+          })
+        : Promise.resolve(null)
+    ]);
 
     const profile = mapPatientClinicalProfile(patient?.clinicalProfile);
+    const organizationSettings = normalizeCdsOrganizationSettings(organization?.settings);
     const alerts = applyInstitutionalGovernance(
       [
-      ...buildAllergyAlerts(profile, input.items),
-      ...buildDuplicateTherapyAlerts(profile, input.items),
-      ...buildConditionAlerts(profile, input.items),
-      ...buildMedicationInteractionAlerts(input.items),
-      ...buildSpecialtyAlerts(input.items, input.context?.specialty)
+        ...buildAllergyAlerts(profile, input.items),
+        ...buildDuplicateTherapyAlerts(profile, input.items),
+        ...buildConditionAlerts(profile, input.items),
+        ...buildMedicationInteractionAlerts(input.items),
+        ...buildSpecialtyAlerts(input.items, input.context?.specialty)
       ],
       {
         organizationId: input.organizationId,
-        requesterRoles: input.requesterRoles
+        requesterRoles: input.requesterRoles,
+        settings: organizationSettings
       }
     );
-    const sources = new Set<string>(["local-rules:v1"]);
+    const sources = new Set<string>([
+      "local-rules:v1",
+      "clinical-profile:v1",
+      "medication-interactions:v1",
+      "specialty-guardrails:v1"
+    ]);
 
     if (input.organizationId && alerts.some((alert) => alert.source === "institutional_policy")) {
       sources.add("institutional-governance:v1");
@@ -105,7 +120,8 @@ function buildAllergyAlerts(
         severity: "high",
         category: "allergy",
         message: `Alergia registrada com correspondencia para ${item.medicationName}.`,
-        source: "local_rule"
+        source: "local_rule",
+        reviewTier: "required"
       }
     ];
   });
@@ -139,7 +155,8 @@ function buildDuplicateTherapyAlerts(
         severity: "moderate",
         category: "duplicate_therapy",
         message: `Possivel duplicidade terapeutica com medicacao cronica registrada: ${duplicate}.`,
-        source: "local_rule"
+        source: "local_rule",
+        reviewTier: "recommended"
       }
     ];
   });
@@ -214,7 +231,8 @@ function buildConditionAlerts(
           category: "condition",
           message: rule.message(item.medicationName, matchingCondition.displayName),
           requiresOverrideJustification: rule.requiresOverrideJustification,
-          source: "local_rule"
+          source: "local_rule",
+          reviewTier: rule.requiresOverrideJustification ? "required" : "recommended"
         }
       ];
     });
@@ -273,7 +291,8 @@ function buildMedicationInteractionAlerts(
         category: "interaction",
         message: `${rule.message} Itens envolvidos: ${matchedPair.displayNames.join(" + ")}.`,
         requiresOverrideJustification: rule.requiresOverrideJustification,
-        source: "local_rule"
+        source: "local_rule",
+        reviewTier: "required"
       }
     ];
   });
@@ -343,7 +362,8 @@ function buildSpecialtyAlerts(
           category: "interaction",
           message: rule.message(item.medicationName),
           requiresOverrideJustification: rule.requiresOverrideJustification,
-          source: "local_rule"
+          source: "local_rule",
+          reviewTier: rule.requiresOverrideJustification ? "required" : "recommended"
         }
       ];
     });
@@ -355,6 +375,7 @@ function applyInstitutionalGovernance(
   input: {
     organizationId?: string;
     requesterRoles?: string[];
+    settings: ReturnType<typeof normalizeCdsOrganizationSettings>;
   }
 ): ClinicalDecisionSupportAlert[] {
   if (!input.organizationId) {
@@ -362,38 +383,84 @@ function applyInstitutionalGovernance(
   }
 
   const requesterRoles = input.requesterRoles ?? [];
-  const privilegedRole = requesterRoles.some(
-    (role) => role === "admin" || role === "compliance"
-  );
-  const highSeverityReviewerRole: ClinicalDecisionSupportAlert["minimumReviewerRole"] =
-    privilegedRole ? "admin" : "compliance";
 
   return alerts.map((alert) => {
-    if (alert.severity === "high") {
+    if (
+      alert.severity === "high" &&
+      input.settings.requireInstitutionalReviewForHighSeverity
+    ) {
       return {
         ...alert,
         source: "institutional_policy" as const,
         requiresOverrideJustification: true,
         institutionalReviewRequired: true,
-        minimumReviewerRole: highSeverityReviewerRole
+        minimumReviewerRole: input.settings.minimumReviewerRole,
+        reviewTier: "required" as const,
+        governanceReason: "high-severity-institutional-policy"
       };
     }
 
     if (
       alert.severity === "moderate" &&
       alert.category === "interaction" &&
-      requesterRoles.includes("professional")
+      requesterRoles.includes("professional") &&
+      input.settings.requireInstitutionalReviewForModerateInteraction
     ) {
       return {
         ...alert,
         source: "institutional_policy" as const,
+        requiresOverrideJustification: true,
         institutionalReviewRequired: true,
-        minimumReviewerRole: "admin" as const
+        minimumReviewerRole: input.settings.minimumReviewerRole,
+        reviewTier: "required" as const,
+        governanceReason: "moderate-interaction-institutional-policy"
+      };
+    }
+
+    if (alert.severity === "moderate") {
+      return {
+        ...alert,
+        reviewTier: alert.reviewTier ?? "recommended",
+        governanceReason:
+          alert.governanceReason ??
+          (alert.category === "interaction"
+            ? "moderate-interaction-review-recommended"
+            : "moderate-alert-review-recommended")
       };
     }
 
     return alert;
   });
+}
+
+function normalizeCdsOrganizationSettings(input: unknown) {
+  const settings =
+    input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const override =
+    settings.overridePolicy && typeof settings.overridePolicy === "object"
+      ? (settings.overridePolicy as Record<string, unknown>)
+      : {};
+
+  return {
+    minimumReviewerRole:
+      override.minimumReviewerRole === "professional" ||
+      override.minimumReviewerRole === "admin" ||
+      override.minimumReviewerRole === "compliance"
+        ? (override.minimumReviewerRole as "professional" | "admin" | "compliance")
+        : ("compliance" as const),
+    requireInstitutionalReviewForHighSeverity:
+      typeof override.requireInstitutionalReviewForHighSeverity === "boolean"
+        ? override.requireInstitutionalReviewForHighSeverity
+        : true,
+    requireInstitutionalReviewForModerateInteraction:
+      typeof override.requireInstitutionalReviewForModerateInteraction === "boolean"
+        ? override.requireInstitutionalReviewForModerateInteraction
+        : true,
+    autoAcknowledgePrivilegedOverride:
+      typeof override.autoAcknowledgePrivilegedOverride === "boolean"
+        ? override.autoAcknowledgePrivilegedOverride
+        : true
+  };
 }
 
 function buildItemPairs(items: PrescriptionItem[]) {

@@ -162,6 +162,8 @@ export interface OrganizationSettings {
   overridePolicy: {
     minimumReviewerRole: "professional" | "admin" | "compliance";
     requireInstitutionalReviewForHighSeverity: boolean;
+    requireInstitutionalReviewForModerateInteraction: boolean;
+    autoAcknowledgePrivilegedOverride: boolean;
   };
   brandingPolicy: {
     allowCustomLogo: boolean;

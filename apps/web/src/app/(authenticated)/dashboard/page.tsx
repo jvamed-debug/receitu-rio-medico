@@ -65,13 +65,24 @@ async function loadDocumentAnalytics() {
   }
 }
 
+async function loadPendingCdsOverrideReviews() {
+  const api = createApiClient();
+
+  try {
+    return await api.listPendingCdsOverrideReviews();
+  } catch {
+    return [];
+  }
+}
+
 export default async function DashboardPage() {
-  const [health, agenda, operations, analytics, documentAnalytics] = await Promise.all([
+  const [health, agenda, operations, analytics, documentAnalytics, pendingOverrideReviews] = await Promise.all([
     loadHealth(),
     loadAppointmentsSummary(),
     loadAppointmentOperations(),
     loadAppointmentAnalytics(),
-    loadDocumentAnalytics()
+    loadDocumentAnalytics(),
+    loadPendingCdsOverrideReviews()
   ]);
 
   const cards = [
@@ -108,6 +119,70 @@ export default async function DashboardPage() {
           </article>
         ))}
       </div>
+
+      <section
+        style={{
+          marginTop: 24,
+          background: "white",
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Governanca clinica e overrides</h2>
+        <div
+          style={{
+            display: "grid",
+            gap: 12,
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            marginBottom: 18
+          }}
+        >
+          <FinanceCard
+            label="Reviews pendentes"
+            amount={pendingOverrideReviews.filter((review) => review.status === "pending").length}
+            detail="overrides que aguardam decisao institucional"
+            countMode
+          />
+          <FinanceCard
+            label="Reviews reconhecidos"
+            amount={
+              pendingOverrideReviews.filter((review) => review.status === "acknowledged").length
+            }
+            detail="casos ja reconhecidos por governanca"
+            countMode
+          />
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {pendingOverrideReviews.length > 0 ? (
+            pendingOverrideReviews.slice(0, 6).map((review) => (
+              <article
+                key={review.id}
+                style={{
+                  borderRadius: 14,
+                  border: "1px solid #d9e8f5",
+                  padding: 14,
+                  background: "#f8fbff",
+                  display: "grid",
+                  gap: 6
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>
+                  Documento {review.documentId} | status {review.status}
+                </div>
+                <div style={{ color: "var(--muted)" }}>
+                  Alertas: {review.alertCodes.join(", ") || "sem codigos informados"}
+                </div>
+                <div style={{ color: "var(--muted)" }}>{review.justification}</div>
+              </article>
+            ))
+          ) : (
+            <div style={{ color: "var(--muted)" }}>
+              Nenhum review de override clinico pendente no momento.
+            </div>
+          )}
+        </div>
+      </section>
 
       <section
         style={{

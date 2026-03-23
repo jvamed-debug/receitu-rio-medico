@@ -338,6 +338,8 @@ export class OrganizationsService {
       overridePolicy?: {
         minimumReviewerRole?: "professional" | "admin" | "compliance";
         requireInstitutionalReviewForHighSeverity?: boolean;
+        requireInstitutionalReviewForModerateInteraction?: boolean;
+        autoAcknowledgePrivilegedOverride?: boolean;
       };
       brandingPolicy?: {
         allowCustomLogo?: boolean;
@@ -585,6 +587,14 @@ function normalizeOrganizationSettings(input: unknown) {
       requireInstitutionalReviewForHighSeverity:
         typeof override.requireInstitutionalReviewForHighSeverity === "boolean"
           ? override.requireInstitutionalReviewForHighSeverity
+          : true,
+      requireInstitutionalReviewForModerateInteraction:
+        typeof override.requireInstitutionalReviewForModerateInteraction === "boolean"
+          ? override.requireInstitutionalReviewForModerateInteraction
+          : true,
+      autoAcknowledgePrivilegedOverride:
+        typeof override.autoAcknowledgePrivilegedOverride === "boolean"
+          ? override.autoAcknowledgePrivilegedOverride
           : true
     },
     brandingPolicy: {
@@ -630,7 +640,15 @@ function mergeOrganizationSettings(current: unknown, patch: unknown) {
       requireInstitutionalReviewForHighSeverity:
         typeof override.requireInstitutionalReviewForHighSeverity === "boolean"
           ? override.requireInstitutionalReviewForHighSeverity
-          : base.overridePolicy.requireInstitutionalReviewForHighSeverity
+          : base.overridePolicy.requireInstitutionalReviewForHighSeverity,
+      requireInstitutionalReviewForModerateInteraction:
+        typeof override.requireInstitutionalReviewForModerateInteraction === "boolean"
+          ? override.requireInstitutionalReviewForModerateInteraction
+          : base.overridePolicy.requireInstitutionalReviewForModerateInteraction,
+      autoAcknowledgePrivilegedOverride:
+        typeof override.autoAcknowledgePrivilegedOverride === "boolean"
+          ? override.autoAcknowledgePrivilegedOverride
+          : base.overridePolicy.autoAcknowledgePrivilegedOverride
     },
     brandingPolicy: {
       allowCustomLogo:
