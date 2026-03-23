@@ -432,6 +432,10 @@ export class ApiClient {
     return this.post<AppointmentReminder>(`/appointments/${id}/reminders/${reminderId}/send`, {});
   }
 
+  retryAppointmentReminder(id: string, reminderId: string) {
+    return this.post<AppointmentReminder>(`/appointments/${id}/reminders/${reminderId}/retry`, {});
+  }
+
   getPatient(id: string) {
     return this.get<PatientDetail | null>(`/patients/${id}`);
   }

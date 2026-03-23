@@ -114,6 +114,16 @@ export class AppointmentsController {
     return this.appointmentRemindersService.dispatchReminder(id, reminderId, principal);
   }
 
+  @Post(":id/reminders/:reminderId/retry")
+  async retryReminder(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Param("reminderId") reminderId: string
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.appointmentRemindersService.retryReminder(id, reminderId, principal);
+  }
+
   @Get(":id/billing")
   async listBilling(
     @CurrentPrincipal() principal: AccessPrincipal,

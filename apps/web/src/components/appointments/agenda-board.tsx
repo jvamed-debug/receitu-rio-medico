@@ -245,6 +245,28 @@ export function AgendaBoard({
     }
   }
 
+  async function retryReminder(appointmentId: string, reminderId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const retried = await api.retryAppointmentReminder(appointmentId, reminderId);
+      setRemindersByAppointment((current) => ({
+        ...current,
+        [appointmentId]: (current[appointmentId] ?? []).map((item) =>
+          item.id === reminderId ? retried : item
+        )
+      }));
+      setMessage(
+        retried.status === "sent"
+          ? "Lembrete reenviado."
+          : "Reenvio registrado com nova tentativa."
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao reenviar lembrete."
+      );
+    }
+  }
+
   async function createBilling(appointmentId: string) {
     const amountCents = Number(billingAmount);
     if (!Number.isFinite(amountCents) || amountCents <= 0) {
@@ -586,6 +608,17 @@ export function AgendaBoard({
                             {new Date(reminder.scheduledFor).toLocaleString("pt-BR")}
                           </div>
                           <div style={{ color: "var(--muted)" }}>{reminder.target ?? "sem destino"}</div>
+                          <div style={{ color: "var(--muted)" }}>
+                            Tentativas: {reminder.attemptCount}
+                            {reminder.nextAttemptAt
+                              ? ` | proxima: ${new Date(reminder.nextAttemptAt).toLocaleString("pt-BR")}`
+                              : ""}
+                          </div>
+                          {reminder.lastError ? (
+                            <div style={{ color: "#a33a2f", fontWeight: 600 }}>
+                              Ultimo erro: {reminder.lastError}
+                            </div>
+                          ) : null}
                           {reminder.status === "pending" ? (
                             <button
                               type="button"
@@ -593,6 +626,15 @@ export function AgendaBoard({
                               onClick={() => sendReminder(appointment.id, reminder.id)}
                             >
                               Enviar agora
+                            </button>
+                          ) : null}
+                          {reminder.status === "failed" ? (
+                            <button
+                              type="button"
+                              style={secondaryButtonStyle}
+                              onClick={() => retryReminder(appointment.id, reminder.id)}
+                            >
+                              Tentar novamente
                             </button>
                           ) : null}
                         </div>

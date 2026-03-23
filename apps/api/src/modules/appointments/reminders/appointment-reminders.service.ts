@@ -116,30 +116,99 @@ export class AppointmentRemindersService {
       throw new NotFoundException("Lembrete nao encontrado");
     }
 
-    const sentReminder = await this.prisma.appointmentReminder.update({
-      where: { id: reminderId },
-      data: await buildReminderDispatchUpdate(
-        reminder,
-        principal,
-        this.reminderProviderGateway
-      )
-    });
+    return this.dispatchReminderRecord(reminder, principal);
+  }
 
-    await this.auditService.log({
-      actorUserId: principal.userId,
-      actorProfessionalId: principal.professionalId,
-      entityType: "appointment_reminder",
-      entityId: reminderId,
-      action: "appointment_reminder_sent",
-      origin: "api.appointments",
-      metadata: {
-        appointmentId,
-        channel: sentReminder.channel,
-        target: sentReminder.target
+  async retryReminder(
+    appointmentId: string,
+    reminderId: string,
+    principal: AccessPrincipal
+  ) {
+    const reminder = await this.prisma.appointmentReminder.findFirst({
+      where: {
+        id: reminderId,
+        appointmentId
       }
     });
 
-    return mapReminderRecord(sentReminder);
+    if (!reminder) {
+      throw new NotFoundException("Lembrete nao encontrado");
+    }
+
+    if (reminder.status !== "FAILED") {
+      throw new BadRequestException("Apenas lembretes com falha podem ser reenviados");
+    }
+
+    return this.dispatchReminderRecord(reminder, principal);
+  }
+
+  private async dispatchReminderRecord(
+    reminder: {
+      id: string;
+      appointmentId: string;
+      channel: string;
+      status?: string;
+      target: string | null;
+      scheduledFor?: Date;
+      sentAt?: Date | null;
+      nextAttemptAt?: Date | null;
+      attemptCount?: number;
+      lastError?: string | null;
+      message?: string;
+      metadata?: unknown;
+    },
+    principal: AccessPrincipal
+  ) {
+    try {
+      const sentReminder = await this.prisma.appointmentReminder.update({
+        where: { id: reminder.id },
+        data: await buildReminderDispatchUpdate(
+          reminder,
+          principal,
+          this.reminderProviderGateway
+        )
+      });
+
+      await this.auditService.log({
+        actorUserId: principal.userId,
+        actorProfessionalId: principal.professionalId,
+        entityType: "appointment_reminder",
+        entityId: reminder.id,
+        action: "appointment_reminder_sent",
+        origin: "api.appointments",
+        metadata: {
+          appointmentId: reminder.appointmentId,
+          channel: sentReminder.channel,
+          target: sentReminder.target,
+          attemptCount: sentReminder.attemptCount
+        }
+      });
+
+      return mapReminderRecord(sentReminder);
+    } catch (error) {
+      const failedReminder = await this.prisma.appointmentReminder.update({
+        where: { id: reminder.id },
+        data: buildReminderFailureUpdate(reminder, error)
+      });
+
+      await this.auditService.log({
+        actorUserId: principal.userId,
+        actorProfessionalId: principal.professionalId,
+        entityType: "appointment_reminder",
+        entityId: reminder.id,
+        action: "appointment_reminder_failed",
+        origin: "api.appointments",
+        metadata: {
+          appointmentId: reminder.appointmentId,
+          channel: failedReminder.channel,
+          target: failedReminder.target,
+          attemptCount: failedReminder.attemptCount,
+          lastError: failedReminder.lastError
+        }
+      });
+
+      return mapReminderRecord(failedReminder);
+    }
   }
 }
 
@@ -151,6 +220,7 @@ async function buildReminderDispatchUpdate(
     target: string | null;
     scheduledFor?: Date;
     message?: string;
+    attemptCount?: number;
     metadata?: unknown;
   },
   principal: AccessPrincipal,
@@ -172,12 +242,40 @@ async function buildReminderDispatchUpdate(
   return {
     status: "SENT" as const,
     sentAt: new Date(dispatch.deliveredAt),
+    nextAttemptAt: null,
+    lastError: null,
+    attemptCount: (reminder.attemptCount ?? 0) + 1,
     metadata: normalizeJsonRecord({
       ...(typeof reminder.metadata === "object" && reminder.metadata ? reminder.metadata : {}),
       dispatchedByProfessionalId: principal.professionalId,
       dispatchMode: "provider",
       providerReference: dispatch.providerReference,
       providerMetadata: normalizeJsonRecord(dispatch.providerMetadata)
+    })
+  };
+}
+
+function buildReminderFailureUpdate(
+  reminder: {
+    attemptCount?: number;
+    metadata?: unknown;
+  },
+  error: unknown
+) {
+  const nextAttemptCount = (reminder.attemptCount ?? 0) + 1;
+  const lastError =
+    error instanceof Error ? error.message : "Falha ao enviar lembrete";
+  const canRetry = nextAttemptCount < 3;
+
+  return {
+    status: "FAILED" as const,
+    sentAt: null,
+    attemptCount: nextAttemptCount,
+    lastError,
+    nextAttemptAt: canRetry ? new Date(Date.now() + 15 * 60 * 1000) : null,
+    metadata: normalizeJsonRecord({
+      ...(typeof reminder.metadata === "object" && reminder.metadata ? reminder.metadata : {}),
+      lastDispatchError: lastError
     })
   };
 }
@@ -221,6 +319,9 @@ function mapReminderRecord(reminder: {
   target: string | null;
   scheduledFor: Date;
   sentAt: Date | null;
+  nextAttemptAt?: Date | null;
+  attemptCount?: number;
+  lastError?: string | null;
   message: string;
   createdAt: Date;
   updatedAt: Date;
@@ -233,6 +334,9 @@ function mapReminderRecord(reminder: {
     target: reminder.target ?? undefined,
     scheduledFor: reminder.scheduledFor.toISOString(),
     sentAt: reminder.sentAt?.toISOString(),
+    nextAttemptAt: reminder.nextAttemptAt?.toISOString(),
+    attemptCount: reminder.attemptCount ?? 0,
+    lastError: reminder.lastError ?? undefined,
     message: reminder.message,
     createdAt: reminder.createdAt.toISOString(),
     updatedAt: reminder.updatedAt.toISOString()

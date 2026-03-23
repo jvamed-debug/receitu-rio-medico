@@ -36,6 +36,9 @@ export interface AppointmentReminder {
   target?: string;
   scheduledFor: string;
   sentAt?: string;
+  nextAttemptAt?: string;
+  attemptCount: number;
+  lastError?: string;
   message: string;
   createdAt: string;
   updatedAt: string;

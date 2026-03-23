@@ -117,3 +117,60 @@ test("dispara lembrete e marca como enviado", async () => {
   assert.equal(result.status, "sent");
   assert.equal(updatedPayload?.status, "SENT");
 });
+
+test("marca lembrete como failed e agenda nova tentativa quando provider falha", async () => {
+  let updatedPayload: Record<string, unknown> | undefined;
+
+  const service = new AppointmentRemindersService(
+    {
+      appointmentReminder: {
+        findFirst: async () => ({
+          id: "rem-2",
+          appointmentId: "apt-1",
+          channel: "email",
+          target: "paciente@teste.app",
+          scheduledFor: new Date("2026-03-25T13:00:00.000Z"),
+          message: "Lembrete",
+          attemptCount: 1,
+          metadata: {}
+        }),
+        update: async ({ data }: { data: Record<string, unknown> }) => {
+          updatedPayload = data;
+          return {
+            id: "rem-2",
+            appointmentId: "apt-1",
+            channel: "email",
+            status: "FAILED",
+            target: "paciente@teste.app",
+            scheduledFor: new Date("2026-03-25T13:00:00.000Z"),
+            sentAt: null,
+            nextAttemptAt: new Date("2026-03-25T13:15:00.000Z"),
+            attemptCount: 2,
+            lastError: "provider down",
+            message: "Lembrete",
+            createdAt: new Date("2026-03-24T10:00:00.000Z"),
+            updatedAt: new Date("2026-03-25T13:01:00.000Z")
+          };
+        }
+      }
+    } as never,
+    { log: async () => undefined } as never,
+    {
+      dispatch: async () => {
+        throw new Error("provider down");
+      }
+    } as never
+  );
+
+  const result = await service.dispatchReminder("apt-1", "rem-2", {
+    userId: "user-1",
+    professionalId: "prof-1",
+    organizationId: "org-1",
+    roles: ["professional"]
+  });
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.attemptCount, 2);
+  assert.equal(result.lastError, "provider down");
+  assert.equal(updatedPayload?.status, "FAILED");
+});

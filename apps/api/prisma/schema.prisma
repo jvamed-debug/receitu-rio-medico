@@ -205,6 +205,7 @@ model AppointmentBilling {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   appointment       Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  webhookEvents     AppointmentBillingWebhookEvent[]
 
   @@index([appointmentId, status])
   @@index([status, createdAt])
@@ -218,6 +219,9 @@ model AppointmentReminder {
   target          String?
   scheduledFor    DateTime
   sentAt          DateTime?
+  nextAttemptAt   DateTime?
+  attemptCount    Int             @default(0)
+  lastError       String?
   message         String
   metadata        Json?
   createdAt       DateTime        @default(now())
@@ -226,6 +230,24 @@ model AppointmentReminder {
 
   @@index([appointmentId, scheduledFor])
   @@index([status, scheduledFor])
+}
+
+model AppointmentBillingWebhookEvent {
+  id                String             @id @default(cuid())
+  appointmentId     String
+  billingId         String
+  eventKey          String             @unique
+  eventId           String?
+  providerReference String?
+  status            BillingStatus
+  payload           Json?
+  resultStatus      String?
+  processedAt       DateTime?
+  createdAt         DateTime           @default(now())
+  billing           AppointmentBilling @relation(fields: [billingId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId, createdAt])
+  @@index([billingId, createdAt])
 }
 
 model PatientClinicalProfile {

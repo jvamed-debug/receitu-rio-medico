@@ -28,8 +28,17 @@ test("webhook reconcilia cobranca quando segredo e valido", async () => {
       get: () => "webhook-secret"
     } as never,
     {
-      listByEntity: async () => [],
       log: async () => ({})
+    } as never,
+    {
+      appointmentBillingWebhookEvent: {
+        findUnique: async () => null,
+        create: async ({ data }: { data: Record<string, unknown> }) => ({
+          id: "event-1",
+          ...data
+        }),
+        update: async () => ({})
+      }
     } as never
   );
 
@@ -63,15 +72,15 @@ test("webhook ignora evento duplicado quando eventId ja foi processado", async (
       get: () => "webhook-secret"
     } as never,
     {
-      listByEntity: async () => [
-        {
-          action: "appointment_billing_webhook_received",
-          metadata: {
-            eventId: "evt-duplicado"
-          }
-        }
-      ],
       log: async () => ({})
+    } as never,
+    {
+      appointmentBillingWebhookEvent: {
+        findUnique: async () => ({
+          id: "event-duplicado",
+          processedAt: new Date("2026-03-23T10:00:00.000Z")
+        })
+      }
     } as never
   );
 
