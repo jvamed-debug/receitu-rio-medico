@@ -1,12 +1,14 @@
 import type {
   Appointment,
   AppointmentBilling,
+  AppointmentSummary,
   AppointmentReminder,
   ClinicalDocument
 } from "@receituario/domain";
 export type {
   Appointment,
   AppointmentBilling,
+  AppointmentSummary,
   AppointmentReminder
 } from "@receituario/domain";
 import type {
@@ -345,6 +347,10 @@ export class ApiClient {
 
   listAppointments() {
     return this.get<Appointment[]>("/appointments");
+  }
+
+  getAppointmentSummary() {
+    return this.get<AppointmentSummary>("/appointments/summary");
   }
 
   createAppointment(input: CreateAppointmentInput) {

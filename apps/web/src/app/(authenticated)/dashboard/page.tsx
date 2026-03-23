@@ -3,13 +3,6 @@ import { createApiClient, getApiBaseUrl } from "../../../lib/api";
 
 export const dynamic = "force-dynamic";
 
-const cards = [
-  { label: "Documentos emitidos", value: "0" },
-  { label: "Pendentes de assinatura", value: "0" },
-  { label: "Pacientes ativos", value: "0" },
-  { label: "Templates", value: "1" }
-] as const;
-
 async function loadHealth() {
   const api = createApiClient();
 
@@ -20,8 +13,28 @@ async function loadHealth() {
   }
 }
 
+async function loadAppointmentsSummary() {
+  const api = createApiClient();
+
+  try {
+    return await api.getAppointmentSummary();
+  } catch {
+    return null;
+  }
+}
+
 export default async function DashboardPage() {
-  const health = await loadHealth();
+  const [health, agenda] = await Promise.all([
+    loadHealth(),
+    loadAppointmentsSummary()
+  ]);
+
+  const cards = [
+    { label: "Consultas", value: String(agenda?.total ?? 0) },
+    { label: "Teleconsultas", value: String(agenda?.telehealth ?? 0) },
+    { label: "Lembretes pendentes", value: String(agenda?.remindersPending ?? 0) },
+    { label: "Cobrancas pagas", value: String(agenda?.billingPaidCount ?? 0) }
+  ] as const;
 
   return (
     <Shell
@@ -50,6 +63,47 @@ export default async function DashboardPage() {
           </article>
         ))}
       </div>
+
+      <section
+        style={{
+          marginTop: 24,
+          background: "white",
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Resumo financeiro da agenda</h2>
+        {agenda ? (
+          <div
+            style={{
+              display: "grid",
+              gap: 12,
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+            }}
+          >
+            <FinanceCard
+              label="A receber"
+              amount={agenda.billingPendingCents}
+              detail={`${agenda.billingPendingCount} cobrancas pendentes`}
+            />
+            <FinanceCard
+              label="Autorizado"
+              amount={agenda.billingAuthorizedCents}
+              detail={`${agenda.billingAuthorizedCount} cobrancas autorizadas`}
+            />
+            <FinanceCard
+              label="Recebido"
+              amount={agenda.billingPaidCents}
+              detail={`${agenda.billingPaidCount} cobrancas pagas`}
+            />
+          </div>
+        ) : (
+          <div style={{ color: "var(--muted)" }}>
+            Nao foi possivel carregar o resumo financeiro da agenda.
+          </div>
+        )}
+      </section>
 
       <section
         style={{
@@ -98,5 +152,35 @@ export default async function DashboardPage() {
         )}
       </section>
     </Shell>
+  );
+}
+
+function FinanceCard({
+  label,
+  amount,
+  detail
+}: {
+  label: string;
+  amount: number;
+  detail: string;
+}) {
+  return (
+    <article
+      style={{
+        background: "#f7fbff",
+        borderRadius: 18,
+        padding: 18,
+        border: "1px solid #d9e8f5"
+      }}
+    >
+      <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
+      <div style={{ fontSize: 28, marginTop: 10 }}>
+        {new Intl.NumberFormat("pt-BR", {
+          style: "currency",
+          currency: "BRL"
+        }).format(amount / 100)}
+      </div>
+      <div style={{ color: "var(--muted)", marginTop: 8 }}>{detail}</div>
+    </article>
   );
 }

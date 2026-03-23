@@ -63,3 +63,18 @@ export interface AppointmentBilling {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface AppointmentSummary {
+  total: number;
+  scheduled: number;
+  confirmed: number;
+  completed: number;
+  telehealth: number;
+  remindersPending: number;
+  billingPendingCount: number;
+  billingAuthorizedCount: number;
+  billingPaidCount: number;
+  billingPendingCents: number;
+  billingAuthorizedCents: number;
+  billingPaidCents: number;
+}

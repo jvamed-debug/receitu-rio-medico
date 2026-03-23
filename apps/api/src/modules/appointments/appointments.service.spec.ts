@@ -69,3 +69,43 @@ test("mapeia status de agenda ao retornar consulta", async () => {
   assert.equal(result[0]?.patientName, "Paciente Teste");
   assert.deepEqual(result[0]?.billingEntries, []);
 });
+
+test("resume agenda com cobrancas e lembretes", async () => {
+  const service = new AppointmentsService({
+    appointment: {
+      findMany: async () => [
+        {
+          id: "apt-1",
+          status: "SCHEDULED",
+          telehealth: true,
+          reminders: [{ id: "rem-1", status: "PENDING" }],
+          billingEntries: [
+            { id: "bill-1", status: "PENDING", amountCents: 10000 },
+            { id: "bill-2", status: "PAID", amountCents: 12000 }
+          ]
+        },
+        {
+          id: "apt-2",
+          status: "CONFIRMED",
+          telehealth: false,
+          reminders: [],
+          billingEntries: [{ id: "bill-3", status: "AUTHORIZED", amountCents: 8000 }]
+        }
+      ]
+    }
+  } as never);
+
+  const result = await service.summary({
+    userId: "user-1",
+    professionalId: "prof-1",
+    organizationId: "org-1",
+    roles: [UserRole.PROFESSIONAL.toLowerCase()]
+  });
+
+  assert.equal(result.total, 2);
+  assert.equal(result.telehealth, 1);
+  assert.equal(result.remindersPending, 1);
+  assert.equal(result.billingPendingCents, 10000);
+  assert.equal(result.billingAuthorizedCents, 8000);
+  assert.equal(result.billingPaidCents, 12000);
+});

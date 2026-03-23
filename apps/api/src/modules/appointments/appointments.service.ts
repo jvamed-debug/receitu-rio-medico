@@ -3,7 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException
 } from "@nestjs/common";
-import type { Appointment } from "@receituario/domain";
+import type { Appointment, AppointmentSummary } from "@receituario/domain";
 
 import { PrismaService } from "../../persistence/prisma.service";
 import type { AccessPrincipal } from "../auth/auth.types";
@@ -29,6 +29,61 @@ export class AppointmentsService {
     });
 
     return appointments.map(mapAppointmentRecord);
+  }
+
+  async summary(principal: AccessPrincipal): Promise<AppointmentSummary> {
+    const appointments = await this.prisma.appointment.findMany({
+      where: buildAppointmentScope(principal),
+      include: {
+        reminders: true,
+        billingEntries: true
+      }
+    });
+
+    return appointments.reduce<AppointmentSummary>(
+      (acc, appointment) => {
+        acc.total += 1;
+        if (appointment.status === "SCHEDULED") acc.scheduled += 1;
+        if (appointment.status === "CONFIRMED") acc.confirmed += 1;
+        if (appointment.status === "COMPLETED") acc.completed += 1;
+        if (appointment.telehealth) acc.telehealth += 1;
+
+        for (const reminder of appointment.reminders) {
+          if (reminder.status === "PENDING") {
+            acc.remindersPending += 1;
+          }
+        }
+
+        for (const billing of appointment.billingEntries) {
+          if (billing.status === "PENDING") {
+            acc.billingPendingCount += 1;
+            acc.billingPendingCents += billing.amountCents;
+          } else if (billing.status === "AUTHORIZED") {
+            acc.billingAuthorizedCount += 1;
+            acc.billingAuthorizedCents += billing.amountCents;
+          } else if (billing.status === "PAID") {
+            acc.billingPaidCount += 1;
+            acc.billingPaidCents += billing.amountCents;
+          }
+        }
+
+        return acc;
+      },
+      {
+        total: 0,
+        scheduled: 0,
+        confirmed: 0,
+        completed: 0,
+        telehealth: 0,
+        remindersPending: 0,
+        billingPendingCount: 0,
+        billingAuthorizedCount: 0,
+        billingPaidCount: 0,
+        billingPendingCents: 0,
+        billingAuthorizedCents: 0,
+        billingPaidCents: 0
+      }
+    );
   }
 
   async create(

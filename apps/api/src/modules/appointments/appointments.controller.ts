@@ -34,6 +34,11 @@ export class AppointmentsController {
     return this.appointmentsService.list(principal);
   }
 
+  @Get("summary")
+  summary(@CurrentPrincipal() principal: AccessPrincipal) {
+    return this.appointmentsService.summary(principal);
+  }
+
   @Post()
   async create(
     @CurrentPrincipal() principal: AccessPrincipal,
