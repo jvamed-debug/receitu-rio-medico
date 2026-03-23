@@ -1,9 +1,14 @@
 import type {
   Appointment,
+  AppointmentBilling,
   AppointmentReminder,
   ClinicalDocument
 } from "@receituario/domain";
-export type { Appointment, AppointmentReminder } from "@receituario/domain";
+export type {
+  Appointment,
+  AppointmentBilling,
+  AppointmentReminder
+} from "@receituario/domain";
 import type {
   AuthTokens,
   LoginRequest,
@@ -135,6 +140,12 @@ export interface CreateAppointmentInput {
   durationMinutes?: number;
   notes?: string;
   telehealth?: boolean;
+}
+
+export interface CreateAppointmentBillingInput {
+  amountCents: number;
+  description: string;
+  paymentProvider?: string;
 }
 
 export interface HealthStatus {
@@ -352,6 +363,32 @@ export class ApiClient {
 
   listAppointmentReminders(id: string) {
     return this.get<AppointmentReminder[]>(`/appointments/${id}/reminders`);
+  }
+
+  listAppointmentBilling(id: string) {
+    return this.get<AppointmentBilling[]>(`/appointments/${id}/billing`);
+  }
+
+  createAppointmentBilling(id: string, input: CreateAppointmentBillingInput) {
+    return this.post<AppointmentBilling>(`/appointments/${id}/billing`, input);
+  }
+
+  authorizeAppointmentBilling(id: string, billingId: string) {
+    return this.post<AppointmentBilling>(
+      `/appointments/${id}/billing/${billingId}/authorize`,
+      {}
+    );
+  }
+
+  markAppointmentBillingPaid(id: string, billingId: string) {
+    return this.post<AppointmentBilling>(
+      `/appointments/${id}/billing/${billingId}/pay`,
+      {}
+    );
+  }
+
+  createTelehealthRoom(id: string) {
+    return this.post<Appointment>(`/appointments/${id}/telehealth/room`, {});
   }
 
   createAppointmentReminder(

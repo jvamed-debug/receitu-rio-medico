@@ -13,8 +13,10 @@ import { ResourceAccessService } from "../access/resource-access.service";
 import { AuthGuard } from "../auth/auth.guard";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
 import type { AccessPrincipal } from "../auth/auth.types";
+import { AppointmentBillingService } from "./billing/appointment-billing.service";
 import { AppointmentsService } from "./appointments.service";
 import { AppointmentRemindersService } from "./reminders/appointment-reminders.service";
+import { TelehealthService } from "./telehealth/telehealth.service";
 
 @UseGuards(AuthGuard)
 @Controller("appointments")
@@ -22,7 +24,9 @@ export class AppointmentsController {
   constructor(
     private readonly appointmentsService: AppointmentsService,
     private readonly resourceAccessService: ResourceAccessService,
-    private readonly appointmentRemindersService: AppointmentRemindersService
+    private readonly appointmentRemindersService: AppointmentRemindersService,
+    private readonly appointmentBillingService: AppointmentBillingService,
+    private readonly telehealthService: TelehealthService
   ) {}
 
   @Get()
@@ -103,6 +107,59 @@ export class AppointmentsController {
   ) {
     await this.assertAppointmentAccess(principal, id);
     return this.appointmentRemindersService.dispatchReminder(id, reminderId, principal);
+  }
+
+  @Get(":id/billing")
+  async listBilling(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.appointmentBillingService.listByAppointment(id);
+  }
+
+  @Post(":id/billing")
+  async createBilling(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Body()
+    input: {
+      amountCents: number;
+      description: string;
+      paymentProvider?: string;
+    }
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.appointmentBillingService.createEntry(id, input, principal);
+  }
+
+  @Post(":id/billing/:billingId/authorize")
+  async authorizeBilling(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Param("billingId") billingId: string
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.appointmentBillingService.authorizeEntry(id, billingId, principal);
+  }
+
+  @Post(":id/billing/:billingId/pay")
+  async payBilling(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Param("billingId") billingId: string
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.appointmentBillingService.payEntry(id, billingId, principal);
+  }
+
+  @Post(":id/telehealth/room")
+  async createTelehealthRoom(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.telehealthService.ensureRoom(id, principal);
   }
 
   private async assertAppointmentAccess(

@@ -20,7 +20,8 @@ export class AppointmentsService {
           select: {
             fullName: true
           }
-        }
+        },
+        billingEntries: true
       },
       orderBy: {
         appointmentAt: "asc"
@@ -61,7 +62,8 @@ export class AppointmentsService {
           select: {
             fullName: true
           }
-        }
+        },
+        billingEntries: true
       }
     });
 
@@ -98,7 +100,8 @@ export class AppointmentsService {
           select: {
             fullName: true
           }
-        }
+        },
+        billingEntries: true
       }
     });
 
@@ -162,11 +165,28 @@ function mapAppointmentRecord(appointment: {
   durationMinutes: number;
   notes: string | null;
   telehealth: boolean;
+  telehealthUrl: string | null;
+  telehealthProvider: string | null;
+  telehealthRoomId: string | null;
   createdAt: Date;
   updatedAt: Date;
   patient?: {
     fullName: string;
   };
+  billingEntries?: Array<{
+    id: string;
+    appointmentId: string;
+    status: string;
+    amountCents: number;
+    currency: string;
+    description: string;
+    paymentProvider: string | null;
+    externalReference: string | null;
+    authorizedAt: Date | null;
+    paidAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
 }) {
   return {
     id: appointment.id,
@@ -179,6 +199,25 @@ function mapAppointmentRecord(appointment: {
     durationMinutes: appointment.durationMinutes,
     notes: appointment.notes ?? undefined,
     telehealth: appointment.telehealth,
+    telehealthUrl: appointment.telehealthUrl ?? undefined,
+    telehealthProvider: appointment.telehealthProvider ?? undefined,
+    telehealthRoomId: appointment.telehealthRoomId ?? undefined,
+    billingEntries: (appointment.billingEntries ?? []).map((entry) => ({
+      id: entry.id,
+      appointmentId: entry.appointmentId,
+      status: entry.status.toLowerCase() as NonNullable<
+        Appointment["billingEntries"]
+      >[number]["status"],
+      amountCents: entry.amountCents,
+      currency: entry.currency,
+      description: entry.description,
+      paymentProvider: entry.paymentProvider ?? undefined,
+      externalReference: entry.externalReference ?? undefined,
+      authorizedAt: entry.authorizedAt?.toISOString(),
+      paidAt: entry.paidAt?.toISOString(),
+      createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString()
+    })),
     createdAt: appointment.createdAt.toISOString(),
     updatedAt: appointment.updatedAt.toISOString(),
     patientName: appointment.patient?.fullName

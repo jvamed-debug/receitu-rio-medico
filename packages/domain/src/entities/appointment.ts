@@ -17,6 +17,10 @@ export interface Appointment {
   durationMinutes: number;
   notes?: string;
   telehealth: boolean;
+  telehealthUrl?: string;
+  telehealthProvider?: string;
+  telehealthRoomId?: string;
+  billingEntries?: AppointmentBilling[];
   createdAt: string;
   updatedAt: string;
   patientName?: string;
@@ -33,6 +37,28 @@ export interface AppointmentReminder {
   scheduledFor: string;
   sentAt?: string;
   message: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AppointmentBillingStatus =
+  | "pending"
+  | "authorized"
+  | "paid"
+  | "cancelled"
+  | "refunded";
+
+export interface AppointmentBilling {
+  id: string;
+  appointmentId: string;
+  status: AppointmentBillingStatus;
+  amountCents: number;
+  currency: string;
+  description: string;
+  paymentProvider?: string;
+  externalReference?: string;
+  authorizedAt?: string;
+  paidAt?: string;
   createdAt: string;
   updatedAt: string;
 }

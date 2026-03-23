@@ -3,6 +3,7 @@
 import {
   ApiClient,
   type Appointment,
+  type AppointmentBilling,
   type AppointmentReminder,
   type PatientSummary
 } from "@receituario/api-client";
@@ -30,12 +31,17 @@ export function AgendaBoard({
   const [remindersByAppointment, setRemindersByAppointment] = useState<
     Record<string, AppointmentReminder[]>
   >({});
+  const [billingByAppointment, setBillingByAppointment] = useState<
+    Record<string, AppointmentBilling[]>
+  >({});
   const [patientId, setPatientId] = useState(patients[0]?.id ?? "");
   const [title, setTitle] = useState("Consulta ambulatorial");
   const [appointmentAt, setAppointmentAt] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [notes, setNotes] = useState("");
   const [telehealth, setTelehealth] = useState(false);
+  const [billingAmount, setBillingAmount] = useState("25000");
+  const [billingDescription, setBillingDescription] = useState("Consulta particular");
   const [reminderChannel, setReminderChannel] = useState<"email" | "sms" | "whatsapp">(
     "whatsapp"
   );
@@ -111,6 +117,21 @@ export function AgendaBoard({
     }
   }
 
+  async function loadBilling(appointmentId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const entries = await api.listAppointmentBilling(appointmentId);
+      setBillingByAppointment((current) => ({
+        ...current,
+        [appointmentId]: entries
+      }));
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao carregar cobrancas."
+      );
+    }
+  }
+
   async function createReminder(appointmentId: string) {
     if (!reminderDateTime) {
       setMessage("Informe data e hora do lembrete.");
@@ -149,6 +170,83 @@ export function AgendaBoard({
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Falha ao enviar lembrete."
+      );
+    }
+  }
+
+  async function createBilling(appointmentId: string) {
+    const amountCents = Number(billingAmount);
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      setMessage("Informe um valor valido em centavos.");
+      return;
+    }
+
+    try {
+      const api = createBrowserApiClient();
+      const created = await api.createAppointmentBilling(appointmentId, {
+        amountCents,
+        description: billingDescription,
+        paymentProvider: "manual"
+      });
+      setBillingByAppointment((current) => ({
+        ...current,
+        [appointmentId]: [created, ...(current[appointmentId] ?? [])]
+      }));
+      setMessage("Cobranca registrada.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao criar cobranca."
+      );
+    }
+  }
+
+  async function authorizeBilling(appointmentId: string, billingId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.authorizeAppointmentBilling(appointmentId, billingId);
+      setBillingByAppointment((current) => ({
+        ...current,
+        [appointmentId]: (current[appointmentId] ?? []).map((entry) =>
+          entry.id === billingId ? updated : entry
+        )
+      }));
+      setMessage("Cobranca autorizada.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao autorizar cobranca."
+      );
+    }
+  }
+
+  async function payBilling(appointmentId: string, billingId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.markAppointmentBillingPaid(appointmentId, billingId);
+      setBillingByAppointment((current) => ({
+        ...current,
+        [appointmentId]: (current[appointmentId] ?? []).map((entry) =>
+          entry.id === billingId ? updated : entry
+        )
+      }));
+      setMessage("Cobranca marcada como paga.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao registrar pagamento."
+      );
+    }
+  }
+
+  async function createTelehealthRoom(appointmentId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.createTelehealthRoom(appointmentId);
+      setAppointments((current) =>
+        current.map((item) => (item.id === appointmentId ? updated : item))
+      );
+      setMessage("Sala de teleconsulta provisionada.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao provisionar teleconsulta."
       );
     }
   }
@@ -214,6 +312,16 @@ export function AgendaBoard({
                       {appointment.telehealth ? "Teleconsulta" : "Presencial"} |{" "}
                       {appointment.durationMinutes} min
                     </div>
+                    {appointment.telehealthUrl ? (
+                      <a
+                        href={appointment.telehealthUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "var(--primary)", fontWeight: 700 }}
+                      >
+                        Abrir sala {appointment.telehealthProvider ?? "teleconsulta"}
+                      </a>
+                    ) : null}
                   </div>
                   <select
                     value={appointment.status}
@@ -234,8 +342,24 @@ export function AgendaBoard({
                 ) : null}
                 <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    {appointment.telehealth ? (
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() => createTelehealthRoom(appointment.id)}
+                      >
+                        {appointment.telehealthUrl ? "Atualizar sala" : "Criar sala"}
+                      </button>
+                    ) : null}
                     <button type="button" style={secondaryButtonStyle} onClick={() => loadReminders(appointment.id)}>
                       Ver lembretes
+                    </button>
+                    <button
+                      type="button"
+                      style={secondaryButtonStyle}
+                      onClick={() => loadBilling(appointment.id)}
+                    >
+                      Ver cobranca
                     </button>
                     <select
                       value={reminderChannel}
@@ -256,6 +380,30 @@ export function AgendaBoard({
                     />
                     <button type="button" style={secondaryButtonStyle} onClick={() => createReminder(appointment.id)}>
                       Agendar lembrete
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      type="number"
+                      min={1}
+                      step={100}
+                      value={billingAmount}
+                      onChange={(event) => setBillingAmount(event.target.value)}
+                      style={inputStyle}
+                      placeholder="Valor em centavos"
+                    />
+                    <input
+                      value={billingDescription}
+                      onChange={(event) => setBillingDescription(event.target.value)}
+                      style={inputStyle}
+                      placeholder="Descricao da cobranca"
+                    />
+                    <button
+                      type="button"
+                      style={secondaryButtonStyle}
+                      onClick={() => createBilling(appointment.id)}
+                    >
+                      Registrar cobranca
                     </button>
                   </div>
                   {(remindersByAppointment[appointment.id] ?? []).length > 0 ? (
@@ -280,6 +428,42 @@ export function AgendaBoard({
                       ))}
                     </div>
                   ) : null}
+                  {(billingByAppointment[appointment.id] ?? []).length > 0 ? (
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {(billingByAppointment[appointment.id] ?? []).map((entry) => (
+                        <div key={entry.id} style={reminderRowStyle}>
+                          <div>
+                            <strong>{formatCurrency(entry.amountCents, entry.currency)}</strong> |{" "}
+                            {entry.status} | {entry.description}
+                          </div>
+                          <div style={{ color: "var(--muted)" }}>
+                            {entry.paymentProvider ?? "manual"}
+                            {entry.externalReference ? ` | ref ${entry.externalReference}` : ""}
+                          </div>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {entry.status === "pending" ? (
+                              <button
+                                type="button"
+                                style={secondaryButtonStyle}
+                                onClick={() => authorizeBilling(appointment.id, entry.id)}
+                              >
+                                Autorizar
+                              </button>
+                            ) : null}
+                            {entry.status === "authorized" ? (
+                              <button
+                                type="button"
+                                style={secondaryButtonStyle}
+                                onClick={() => payBilling(appointment.id, entry.id)}
+                              >
+                                Marcar pago
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </article>
             ))
@@ -292,6 +476,13 @@ export function AgendaBoard({
       </section>
     </div>
   );
+}
+
+function formatCurrency(amountCents: number, currency: string) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency
+  }).format(amountCents / 100);
 }
 
 function createBrowserApiClient() {

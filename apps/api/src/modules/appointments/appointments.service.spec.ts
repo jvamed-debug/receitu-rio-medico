@@ -44,6 +44,10 @@ test("mapeia status de agenda ao retornar consulta", async () => {
           durationMinutes: 30,
           notes: null,
           telehealth: false,
+          telehealthUrl: null,
+          telehealthProvider: null,
+          telehealthRoomId: null,
+          billingEntries: [],
           createdAt: new Date("2026-03-22T10:00:00.000Z"),
           updatedAt: new Date("2026-03-22T10:00:00.000Z"),
           patient: {
@@ -63,4 +67,5 @@ test("mapeia status de agenda ao retornar consulta", async () => {
 
   assert.equal(result[0]?.status, "confirmed");
   assert.equal(result[0]?.patientName, "Paciente Teste");
+  assert.deepEqual(result[0]?.billingEntries, []);
 });
