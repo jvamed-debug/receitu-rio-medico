@@ -282,3 +282,85 @@ test("sincroniza pedidos pendentes em lote", async () => {
   assert.equal(result.processed, 1);
   assert.equal(result.results[0]?.status, "confirmed");
 });
+
+test("gera snapshot operacional da farmacia", async () => {
+  const service = new PharmacyService(
+    {
+      pharmacyOrder: {
+        count: async ({ where }: { where: { status?: string; updatedAt?: { gte: Date } } }) => {
+          if (where.status === "PENDING") {
+            return 2;
+          }
+
+          if (where.status === "CHECKOUT_READY") {
+            return 1;
+          }
+
+          if (where.status === "ORDER_PLACED") {
+            return 1;
+          }
+
+          if (where.status === "FAILED") {
+            return 1;
+          }
+
+          if (where.status === "CONFIRMED") {
+            return 3;
+          }
+
+          return 0;
+        },
+        findMany: async () => [
+          {
+            id: "order-1",
+            documentId: "doc-1",
+            provider: "mock-pharmacy",
+            providerMode: "mock",
+            quoteId: "quote-doc-1",
+            status: "CONFIRMED",
+            externalReference: "ref-1",
+            checkoutUrl: null,
+            partnerOrderUrl: "https://pharmacy.receituario.local/orders/1",
+            totalPriceCents: 2500,
+            currency: "BRL",
+            items: [],
+            warnings: [],
+            metadata: { partnerKey: "eco-farma", routeStrategy: "best-value" },
+            createdAt: new Date("2026-03-23T12:00:00.000Z"),
+            updatedAt: new Date("2026-03-23T12:05:00.000Z")
+          }
+        ]
+      }
+    } as never,
+    {} as never,
+    {
+      getReadiness: async () => ({
+        mode: "mock",
+        provider: "mock-pharmacy",
+        checkedAt: "2026-03-23T12:10:00.000Z",
+        configured: true,
+        capabilities: {
+          quote: true,
+          createOrder: true,
+          statusLookup: true,
+          syncPending: true
+        },
+        connectivity: {
+          status: "mock"
+        },
+        issues: [],
+        metadata: {}
+      })
+    } as never
+  );
+
+  const result = await service.getOperationsSnapshot();
+
+  assert.equal(result.queue.pending, 2);
+  assert.equal(result.queue.checkoutReady, 1);
+  assert.equal(result.queue.orderPlaced, 1);
+  assert.equal(result.queue.failed, 1);
+  assert.equal(result.queue.confirmedToday, 3);
+  assert.equal(result.recentOrders[0]?.partnerKey, "eco-farma");
+  assert.equal(result.alerts.length, 1);
+});

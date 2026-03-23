@@ -89,4 +89,22 @@ export class PharmacyController {
 
     return this.pharmacyService.syncPendingOrders(input ?? {});
   }
+
+  @Get("provider/readiness")
+  async getProviderReadiness(@CurrentPrincipal() principal: AccessPrincipal) {
+    if (!principal.roles.includes("admin") && !principal.roles.includes("compliance")) {
+      throw new ForbiddenException("Readiness farmaceutico restrito a perfis operacionais");
+    }
+
+    return this.pharmacyService.getProviderReadiness();
+  }
+
+  @Get("operations")
+  async getOperations(@CurrentPrincipal() principal: AccessPrincipal) {
+    if (!principal.roles.includes("admin") && !principal.roles.includes("compliance")) {
+      throw new ForbiddenException("Operacao farmaceutica restrita a perfis operacionais");
+    }
+
+    return this.pharmacyService.getOperationsSnapshot();
+  }
 }

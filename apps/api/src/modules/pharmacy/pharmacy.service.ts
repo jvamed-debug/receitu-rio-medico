@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PharmacyOrderStatus } from "@prisma/client";
-import type { PharmacyOrder, PharmacyQuote, PrescriptionDocument } from "@receituario/domain";
+import type {
+  PharmacyOperationsSnapshot,
+  PharmacyOrder,
+  PharmacyQuote,
+  PrescriptionDocument
+} from "@receituario/domain";
 
 import { PrismaService } from "../../persistence/prisma.service";
 import { DocumentsService } from "../documents/documents.service";
@@ -16,6 +21,10 @@ export class PharmacyService {
 
   async quotePrescription(documentId: string): Promise<PharmacyQuote> {
     return this.quotePrescriptionWithRouting(documentId, {});
+  }
+
+  async getProviderReadiness() {
+    return this.pharmacyProviderGateway.getReadiness();
   }
 
   async quotePrescriptionWithRouting(
@@ -176,6 +185,80 @@ export class PharmacyService {
       results
     };
   }
+
+  async getOperationsSnapshot(): Promise<PharmacyOperationsSnapshot> {
+    const [readiness, pending, checkoutReady, orderPlaced, failed, confirmedToday, recentOrders] =
+      await Promise.all([
+        this.pharmacyProviderGateway.getReadiness(),
+        this.prisma.pharmacyOrder.count({
+          where: {
+            status: PharmacyOrderStatus.PENDING
+          }
+        }),
+        this.prisma.pharmacyOrder.count({
+          where: {
+            status: PharmacyOrderStatus.CHECKOUT_READY
+          }
+        }),
+        this.prisma.pharmacyOrder.count({
+          where: {
+            status: PharmacyOrderStatus.ORDER_PLACED
+          }
+        }),
+        this.prisma.pharmacyOrder.count({
+          where: {
+            status: PharmacyOrderStatus.FAILED
+          }
+        }),
+        this.prisma.pharmacyOrder.count({
+          where: {
+            status: PharmacyOrderStatus.CONFIRMED,
+            updatedAt: {
+              gte: startOfToday()
+            }
+          }
+        }),
+        this.prisma.pharmacyOrder.findMany({
+          orderBy: {
+            updatedAt: "desc"
+          },
+          take: 10
+        })
+      ]);
+
+    const alerts = [...readiness.issues];
+
+    if (failed > 0) {
+      alerts.push(`Existem ${failed} pedidos farmaceuticos com falha para revisao.`);
+    }
+
+    if (pending + checkoutReady + orderPlaced > 20) {
+      alerts.push("Fila farmaceutica acima do esperado; revisar sincronizacao e parceiros.");
+    }
+
+    return {
+      checkedAt: new Date().toISOString(),
+      readiness,
+      queue: {
+        pending,
+        checkoutReady,
+        orderPlaced,
+        failed,
+        confirmedToday
+      },
+      recentOrders: recentOrders.map((order) => ({
+        id: order.id,
+        documentId: order.documentId,
+        partnerKey: extractOrderMetadata(order.metadata).partnerKey,
+        status: order.status.toLowerCase() as PharmacyOrder["status"],
+        totalPriceCents: order.totalPriceCents,
+        currency: order.currency,
+        createdAt: order.createdAt.toISOString(),
+        updatedAt: order.updatedAt.toISOString()
+      })),
+      alerts
+    };
+  }
 }
 
 function normalizeWarnings(quote: PharmacyQuote) {
@@ -229,6 +312,8 @@ function toDomainOrder(order: {
   createdAt: Date;
   updatedAt: Date;
 }): PharmacyOrder {
+  const metadata = extractOrderMetadata(order.metadata);
+
   return {
     id: order.id,
     documentId: order.documentId,
@@ -237,19 +322,9 @@ function toDomainOrder(order: {
       order.providerMode === "mock" || order.providerMode === "remote"
         ? order.providerMode
         : undefined,
-    partnerKey:
-      order.metadata &&
-      typeof order.metadata === "object" &&
-      typeof (order.metadata as Record<string, unknown>).partnerKey === "string"
-        ? ((order.metadata as Record<string, unknown>).partnerKey as string)
-        : undefined,
+    partnerKey: metadata.partnerKey,
     quoteId: order.quoteId,
-    routeStrategy:
-      order.metadata &&
-      typeof order.metadata === "object" &&
-      typeof (order.metadata as Record<string, unknown>).routeStrategy === "string"
-        ? ((order.metadata as Record<string, unknown>).routeStrategy as PharmacyOrder["routeStrategy"])
-        : undefined,
+    routeStrategy: metadata.routeStrategy,
     status: order.status.toLowerCase() as PharmacyOrder["status"],
     externalReference: order.externalReference ?? undefined,
     checkoutUrl: order.checkoutUrl ?? undefined,
@@ -267,4 +342,29 @@ function toDomainOrder(order: {
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString()
   };
+}
+
+function extractOrderMetadata(metadata: unknown): {
+  partnerKey?: string;
+  routeStrategy?: PharmacyOrder["routeStrategy"];
+} {
+  if (!metadata || typeof metadata !== "object") {
+    return {};
+  }
+
+  return {
+    partnerKey:
+      typeof (metadata as Record<string, unknown>).partnerKey === "string"
+        ? ((metadata as Record<string, unknown>).partnerKey as string)
+        : undefined,
+    routeStrategy:
+      typeof (metadata as Record<string, unknown>).routeStrategy === "string"
+        ? ((metadata as Record<string, unknown>).routeStrategy as PharmacyOrder["routeStrategy"])
+        : undefined
+  };
+}
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }

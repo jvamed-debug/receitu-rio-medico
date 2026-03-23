@@ -3,13 +3,138 @@ import {
   ServiceUnavailableException
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { PharmacyOrder, PharmacyPartnerOffer, PharmacyQuote } from "@receituario/domain";
+import type {
+  PharmacyOrder,
+  PharmacyPartnerOffer,
+  PharmacyProviderReadinessResponse,
+  PharmacyQuote
+} from "@receituario/domain";
 
 import { mapRemotePharmacyQuote } from "./pharmacy-anti-corruption.mapper";
 
 @Injectable()
 export class PharmacyProviderGateway {
   constructor(private readonly configService: ConfigService) {}
+
+  async getReadiness(): Promise<PharmacyProviderReadinessResponse> {
+    const mode =
+      this.configService.get<string>("PHARMACY_PROVIDER_MODE")?.toLowerCase() ?? "mock";
+    const provider =
+      this.configService.get<string>("PHARMACY_PROVIDER_NAME") ??
+      (mode === "mock" ? "mock-pharmacy" : "remote-pharmacy");
+
+    if (mode === "mock") {
+      return {
+        mode: "mock",
+        provider,
+        checkedAt: new Date().toISOString(),
+        configured: true,
+        capabilities: {
+          quote: true,
+          createOrder: true,
+          statusLookup: true,
+          syncPending: true
+        },
+        connectivity: {
+          status: "mock"
+        },
+        issues: [],
+        metadata: {
+          checkoutBaseUrl:
+            this.configService.get<string>("PHARMACY_PROVIDER_CHECKOUT_BASE_URL") ??
+            "https://pharmacy.receituario.local"
+        }
+      };
+    }
+
+    const baseUrl = this.configService.get<string>("PHARMACY_PROVIDER_BASE_URL");
+    const apiKey = this.configService.get<string>("PHARMACY_PROVIDER_API_KEY");
+    const issues: string[] = [];
+
+    if (!baseUrl) {
+      issues.push("PHARMACY_PROVIDER_BASE_URL nao configurado");
+    }
+
+    if (!apiKey) {
+      issues.push("PHARMACY_PROVIDER_API_KEY nao configurado");
+    }
+
+    if (issues.length > 0) {
+      return {
+        mode: "remote",
+        provider,
+        checkedAt: new Date().toISOString(),
+        configured: false,
+        capabilities: {
+          quote: false,
+          createOrder: false,
+          statusLookup: false,
+          syncPending: false
+        },
+        connectivity: {
+          status: "unavailable"
+        },
+        issues,
+        metadata: {}
+      };
+    }
+
+    try {
+      const response = await fetch(`${baseUrl!.replace(/\/$/, "")}/health`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${apiKey!}`
+        }
+      });
+
+      return {
+        mode: "remote",
+        provider,
+        checkedAt: new Date().toISOString(),
+        configured: true,
+        capabilities: {
+          quote: response.ok,
+          createOrder: response.ok,
+          statusLookup: response.ok,
+          syncPending: response.ok
+        },
+        connectivity: {
+          status: response.ok ? "ok" : "degraded",
+          httpStatus: response.status
+        },
+        issues: response.ok
+          ? []
+          : [`Provider farmaceutico respondeu com status ${response.status}`],
+        metadata: {
+          baseUrl
+        }
+      };
+    } catch (error) {
+      return {
+        mode: "remote",
+        provider,
+        checkedAt: new Date().toISOString(),
+        configured: true,
+        capabilities: {
+          quote: false,
+          createOrder: false,
+          statusLookup: false,
+          syncPending: false
+        },
+        connectivity: {
+          status: "unavailable"
+        },
+        issues: [
+          error instanceof Error
+            ? `Falha de conectividade com provider farmaceutico: ${error.message}`
+            : "Falha de conectividade com provider farmaceutico"
+        ],
+        metadata: {
+          baseUrl
+        }
+      };
+    }
+  }
 
   async quotePrescription(input: {
     documentId: string;

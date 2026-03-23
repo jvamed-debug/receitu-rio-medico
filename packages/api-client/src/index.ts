@@ -8,6 +8,8 @@ import type {
   AppointmentReminder,
   ClinicalDocument,
   PharmacyOrder,
+  PharmacyOperationsSnapshot,
+  PharmacyProviderReadinessResponse,
   PharmacyQuote
 } from "@receituario/domain";
 export type {
@@ -19,6 +21,8 @@ export type {
   AppointmentSummary,
   AppointmentReminder,
   PharmacyOrder,
+  PharmacyOperationsSnapshot,
+  PharmacyProviderReadinessResponse,
   PharmacyQuote
 } from "@receituario/domain";
 import type {
@@ -666,6 +670,14 @@ export class ApiClient {
 
   getPharmacyOrder(orderId: string) {
     return this.get<PharmacyOrder>(`/pharmacy/orders/${orderId}`);
+  }
+
+  getPharmacyProviderReadiness() {
+    return this.get<PharmacyProviderReadinessResponse>("/pharmacy/provider/readiness");
+  }
+
+  getPharmacyOperations() {
+    return this.get<PharmacyOperationsSnapshot>("/pharmacy/operations");
   }
 
   syncPharmacyOrder(orderId: string) {

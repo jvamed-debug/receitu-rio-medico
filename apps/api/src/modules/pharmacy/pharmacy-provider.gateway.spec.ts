@@ -99,3 +99,47 @@ test("gateway mock roteia para parceiro mais rapido quando solicitado", async ()
 
   assert.equal(result.selectedPartnerKey, "fast-meds");
 });
+
+test("gateway de farmacia expõe readiness em modo mock", async () => {
+  const gateway = new PharmacyProviderGateway({
+    get: (key: string) => {
+      switch (key) {
+        case "PHARMACY_PROVIDER_MODE":
+          return "mock";
+        case "PHARMACY_PROVIDER_NAME":
+          return "mock-pharmacy";
+        default:
+          return undefined;
+      }
+    }
+  } as never);
+
+  const result = await gateway.getReadiness();
+
+  assert.equal(result.mode, "mock");
+  assert.equal(result.configured, true);
+  assert.equal(result.connectivity.status, "mock");
+  assert.equal(result.issues.length, 0);
+});
+
+test("gateway de farmacia sinaliza configuracao faltante em modo remoto", async () => {
+  const gateway = new PharmacyProviderGateway({
+    get: (key: string) => {
+      switch (key) {
+        case "PHARMACY_PROVIDER_MODE":
+          return "remote";
+        case "PHARMACY_PROVIDER_NAME":
+          return "partner-pharmacy";
+        default:
+          return undefined;
+      }
+    }
+  } as never);
+
+  const result = await gateway.getReadiness();
+
+  assert.equal(result.mode, "remote");
+  assert.equal(result.configured, false);
+  assert.equal(result.connectivity.status, "unavailable");
+  assert.equal(result.issues.length, 2);
+});

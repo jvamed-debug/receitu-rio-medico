@@ -71,3 +71,45 @@ export interface PharmacyOrder {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface PharmacyProviderReadinessResponse {
+  mode: "mock" | "remote";
+  provider: string;
+  checkedAt: string;
+  configured: boolean;
+  capabilities: {
+    quote: boolean;
+    createOrder: boolean;
+    statusLookup: boolean;
+    syncPending: boolean;
+  };
+  connectivity: {
+    status: "mock" | "ok" | "degraded" | "unavailable";
+    httpStatus?: number;
+  };
+  issues: string[];
+  metadata: Record<string, unknown>;
+}
+
+export interface PharmacyOperationsSnapshot {
+  checkedAt: string;
+  readiness: PharmacyProviderReadinessResponse;
+  queue: {
+    pending: number;
+    checkoutReady: number;
+    orderPlaced: number;
+    failed: number;
+    confirmedToday: number;
+  };
+  recentOrders: Array<{
+    id: string;
+    documentId: string;
+    partnerKey?: string;
+    status: PharmacyOrderStatus;
+    totalPriceCents: number;
+    currency: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  alerts: string[];
+}

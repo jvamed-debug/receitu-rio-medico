@@ -445,6 +445,8 @@ Ja entregue:
 - roteamento por parceiro e estrategia de selecao
 - ofertas alternativas na cotacao
 - sincronizacao em lote de pedidos pendentes
+- readiness operacional do provider farmaceutico
+- snapshot operacional da fila de pedidos e alertas de integracao
 
 Falta para fechar:
 
@@ -536,8 +538,8 @@ Falta para fechar:
 ### Bloco imediato
 
 1. passo 13: provider real de assinatura e homologacao ponta a ponta
-2. passo 18: CDS com interacoes graves e regras mais finas por especialidade
-3. passo 22: provider farmaceutico real, rede parceira e conciliacao de pedidos
+2. passo 22: provider farmaceutico real, rede parceira e conciliacao de pedidos
+3. passo 18: CDS com interacoes graves e regras mais finas por especialidade
 
 ### Bloco seguinte
 
