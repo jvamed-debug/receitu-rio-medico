@@ -1,10 +1,10 @@
 import { Shell } from "../../../components/shell";
-import { createApiClient } from "../../../lib/api";
+import { createServerApiClient } from "../../../lib/api";
 
 export const dynamic = "force-dynamic";
 
 async function loadPatients() {
-  const api = createApiClient();
+  const api = await createServerApiClient();
 
   try {
     return await api.listPatients();

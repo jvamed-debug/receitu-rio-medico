@@ -81,6 +81,7 @@ model ProfessionalProfile {
   memberships          OrganizationMembership[]
   documents            ClinicalDocument[]
   primaryPatients      Patient[]          @relation("PrimaryProfessionalPatients")
+  reviewedClinicalProfiles PatientClinicalProfile[]
   signatureSessions    SignatureSession[]
   auditLogs            AuditLog[]
   createdAt            DateTime           @default(now())
@@ -124,6 +125,7 @@ model Patient {
   email      String?
   notes      String?
   primaryProfessionalId String?
+  clinicalProfile PatientClinicalProfile?
   documents  ClinicalDocument[]
   organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
@@ -132,6 +134,24 @@ model Patient {
 
   @@index([primaryProfessionalId])
   @@index([organizationId])
+}
+
+model PatientClinicalProfile {
+  id                     String               @id @default(cuid())
+  patientId              String               @unique
+  allergies              Json?
+  conditions             Json?
+  chronicMedications     Json?
+  carePlan               Json?
+  summary                String?
+  reviewedByProfessionalId String?
+  reviewedAt             DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  patient                Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  reviewedByProfessional ProfessionalProfile? @relation(fields: [reviewedByProfessionalId], references: [id], onDelete: SetNull)
+
+  @@index([reviewedByProfessionalId, reviewedAt])
 }
 
 model ClinicalDocument {

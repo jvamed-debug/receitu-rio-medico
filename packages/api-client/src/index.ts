@@ -11,6 +11,32 @@ export interface PatientSummary {
   fullName: string;
   cpf?: string;
   cns?: string;
+  clinicalProfile?: PatientClinicalProfile;
+}
+
+export interface PatientClinicalProfile {
+  allergies: Array<{
+    substance: string;
+    reaction?: string;
+    severity?: "low" | "moderate" | "high";
+  }>;
+  conditions: Array<{
+    name: string;
+    status?: "active" | "controlled" | "resolved";
+    notes?: string;
+  }>;
+  chronicMedications: Array<{
+    name: string;
+    dosage?: string;
+    frequency?: string;
+  }>;
+  carePlan: Array<{
+    title: string;
+    notes?: string;
+  }>;
+  summary?: string;
+  reviewedByProfessionalId?: string;
+  reviewedAt?: string;
 }
 
 export interface TemplateSummary {
@@ -294,6 +320,10 @@ export class ApiClient {
 
   getPatient(id: string) {
     return this.get<PatientDetail | null>(`/patients/${id}`);
+  }
+
+  updatePatientClinicalProfile(id: string, input: PatientClinicalProfile) {
+    return this.patch<PatientClinicalProfile>(`/patients/${id}/clinical-profile`, input);
   }
 
   listDocuments() {
