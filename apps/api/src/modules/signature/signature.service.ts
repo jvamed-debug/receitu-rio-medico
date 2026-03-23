@@ -287,6 +287,138 @@ export class SignatureService {
     });
   }
 
+  async getSessionScope(sessionId: string) {
+    const session = await this.prisma.signatureSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        documentId: true
+      }
+    });
+
+    if (!session) {
+      throw new NotFoundException("Sessao de assinatura nao encontrada");
+    }
+
+    return session;
+  }
+
+  async syncSessionStatus(input: { sessionId: string }) {
+    const session = await this.prisma.signatureSession.findUnique({
+      where: { id: input.sessionId }
+    });
+
+    if (!session) {
+      throw new NotFoundException("Sessao de assinatura nao encontrada");
+    }
+
+    if (
+      session.status === SignatureSessionStatus.SIGNED ||
+      session.status === SignatureSessionStatus.FAILED
+    ) {
+      return {
+        sessionId: session.id,
+        status: session.status.toLowerCase(),
+        issuedAt: session.signedAt?.toISOString() ?? null,
+        providerStatus: session.status.toLowerCase(),
+        providerReference: session.providerReference ?? null
+      };
+    }
+
+    const providerStatus = await this.signatureProviderGateway.getStatus({
+      sessionId: session.id,
+      provider: session.provider,
+      externalReference: session.providerReference
+    });
+
+    if (providerStatus.status === "signed") {
+      return this.finalizeSignedSession({
+        sessionId: session.id,
+        documentId: session.documentId,
+        professionalId: session.professionalId,
+        provider: session.provider,
+        signedAt: providerStatus.signedAt ?? new Date().toISOString(),
+        providerReference: providerStatus.externalReference,
+        policyVersion: session.policyVersion ?? undefined,
+        signatureLevel: session.signatureLevel ?? undefined,
+        retentionCategory: "clinical_record",
+        evidence: providerStatus.evidence,
+        usedWindow: false,
+        complianceRecord:
+          typeof session.evidence === "object" && session.evidence
+            ? (session.evidence as Record<string, unknown>)
+            : {}
+      });
+    }
+
+    if (providerStatus.status === "failed") {
+      await this.prisma.signatureSession.update({
+        where: { id: session.id },
+        data: {
+          status: SignatureSessionStatus.FAILED,
+          providerReference:
+            providerStatus.externalReference ?? session.providerReference,
+          evidence: {
+            ...(typeof session.evidence === "object" && session.evidence
+              ? session.evidence
+              : {}),
+            providerEvidence: providerStatus.evidence,
+            providerStatus: providerStatus.providerStatus ?? "failed",
+            syncedAt: new Date().toISOString()
+          } as unknown as Prisma.InputJsonValue
+        }
+      });
+
+      await this.auditService.log({
+        actorProfessionalId: session.professionalId,
+        entityType: "signature_session",
+        entityId: session.id,
+        action: "signature_sync_failed",
+        origin: "api.signature.sync",
+        metadata: {
+          provider: session.provider,
+          providerStatus: providerStatus.providerStatus ?? "failed",
+          externalReference:
+            providerStatus.externalReference ?? session.providerReference ?? null
+        }
+      });
+
+      return {
+        sessionId: session.id,
+        status: "failed",
+        issuedAt: null,
+        providerStatus: providerStatus.providerStatus ?? "failed",
+        providerReference:
+          providerStatus.externalReference ?? session.providerReference ?? null
+      };
+    }
+
+    await this.prisma.signatureSession.update({
+      where: { id: session.id },
+      data: {
+        providerReference:
+          providerStatus.externalReference ?? session.providerReference,
+        evidence: {
+          ...(typeof session.evidence === "object" && session.evidence
+            ? session.evidence
+            : {}),
+          providerEvidence: providerStatus.evidence,
+          providerStatus: providerStatus.providerStatus ?? "pending",
+          syncedAt: new Date().toISOString()
+        } as unknown as Prisma.InputJsonValue
+      }
+    });
+
+    return {
+      sessionId: session.id,
+      status: "pending",
+      issuedAt: null,
+      providerStatus: providerStatus.providerStatus ?? "pending",
+      providerReference:
+        providerStatus.externalReference ?? session.providerReference ?? null
+    };
+  }
+
   async ensurePdfArtifact(documentId: string) {
     const existingArtifact = await this.prisma.pdfArtifact.findUnique({
       where: { documentId }

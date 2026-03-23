@@ -9,6 +9,9 @@ import { DocumentsService } from "./documents.service";
 test("bloqueia prescricao com alerta que exige override sem justificativa", async () => {
   const service = new DocumentsService(
     {
+      cdsOverrideReview: {
+        create: async () => undefined
+      },
       clinicalDocument: {
         create: async () => {
           throw new Error("nao deveria persistir");
@@ -49,8 +52,15 @@ test("bloqueia prescricao com alerta que exige override sem justificativa", asyn
 });
 
 test("persiste prescricao com override justificado", async () => {
+  let createdReviewPayload: Record<string, unknown> | undefined;
+
   const service = new DocumentsService(
     {
+      cdsOverrideReview: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          createdReviewPayload = data;
+        }
+      },
       clinicalDocument: {
         create: async ({ data }: { data: Record<string, unknown> }) => ({
           id: "doc-1",
@@ -104,4 +114,5 @@ test("persiste prescricao com override justificado", async () => {
 
   assert.equal(result.type, "prescription");
   assert.equal(result.cdsOverride?.acceptedAlertCodes[0], "condition_pregnancy_risk");
+  assert.equal(createdReviewPayload?.documentId, "doc-1");
 });

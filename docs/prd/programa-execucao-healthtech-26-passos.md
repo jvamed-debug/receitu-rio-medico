@@ -1,4 +1,4 @@
-# Programa de Execucao da Healthtech: 26 Passos
+﻿# Programa de Execucao da Healthtech: 26 Passos
 
 ## Objetivo
 
@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 13. provider real de assinatura
-- 18. CDS com interacoes e override
-- 22. provider farmaceutico real e anti-corruption
+- 13. provider real de assinatura e homologacao ponta a ponta
+- 18. CDS com interacoes graves e regras mais finas por especialidade
+- 22. provider farmaceutico real, rede parceira e conciliacao de pedidos
 
 ## Checklist dos 26 passos
 
@@ -173,7 +173,6 @@ Ja entregue:
 Falta para fechar:
 
 - logs com base legal e finalidade onde fizer sentido
-- anonimização para analytics
 - governanca mais forte para consentimento
 - descarte automatizado com workflow de aprovacao
 
@@ -264,6 +263,8 @@ Ja entregue:
 - referencia e evidencia persistidas
 - `callbackUrl` e `callbackSecret` no fluxo remoto
 - endpoint publico de callback para provider
+- sincronizacao manual de sessao remota por status
+- endpoint protegido para reconciliar sessao pendente
 
 Falta para fechar:
 
@@ -344,7 +345,7 @@ Falta para fechar:
 
 ### 18. Incluir CDS basico
 
-Status: em progresso
+Status: em progresso avancado
 
 Ja entregue:
 
@@ -354,12 +355,14 @@ Ja entregue:
 - alerta por condicao clinica em contexto gestacional, renal e hepatica
 - suporte a override justificado no contrato documental
 - severidade resumida no documento
+- abertura automatica de revisao institucional para override critico
+- listagem e resolucao de revisoes de override
 
 Falta para fechar:
 
 - interacoes graves
-- graduacao e governanca de override
-- override com workflow institucional
+- graduacao mais fina de override
+- workflow institucional com regras por tenant e papel
 
 ## Trilha 5: Operacao da clinica
 
@@ -415,7 +418,7 @@ Falta para fechar:
 
 ### 22. Integracao farmaceutica
 
-Status: em progresso inicial
+Status: em progresso avancado
 
 Ja entregue:
 
@@ -425,6 +428,9 @@ Ja entregue:
 - contrato compartilhado de cotacao
 - camada anti-corruption para quote remoto
 - normalizacao de provider, disponibilidade, warnings e links de continuidade
+- criacao de pedido farmaceutico a partir da prescricao
+- persistencia e leitura de pedido farmaceutico
+- sincronizacao de status do pedido
 
 Falta para fechar:
 
@@ -516,9 +522,9 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 13: provider real de assinatura
-2. passo 18: CDS com interacoes graves e override governado
-3. passo 22: provider farmaceutico real com camada anti-corruption
+1. passo 13: provider real de assinatura e homologacao ponta a ponta
+2. passo 18: CDS com interacoes graves e regras mais finas por especialidade
+3. passo 22: provider farmaceutico real, rede parceira e conciliacao de pedidos
 
 ### Bloco seguinte
 
@@ -528,7 +534,7 @@ Falta para fechar:
 
 ### Bloco posterior
 
-7. aprofundar passo 22 com provider farmaceutico real
+7. aprofundar passo 22 com disponibilidade, compra e pos-compra
 8. aprofundar LGPD operacional
 9. aprofundar governanca institucional
 

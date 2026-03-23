@@ -7,6 +7,7 @@ import type {
   AppointmentSummary,
   AppointmentReminder,
   ClinicalDocument,
+  PharmacyOrder,
   PharmacyQuote
 } from "@receituario/domain";
 export type {
@@ -17,6 +18,7 @@ export type {
   AppointmentOperationsSnapshot,
   AppointmentSummary,
   AppointmentReminder,
+  PharmacyOrder,
   PharmacyQuote
 } from "@receituario/domain";
 import type {
@@ -265,6 +267,21 @@ export interface SharedDocumentResponse {
       createdAt: string;
     } | null;
   };
+}
+
+export interface CdsOverrideReviewSummary {
+  id: string;
+  documentId: string;
+  organizationId?: string | null;
+  status: "pending" | "acknowledged" | "approved" | "rejected";
+  justification: string;
+  alertCodes: string[];
+  resolutionNotes?: string | null;
+  requestedByProfessionalId: string;
+  reviewedByProfessionalId?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SignatureWindowResponse {
@@ -585,6 +602,50 @@ export class ApiClient {
 
   createPrescriptionQuote(documentId: string) {
     return this.post<PharmacyQuote>(`/pharmacy/prescriptions/${documentId}/quote`, {});
+  }
+
+  createPrescriptionOrder(documentId: string) {
+    return this.post<PharmacyOrder>(`/pharmacy/prescriptions/${documentId}/orders`, {});
+  }
+
+  getPharmacyOrder(orderId: string) {
+    return this.get<PharmacyOrder>(`/pharmacy/orders/${orderId}`);
+  }
+
+  syncPharmacyOrder(orderId: string) {
+    return this.post<PharmacyOrder>(`/pharmacy/orders/${orderId}/sync`, {});
+  }
+
+  listPendingCdsOverrideReviews() {
+    return this.get<CdsOverrideReviewSummary[]>("/documents/override-reviews");
+  }
+
+  resolveCdsOverrideReview(
+    reviewId: string,
+    input: {
+      decision: "acknowledged" | "approved" | "rejected";
+      resolutionNotes?: string;
+    }
+  ) {
+    return this.post<CdsOverrideReviewSummary>(
+      `/documents/override-reviews/${reviewId}/resolve`,
+      input
+    );
+  }
+
+  syncSignatureSession(sessionId: string) {
+    return this.post<{
+      sessionId: string;
+      status: string;
+      issuedAt?: string | null;
+      providerStatus?: string;
+      providerReference?: string | null;
+      pdfArtifact?: {
+        id: string;
+        storageKey: string;
+        sha256: string;
+      };
+    }>(`/signature/sessions/${sessionId}/sync`, {});
   }
 
   listTemplates() {

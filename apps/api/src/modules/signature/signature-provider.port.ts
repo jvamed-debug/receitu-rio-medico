@@ -22,3 +22,11 @@ export type SignatureProviderExecutionResult = {
   signedAt: string;
   evidence: Record<string, unknown>;
 };
+
+export type SignatureProviderStatusResult = {
+  status: "pending" | "signed" | "failed";
+  externalReference?: string;
+  signedAt?: string;
+  providerStatus?: string;
+  evidence: Record<string, unknown>;
+};

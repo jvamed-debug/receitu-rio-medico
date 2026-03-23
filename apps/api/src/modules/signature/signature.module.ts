@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AccessModule } from "../access/access.module";
 import { AuthModule } from "../auth/auth.module";
 import { AuditModule } from "../audit/audit.module";
 import { ComplianceModule } from "../compliance/compliance.module";
@@ -10,7 +11,7 @@ import { SignatureProviderCallbackController } from "./signature-provider-callba
 import { SignatureService } from "./signature.service";
 
 @Module({
-  imports: [AuthModule, AuditModule, ComplianceModule, PersistenceModule],
+  imports: [AccessModule, AuthModule, AuditModule, ComplianceModule, PersistenceModule],
   controllers: [SignatureController, SignatureProviderCallbackController],
   providers: [SignatureService, SignatureProviderGateway],
   exports: [SignatureService, SignatureProviderGateway]

@@ -1,4 +1,4 @@
-import { Controller, Param, Post, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 
 import { ResourceAccessService } from "../access/resource-access.service";
 import { AuthGuard } from "../auth/auth.guard";
@@ -25,5 +25,46 @@ export class PharmacyController {
       "prescription_quote"
     );
     return this.pharmacyService.quotePrescription(documentId);
+  }
+
+  @Post("prescriptions/:documentId/orders")
+  async createPrescriptionOrder(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("documentId") documentId: string
+  ) {
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      documentId,
+      "prescription_order_create"
+    );
+    return this.pharmacyService.createOrderForPrescription(documentId);
+  }
+
+  @Post("orders/:orderId/sync")
+  async syncOrder(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("orderId") orderId: string
+  ) {
+    const order = await this.pharmacyService.getOrderScope(orderId);
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      order.documentId,
+      "prescription_order_sync"
+    );
+    return this.pharmacyService.syncOrder(orderId);
+  }
+
+  @Get("orders/:orderId")
+  async getOrder(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("orderId") orderId: string
+  ) {
+    const order = await this.pharmacyService.getOrderScope(orderId);
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      order.documentId,
+      "prescription_order_read"
+    );
+    return this.pharmacyService.getOrder(orderId);
   }
 }

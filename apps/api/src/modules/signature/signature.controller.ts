@@ -14,19 +14,28 @@ import type { AccessPrincipal } from "../auth/auth.types";
 import { RequireRoles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
 import { ensureRecentStepUp } from "../auth/step-up.util";
+import { ResourceAccessService } from "../access/resource-access.service";
 import { SignatureService } from "./signature.service";
 
 @UseGuards(AuthGuard, RolesGuard)
 @Controller()
 export class SignatureController {
-  constructor(private readonly signatureService: SignatureService) {}
+  constructor(
+    private readonly signatureService: SignatureService,
+    private readonly resourceAccessService: ResourceAccessService
+  ) {}
 
   @RequireRoles("professional", "admin")
   @Post("signature/sessions")
-  createSession(
-    @CurrentPrincipal() principal: { professionalId?: string },
+  async createSession(
+    @CurrentPrincipal() principal: AccessPrincipal,
     @Body() input: { documentId: string; provider: string }
   ) {
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      input.documentId,
+      "signature_session_create"
+    );
     return this.signatureService.createSession({
       professionalId: principal.professionalId ?? "",
       documentId: input.documentId,
@@ -60,13 +69,18 @@ export class SignatureController {
 
   @RequireRoles("professional", "admin")
   @Post("documents/:id/sign")
-  signDocument(
+  async signDocument(
     @CurrentPrincipal() principal: AccessPrincipal,
     @Param("id") id: string,
     @Body() input: { provider?: string },
     @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> }
   ) {
     ensureRecentStepUp(principal, "sign_document");
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      id,
+      "document_sign"
+    );
     return this.signatureService.signDocument({
       professionalId: principal.professionalId ?? "",
       documentId: id,
@@ -84,7 +98,30 @@ export class SignatureController {
   }
 
   @Get("documents/:id/signatures")
-  listDocumentSessions(@Param("id") id: string) {
+  async listDocumentSessions(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      id,
+      "document_signature_history"
+    );
     return this.signatureService.listDocumentSessions(id);
+  }
+
+  @RequireRoles("professional", "admin", "compliance")
+  @Post("signature/sessions/:id/sync")
+  async syncSession(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    const session = await this.signatureService.getSessionScope(id);
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      session.documentId,
+      "signature_session_sync"
+    );
+    return this.signatureService.syncSessionStatus({ sessionId: id });
   }
 }

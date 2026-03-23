@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { createHash } from "node:crypto";
-import { DocumentType, Prisma } from "@prisma/client";
+import { CdsOverrideReviewStatus, DocumentType, Prisma } from "@prisma/client";
 import type {
   ClinicalDocument,
   ClinicalDocumentType,
@@ -207,6 +207,8 @@ export class DocumentsService {
       }
     });
 
+    await this.maybeCreateCdsOverrideReview(type, document, enrichedInput);
+
     return toDomainDocument(document);
   }
 
@@ -246,6 +248,113 @@ export class DocumentsService {
       cdsOverride
     };
   }
+
+  async listPendingOverrideReviews(input: {
+    organizationId?: string;
+    professionalId?: string;
+    roles: string[];
+  }) {
+    const canBypass = input.roles.some((role) => role === "admin" || role === "compliance");
+    const reviews = await this.prisma.cdsOverrideReview.findMany({
+      where: {
+        status: {
+          in: [CdsOverrideReviewStatus.PENDING, CdsOverrideReviewStatus.ACKNOWLEDGED]
+        },
+        ...(canBypass
+          ? input.organizationId
+            ? { organizationId: input.organizationId }
+            : {}
+          : input.organizationId
+            ? { organizationId: input.organizationId }
+            : input.professionalId
+              ? { requestedByProfessionalId: input.professionalId }
+              : { id: "__no_access__" })
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    return reviews.map(toOverrideReviewSummary);
+  }
+
+  async resolveOverrideReview(input: {
+    reviewId: string;
+    organizationId?: string;
+    professionalId?: string;
+    roles: string[];
+    reviewedByProfessionalId: string;
+    decision: "acknowledged" | "approved" | "rejected";
+    resolutionNotes?: string;
+  }) {
+    const review = await this.prisma.cdsOverrideReview.findUnique({
+      where: { id: input.reviewId }
+    });
+
+    if (!review) {
+      throw new NotFoundException("Revisao de override nao encontrada");
+    }
+
+    const canBypass = input.roles.some((role) => role === "admin" || role === "compliance");
+
+    if (!canBypass) {
+      if (input.organizationId && review.organizationId) {
+        if (input.organizationId !== review.organizationId) {
+          throw new NotFoundException("Revisao de override nao encontrada");
+        }
+      } else if (
+        !input.professionalId ||
+        review.requestedByProfessionalId !== input.professionalId
+      ) {
+        throw new NotFoundException("Revisao de override nao encontrada");
+      }
+    }
+
+    const updated = await this.prisma.cdsOverrideReview.update({
+      where: { id: review.id },
+      data: {
+        status: mapReviewStatus(input.decision),
+        reviewedByProfessionalId: input.reviewedByProfessionalId,
+        reviewedAt: new Date(),
+        resolutionNotes: input.resolutionNotes ?? null
+      }
+    });
+
+    return toOverrideReviewSummary(updated);
+  }
+
+  private async maybeCreateCdsOverrideReview(
+    type: ClinicalDocumentType,
+    document: { id: string; organizationId: string | null },
+    enrichedInput: Record<string, unknown>
+  ) {
+    if (type !== "prescription") {
+      return;
+    }
+
+    const cdsSummary = enrichedInput.cdsSummary as ClinicalDocument["cdsSummary"] | undefined;
+    const cdsOverride = enrichedInput.cdsOverride as ClinicalDocument["cdsOverride"] | undefined;
+    const requiredAlerts =
+      cdsSummary?.alerts.filter((alert) => alert.requiresOverrideJustification) ?? [];
+
+    if (!cdsOverride || requiredAlerts.length === 0) {
+      return;
+    }
+
+    await this.prisma.cdsOverrideReview.create({
+      data: {
+        documentId: document.id,
+        organizationId:
+          typeof enrichedInput.organizationId === "string"
+            ? enrichedInput.organizationId
+            : document.organizationId,
+        requestedByProfessionalId: String(enrichedInput.authorProfessionalId),
+        status: CdsOverrideReviewStatus.PENDING,
+        alertCodes: requiredAlerts.map((alert) => alert.code) as Prisma.InputJsonValue,
+        justification: cdsOverride.justification
+      }
+    });
+  }
 }
 
 function ensureCdsOverrideCompliance(
@@ -283,6 +392,49 @@ function ensureCdsOverrideCompliance(
       missingAlertCodes: missingCodes
     });
   }
+}
+
+function mapReviewStatus(decision: "acknowledged" | "approved" | "rejected") {
+  switch (decision) {
+    case "acknowledged":
+      return CdsOverrideReviewStatus.ACKNOWLEDGED;
+    case "approved":
+      return CdsOverrideReviewStatus.APPROVED;
+    case "rejected":
+      return CdsOverrideReviewStatus.REJECTED;
+  }
+}
+
+function toOverrideReviewSummary(review: {
+  id: string;
+  documentId: string;
+  organizationId: string | null;
+  status: CdsOverrideReviewStatus;
+  justification: string;
+  alertCodes: unknown;
+  resolutionNotes: string | null;
+  requestedByProfessionalId: string;
+  reviewedByProfessionalId: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: review.id,
+    documentId: review.documentId,
+    organizationId: review.organizationId,
+    status: review.status.toLowerCase(),
+    justification: review.justification,
+    alertCodes: Array.isArray(review.alertCodes)
+      ? review.alertCodes.filter((item): item is string => typeof item === "string")
+      : [],
+    resolutionNotes: review.resolutionNotes,
+    requestedByProfessionalId: review.requestedByProfessionalId,
+    reviewedByProfessionalId: review.reviewedByProfessionalId,
+    reviewedAt: review.reviewedAt?.toISOString() ?? null,
+    createdAt: review.createdAt.toISOString(),
+    updatedAt: review.updatedAt.toISOString()
+  };
 }
 
 function buildPreviewSections(type: DocumentType, payload: Record<string, unknown>) {

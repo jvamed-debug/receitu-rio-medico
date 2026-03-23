@@ -175,6 +175,7 @@ function createService(
   }>,
   gatewayOverrides?: Partial<{
     sign: (...args: any[]) => Promise<any>;
+    getStatus: (...args: any[]) => Promise<any>;
   }>
 ) {
   const prisma = {
@@ -255,6 +256,14 @@ function createService(
         providerMode: "mock"
       }
     }),
+    getStatus: async () => ({
+      status: "pending",
+      externalReference: "icpbr-sig-1",
+      providerStatus: "pending",
+      evidence: {
+        providerMode: "mock"
+      }
+    }),
     ...gatewayOverrides
   };
 
@@ -265,3 +274,53 @@ function createService(
     gateway as never
   );
 }
+
+test("syncSessionStatus finaliza sessao quando provider remoto retorna signed", async () => {
+  let updatedDocument = false;
+
+  const service = createService(
+    {
+      signatureSession: {
+        findUnique: async () => ({
+          id: "sig-3",
+          documentId: "doc-3",
+          professionalId: "prof-1",
+          provider: SignatureProvider.ICP_BRASIL_VENDOR,
+          policyVersion: "2026.03",
+          signatureLevel: "qualified",
+          providerReference: "remote-sig-3",
+          evidence: { policyVersion: "2026.03" },
+          status: SignatureSessionStatus.PENDING,
+          signedAt: null
+        }),
+        update: async () => undefined
+      },
+      clinicalDocument: {
+        update: async () => {
+          updatedDocument = true;
+          return {
+            id: "doc-3",
+            status: DocumentStatus.ISSUED,
+            issuedAt: new Date("2026-03-22T18:00:00.000Z")
+          };
+        }
+      }
+    },
+    undefined,
+    {
+      getStatus: async () => ({
+        status: "signed",
+        externalReference: "remote-sig-3",
+        signedAt: "2026-03-22T18:00:00.000Z",
+        providerStatus: "completed",
+        evidence: { providerMode: "remote" }
+      })
+    }
+  );
+
+  const result = await service.syncSessionStatus({ sessionId: "sig-3" });
+
+  assert.equal(result.sessionId, "sig-3");
+  assert.equal(result.status, DocumentStatus.ISSUED);
+  assert.equal(updatedDocument, true);
+});

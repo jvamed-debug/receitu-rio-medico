@@ -84,3 +84,48 @@ test("gateway remoto inclui callback na requisicao", async () => {
     global.fetch = originalFetch;
   }
 });
+
+test("gateway remoto normaliza status de assinatura", async () => {
+  const originalFetch = global.fetch;
+
+  global.fetch = (async () => {
+    return {
+      ok: true,
+      json: async () => ({
+        status: "completed",
+        externalReference: "remote-sig-2",
+        signedAt: "2026-03-23T10:05:00.000Z",
+        evidence: { providerMode: "remote" }
+      })
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const gateway = new SignatureProviderGateway({
+      get: (key: string) => {
+        switch (key) {
+          case "SIGNATURE_PROVIDER_MODE":
+            return "remote";
+          case "SIGNATURE_PROVIDER_BASE_URL":
+            return "https://signature.vendor.example";
+          case "SIGNATURE_PROVIDER_API_KEY":
+            return "secret";
+          default:
+            return undefined;
+        }
+      }
+    } as never);
+
+    const result = await gateway.getStatus({
+      sessionId: "sig-2",
+      externalReference: "remote-sig-2",
+      provider: SignatureProvider.ICP_BRASIL_VENDOR
+    });
+
+    assert.equal(result.status, "signed");
+    assert.equal(result.externalReference, "remote-sig-2");
+    assert.equal(result.providerStatus, "completed");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

@@ -249,6 +249,54 @@ export class DocumentsController {
     });
     return shareLink;
   }
+
+  @RequireRoles("professional", "admin", "compliance")
+  @Get("override-reviews")
+  listOverrideReviews(@CurrentPrincipal() principal: AccessPrincipal) {
+    return this.documentsService.listPendingOverrideReviews({
+      organizationId: principal.organizationId,
+      professionalId: principal.professionalId,
+      roles: principal.roles
+    });
+  }
+
+  @RequireRoles("professional", "admin", "compliance")
+  @Post("override-reviews/:reviewId/resolve")
+  async resolveOverrideReview(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("reviewId") reviewId: string,
+    @Body()
+    input: {
+      decision: "acknowledged" | "approved" | "rejected";
+      resolutionNotes?: string;
+    }
+  ) {
+    ensureRecentStepUp(principal, "resolve_cds_override_review");
+    ensureProfessionalPrincipal(principal);
+    const review = await this.documentsService.resolveOverrideReview({
+      reviewId,
+      organizationId: principal.organizationId,
+      professionalId: principal.professionalId,
+      roles: principal.roles,
+      reviewedByProfessionalId: principal.professionalId ?? "",
+      decision: input.decision,
+      resolutionNotes: input.resolutionNotes
+    });
+    await this.auditService.log({
+      actorUserId: principal.userId,
+      actorProfessionalId: principal.professionalId,
+      entityType: "cds_override_review",
+      entityId: review.id,
+      action: "cds_override_review_resolved",
+      origin: "api.documents",
+      metadata: {
+        documentId: review.documentId,
+        status: review.status,
+        resolutionNotes: review.resolutionNotes
+      }
+    });
+    return review;
+  }
 }
 
 function ensureProfessionalPrincipal(principal: { professionalId?: string }) {
