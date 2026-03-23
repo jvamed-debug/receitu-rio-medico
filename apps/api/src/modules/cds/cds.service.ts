@@ -18,6 +18,8 @@ export class CdsService {
     context?: {
       specialty?: string;
     };
+    organizationId?: string;
+    requesterRoles?: string[];
   }): Promise<ClinicalDecisionSupportSummary> {
     const patient = await this.prisma.patient.findUnique({
       where: { id: input.patientId },
@@ -27,18 +29,30 @@ export class CdsService {
     });
 
     const profile = mapPatientClinicalProfile(patient?.clinicalProfile);
-    const alerts = [
+    const alerts = applyInstitutionalGovernance(
+      [
       ...buildAllergyAlerts(profile, input.items),
       ...buildDuplicateTherapyAlerts(profile, input.items),
       ...buildConditionAlerts(profile, input.items),
       ...buildMedicationInteractionAlerts(input.items),
       ...buildSpecialtyAlerts(input.items, input.context?.specialty)
-    ];
+      ],
+      {
+        organizationId: input.organizationId,
+        requesterRoles: input.requesterRoles
+      }
+    );
+    const sources = new Set<string>(["local-rules:v1"]);
+
+    if (input.organizationId && alerts.some((alert) => alert.source === "institutional_policy")) {
+      sources.add("institutional-governance:v1");
+    }
 
     return {
       severity: resolveSeverity(alerts),
       alerts,
-      reviewedAt: new Date().toISOString()
+      reviewedAt: new Date().toISOString(),
+      sources: [...sources]
     };
   }
 }
@@ -90,7 +104,8 @@ function buildAllergyAlerts(
         code: "allergy_match",
         severity: "high",
         category: "allergy",
-        message: `Alergia registrada com correspondencia para ${item.medicationName}.`
+        message: `Alergia registrada com correspondencia para ${item.medicationName}.`,
+        source: "local_rule"
       }
     ];
   });
@@ -123,7 +138,8 @@ function buildDuplicateTherapyAlerts(
         code: "duplicate_therapy",
         severity: "moderate",
         category: "duplicate_therapy",
-        message: `Possivel duplicidade terapeutica com medicacao cronica registrada: ${duplicate}.`
+        message: `Possivel duplicidade terapeutica com medicacao cronica registrada: ${duplicate}.`,
+        source: "local_rule"
       }
     ];
   });
@@ -197,7 +213,8 @@ function buildConditionAlerts(
           severity: rule.severity,
           category: "condition",
           message: rule.message(item.medicationName, matchingCondition.displayName),
-          requiresOverrideJustification: rule.requiresOverrideJustification
+          requiresOverrideJustification: rule.requiresOverrideJustification,
+          source: "local_rule"
         }
       ];
     });
@@ -255,7 +272,8 @@ function buildMedicationInteractionAlerts(
         severity: rule.severity,
         category: "interaction",
         message: `${rule.message} Itens envolvidos: ${matchedPair.displayNames.join(" + ")}.`,
-        requiresOverrideJustification: rule.requiresOverrideJustification
+        requiresOverrideJustification: rule.requiresOverrideJustification,
+        source: "local_rule"
       }
     ];
   });
@@ -324,10 +342,57 @@ function buildSpecialtyAlerts(
           severity: rule.severity,
           category: "interaction",
           message: rule.message(item.medicationName),
-          requiresOverrideJustification: rule.requiresOverrideJustification
+          requiresOverrideJustification: rule.requiresOverrideJustification,
+          source: "local_rule"
         }
       ];
     });
+  });
+}
+
+function applyInstitutionalGovernance(
+  alerts: ClinicalDecisionSupportAlert[],
+  input: {
+    organizationId?: string;
+    requesterRoles?: string[];
+  }
+): ClinicalDecisionSupportAlert[] {
+  if (!input.organizationId) {
+    return alerts;
+  }
+
+  const requesterRoles = input.requesterRoles ?? [];
+  const privilegedRole = requesterRoles.some(
+    (role) => role === "admin" || role === "compliance"
+  );
+  const highSeverityReviewerRole: ClinicalDecisionSupportAlert["minimumReviewerRole"] =
+    privilegedRole ? "admin" : "compliance";
+
+  return alerts.map((alert) => {
+    if (alert.severity === "high") {
+      return {
+        ...alert,
+        source: "institutional_policy" as const,
+        requiresOverrideJustification: true,
+        institutionalReviewRequired: true,
+        minimumReviewerRole: highSeverityReviewerRole
+      };
+    }
+
+    if (
+      alert.severity === "moderate" &&
+      alert.category === "interaction" &&
+      requesterRoles.includes("professional")
+    ) {
+      return {
+        ...alert,
+        source: "institutional_policy" as const,
+        institutionalReviewRequired: true,
+        minimumReviewerRole: "admin" as const
+      };
+    }
+
+    return alert;
   });
 }
 

@@ -88,3 +88,40 @@ test("detecta interacao grave e regra por especialidade", async () => {
     true
   );
 });
+
+test("aplica governanca institucional por tenant e papel", async () => {
+  const service = new CdsService({
+    patient: {
+      findUnique: async () => ({
+        clinicalProfile: {
+          allergies: [],
+          chronicMedications: [],
+          conditions: []
+        }
+      })
+    }
+  } as never);
+
+  const result = await service.analyzePrescription({
+    patientId: "patient-3",
+    organizationId: "org-1",
+    requesterRoles: ["professional"],
+    items: [
+      {
+        medicationName: "Warfarina",
+        dosage: "5mg"
+      },
+      {
+        medicationName: "Ibuprofeno",
+        dosage: "400mg"
+      }
+    ]
+  });
+
+  const interaction = result.alerts.find((alert) => alert.code === "interaction_warfarin_nsaid");
+
+  assert.equal(interaction?.source, "institutional_policy");
+  assert.equal(interaction?.institutionalReviewRequired, true);
+  assert.equal(interaction?.minimumReviewerRole, "compliance");
+  assert.equal(result.sources?.includes("institutional-governance:v1"), true);
+});

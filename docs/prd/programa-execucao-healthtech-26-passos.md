@@ -367,11 +367,13 @@ Ja entregue:
 - listagem e resolucao de revisoes de override
 - interacoes graves entre medicamentos
 - regras adicionais por especialidade
+- governanca institucional por organizacao e papel
+- source tagging do CDS entre regra local e politica institucional
+- reconhecimento automatico de override institucional por perfil privilegiado
 
 Falta para fechar:
 
 - graduacao mais fina de override
-- workflow institucional com regras por tenant e papel
 - interacoes mais amplas baseadas em fonte clinica homologada
 
 ## Trilha 5: Operacao da clinica

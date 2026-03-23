@@ -54,7 +54,8 @@ export class DocumentsController {
       ...input,
       patientId: input.patientId,
       authorProfessionalId: principal.professionalId ?? "",
-      organizationId: principal.organizationId
+      organizationId: principal.organizationId,
+      requesterRoles: principal.roles
     });
     await this.auditService.log({
       actorUserId: principal.userId,
@@ -86,7 +87,8 @@ export class DocumentsController {
       ...input,
       patientId: input.patientId,
       authorProfessionalId: principal.professionalId ?? "",
-      organizationId: principal.organizationId
+      organizationId: principal.organizationId,
+      requesterRoles: principal.roles
     });
     await this.auditService.log({
       actorUserId: principal.userId,
@@ -114,7 +116,8 @@ export class DocumentsController {
       ...input,
       patientId: input.patientId,
       authorProfessionalId: principal.professionalId ?? "",
-      organizationId: principal.organizationId
+      organizationId: principal.organizationId,
+      requesterRoles: principal.roles
     });
     await this.auditService.log({
       actorUserId: principal.userId,
@@ -142,7 +145,8 @@ export class DocumentsController {
       ...input,
       patientId: input.patientId,
       authorProfessionalId: principal.professionalId ?? "",
-      organizationId: principal.organizationId
+      organizationId: principal.organizationId,
+      requesterRoles: principal.roles
     });
     await this.auditService.log({
       actorUserId: principal.userId,

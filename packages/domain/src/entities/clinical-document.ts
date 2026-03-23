@@ -46,12 +46,16 @@ export interface ClinicalDecisionSupportAlert {
   category: "allergy" | "interaction" | "duplicate_therapy" | "condition";
   message: string;
   requiresOverrideJustification?: boolean;
+  source?: "local_rule" | "institutional_policy";
+  institutionalReviewRequired?: boolean;
+  minimumReviewerRole?: "professional" | "admin" | "compliance";
 }
 
 export interface ClinicalDecisionSupportSummary {
   severity: "none" | "low" | "moderate" | "high";
   alerts: ClinicalDecisionSupportAlert[];
   reviewedAt: string;
+  sources?: string[];
 }
 
 export interface ClinicalDecisionSupportOverride {

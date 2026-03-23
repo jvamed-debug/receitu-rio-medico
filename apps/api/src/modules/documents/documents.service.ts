@@ -224,6 +224,11 @@ export class DocumentsService {
 
     const cdsSummary = await this.cdsService.analyzePrescription({
       patientId: String(input.patientId),
+      organizationId:
+        typeof input.organizationId === "string" ? input.organizationId : undefined,
+      requesterRoles: Array.isArray(input.requesterRoles)
+        ? input.requesterRoles.filter((role): role is string => typeof role === "string")
+        : undefined,
       context:
         input.context && typeof input.context === "object"
           ? { specialty: String((input.context as Record<string, unknown>).specialty ?? "") }
@@ -345,6 +350,20 @@ export class DocumentsService {
       return;
     }
 
+    const requesterRoles = Array.isArray(enrichedInput.requesterRoles)
+      ? enrichedInput.requesterRoles.filter((role): role is string => typeof role === "string")
+      : [];
+    const privilegedReviewer = requesterRoles.some(
+      (role) => role === "admin" || role === "compliance"
+    );
+    const reviewRequiredByPolicy = requiredAlerts.some(
+      (alert) => alert.institutionalReviewRequired
+    );
+    const nextStatus =
+      privilegedReviewer && reviewRequiredByPolicy
+        ? CdsOverrideReviewStatus.ACKNOWLEDGED
+        : CdsOverrideReviewStatus.PENDING;
+
     await this.prisma.cdsOverrideReview.create({
       data: {
         documentId: document.id,
@@ -353,9 +372,17 @@ export class DocumentsService {
             ? enrichedInput.organizationId
             : document.organizationId,
         requestedByProfessionalId: String(enrichedInput.authorProfessionalId),
-        status: CdsOverrideReviewStatus.PENDING,
+        status: nextStatus,
         alertCodes: requiredAlerts.map((alert) => alert.code) as Prisma.InputJsonValue,
-        justification: cdsOverride.justification
+        justification: cdsOverride.justification,
+        reviewedByProfessionalId: nextStatus === CdsOverrideReviewStatus.ACKNOWLEDGED
+          ? String(enrichedInput.authorProfessionalId)
+          : null,
+        reviewedAt: nextStatus === CdsOverrideReviewStatus.ACKNOWLEDGED ? new Date() : null,
+        resolutionNotes:
+          nextStatus === CdsOverrideReviewStatus.ACKNOWLEDGED
+            ? "Override institucionalmente reconhecido por perfil privilegiado."
+            : null
       }
     });
   }
@@ -497,4 +524,5 @@ function buildPreviewSections(type: DocumentType, payload: Record<string, unknow
 
 type CreateDocumentInput<T extends Record<string, unknown>> = T & {
   organizationId?: string;
+  requesterRoles?: string[];
 };
