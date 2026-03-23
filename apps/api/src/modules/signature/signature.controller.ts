@@ -141,6 +141,17 @@ export class SignatureController {
   }
 
   @RequireRoles("admin", "compliance")
+  @Get("signature/operations")
+  getOperations(@Query("provider") provider?: string) {
+    return this.signatureService.getOperationsSnapshot({
+      provider:
+        provider === "GOVBR_VENDOR"
+          ? SignatureProvider.GOVBR_VENDOR
+          : SignatureProvider.ICP_BRASIL_VENDOR
+    });
+  }
+
+  @RequireRoles("admin", "compliance")
   @Post("signature/sessions/sync-pending")
   syncPendingSessions(@Body() input: { limit?: number }) {
     return this.signatureService.syncPendingSessions({

@@ -291,6 +291,46 @@ export interface SignatureWindowResponse {
   active?: boolean;
 }
 
+export interface SignatureProviderReadinessResponse {
+  mode: "mock" | "remote";
+  provider: string;
+  checkedAt: string;
+  configured: boolean;
+  callbackVerificationMode: "shared-secret" | "hmac";
+  capabilities: {
+    createSignature: boolean;
+    statusLookup: boolean;
+    callbackSupport: boolean;
+    hmacVerification: boolean;
+  };
+  connectivity: {
+    status: "mock" | "ok" | "degraded" | "unavailable";
+    httpStatus?: number;
+  };
+  issues: string[];
+  metadata: Record<string, unknown>;
+}
+
+export interface SignatureOperationsSnapshot {
+  checkedAt: string;
+  readiness: SignatureProviderReadinessResponse;
+  queue: {
+    pending: number;
+    failed: number;
+    signedToday: number;
+  };
+  recentSessions: Array<{
+    id: string;
+    documentId: string;
+    provider: string;
+    status: string;
+    providerReference?: string | null;
+    createdAt: string;
+    signedAt?: string | null;
+  }>;
+  alerts: string[];
+}
+
 export interface SignDocumentResponse {
   sessionId: string;
   documentId: string;
@@ -669,6 +709,18 @@ export class ApiClient {
         sha256: string;
       };
     }>(`/signature/sessions/${sessionId}/sync`, {});
+  }
+
+  getSignatureProviderReadiness(provider?: string) {
+    return this.get<SignatureProviderReadinessResponse>(
+      `/signature/provider/readiness${provider ? `?provider=${encodeURIComponent(provider)}` : ""}`
+    );
+  }
+
+  getSignatureOperations(provider?: string) {
+    return this.get<SignatureOperationsSnapshot>(
+      `/signature/operations${provider ? `?provider=${encodeURIComponent(provider)}` : ""}`
+    );
   }
 
   listTemplates() {

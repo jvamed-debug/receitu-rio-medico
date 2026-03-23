@@ -445,6 +445,89 @@ export class SignatureService {
     };
   }
 
+  async getOperationsSnapshot(input: {
+    provider: SignatureProvider;
+  }) {
+    const checkedAt = new Date();
+    const startOfDay = new Date(checkedAt);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const [readiness, pending, failed, signedToday, recentSessions] = await Promise.all([
+      this.signatureProviderGateway.getReadiness({
+        provider: input.provider
+      }),
+      this.prisma.signatureSession.count({
+        where: {
+          provider: input.provider,
+          status: SignatureSessionStatus.PENDING
+        }
+      }),
+      this.prisma.signatureSession.count({
+        where: {
+          provider: input.provider,
+          status: SignatureSessionStatus.FAILED
+        }
+      }),
+      this.prisma.signatureSession.count({
+        where: {
+          provider: input.provider,
+          status: SignatureSessionStatus.SIGNED,
+          signedAt: {
+            gte: startOfDay
+          }
+        }
+      }),
+      this.prisma.signatureSession.findMany({
+        where: {
+          provider: input.provider
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 10,
+        select: {
+          id: true,
+          documentId: true,
+          provider: true,
+          status: true,
+          providerReference: true,
+          createdAt: true,
+          signedAt: true
+        }
+      })
+    ]);
+
+    const alerts = [...readiness.issues];
+
+    if (failed > 0) {
+      alerts.push(`${failed} sessao(oes) de assinatura em falha aguardando tratamento.`);
+    }
+
+    if (pending > 10) {
+      alerts.push(`${pending} sessao(oes) pendentes indicam fila de reconciliacao acima do esperado.`);
+    }
+
+    return {
+      checkedAt: checkedAt.toISOString(),
+      readiness,
+      queue: {
+        pending,
+        failed,
+        signedToday
+      },
+      recentSessions: recentSessions.map((session) => ({
+        id: session.id,
+        documentId: session.documentId,
+        provider: session.provider,
+        status: session.status.toLowerCase(),
+        providerReference: session.providerReference ?? null,
+        createdAt: session.createdAt.toISOString(),
+        signedAt: session.signedAt?.toISOString() ?? null
+      })),
+      alerts
+    };
+  }
+
   async ensurePdfArtifact(documentId: string) {
     const existingArtifact = await this.prisma.pdfArtifact.findUnique({
       where: { documentId }

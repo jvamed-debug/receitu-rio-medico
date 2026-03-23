@@ -268,6 +268,7 @@ Ja entregue:
 - readiness operacional do provider
 - verificacao de callback com modo HMAC opcional
 - sincronizacao em lote de sessoes pendentes
+- snapshot operacional de homologacao com fila e alertas
 
 Falta para fechar:
 

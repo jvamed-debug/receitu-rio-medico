@@ -160,6 +160,7 @@ function createService(
       update?: (...args: any[]) => Promise<any>;
       findUnique?: (...args: any[]) => Promise<any>;
       findMany?: (...args: any[]) => Promise<any>;
+      count?: (...args: any[]) => Promise<any>;
     };
     clinicalDocument: {
       update?: (...args: any[]) => Promise<any>;
@@ -176,6 +177,7 @@ function createService(
   gatewayOverrides?: Partial<{
     sign: (...args: any[]) => Promise<any>;
     getStatus: (...args: any[]) => Promise<any>;
+    getReadiness: (...args: any[]) => Promise<any>;
   }>
 ) {
   const prisma = {
@@ -193,6 +195,7 @@ function createService(
       update: async () => undefined,
       findUnique: async () => null,
       findMany: async () => [],
+      count: async () => 0,
       ...prismaOverrides?.signatureSession
     },
     clinicalDocument: {
@@ -263,6 +266,24 @@ function createService(
       evidence: {
         providerMode: "mock"
       }
+    }),
+    getReadiness: async () => ({
+      mode: "mock",
+      provider: SignatureProvider.ICP_BRASIL_VENDOR,
+      checkedAt: "2026-03-23T12:00:00.000Z",
+      configured: true,
+      callbackVerificationMode: "shared-secret",
+      capabilities: {
+        createSignature: true,
+        statusLookup: true,
+        callbackSupport: true,
+        hmacVerification: false
+      },
+      connectivity: {
+        status: "mock"
+      },
+      issues: [],
+      metadata: {}
     }),
     ...gatewayOverrides
   };
@@ -372,4 +393,66 @@ test("syncPendingSessions processa sessoes pendentes com limite", async () => {
 
   assert.equal(result.processed, 1);
   assert.equal(result.results[0]?.status, "pending");
+});
+
+test("getOperationsSnapshot consolida readiness e fila", async () => {
+  const service = createService(
+    {
+      signatureSession: {
+        count: async ({ where }: { where?: { status?: SignatureSessionStatus } }) => {
+          switch (where?.status) {
+            case SignatureSessionStatus.PENDING:
+              return 2;
+            case SignatureSessionStatus.FAILED:
+              return 1;
+            case SignatureSessionStatus.SIGNED:
+              return 4;
+            default:
+              return 0;
+          }
+        },
+        findMany: async () => [
+          {
+            id: "sig-ops-1",
+            documentId: "doc-ops-1",
+            provider: SignatureProvider.ICP_BRASIL_VENDOR,
+            status: SignatureSessionStatus.PENDING,
+            providerReference: "remote-sig-ops-1",
+            createdAt: new Date("2026-03-23T09:00:00.000Z"),
+            signedAt: null
+          }
+        ]
+      }
+    },
+    undefined,
+    {
+      getReadiness: async () => ({
+        mode: "remote",
+        provider: SignatureProvider.ICP_BRASIL_VENDOR,
+        checkedAt: "2026-03-23T12:00:00.000Z",
+        configured: true,
+        callbackVerificationMode: "hmac",
+        capabilities: {
+          createSignature: true,
+          statusLookup: true,
+          callbackSupport: true,
+          hmacVerification: true
+        },
+        connectivity: {
+          status: "ok"
+        },
+        issues: [],
+        metadata: {}
+      })
+    }
+  );
+
+  const result = await service.getOperationsSnapshot({
+    provider: SignatureProvider.ICP_BRASIL_VENDOR
+  });
+
+  assert.equal(result.queue.pending, 2);
+  assert.equal(result.queue.failed, 1);
+  assert.equal(result.queue.signedToday, 4);
+  assert.equal(result.recentSessions[0]?.id, "sig-ops-1");
 });
