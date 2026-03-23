@@ -15,9 +15,11 @@ import { AuthGuard } from "../auth/auth.guard";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
 import type { AccessPrincipal } from "../auth/auth.types";
 import { AppointmentBillingService } from "./billing/appointment-billing.service";
+import { PaymentProviderGateway } from "./billing/payment-provider.gateway";
 import { AppointmentMaintenanceService } from "./appointment-maintenance.service";
 import { AppointmentsService } from "./appointments.service";
 import { AppointmentRemindersService } from "./reminders/appointment-reminders.service";
+import { ReminderProviderGateway } from "./reminders/reminder-provider.gateway";
 import { TelehealthService } from "./telehealth/telehealth.service";
 
 @UseGuards(AuthGuard)
@@ -28,6 +30,8 @@ export class AppointmentsController {
     private readonly resourceAccessService: ResourceAccessService,
     private readonly appointmentRemindersService: AppointmentRemindersService,
     private readonly appointmentBillingService: AppointmentBillingService,
+    private readonly paymentProviderGateway: PaymentProviderGateway,
+    private readonly reminderProviderGateway: ReminderProviderGateway,
     private readonly telehealthService: TelehealthService,
     private readonly appointmentMaintenanceService: AppointmentMaintenanceService
   ) {}
@@ -74,6 +78,22 @@ export class AppointmentsController {
     }
   ) {
     return this.appointmentsService.analytics(principal, query);
+  }
+
+  @Get("integrations/readiness")
+  providerReadiness(@CurrentPrincipal() principal: AccessPrincipal) {
+    if (!principal.roles.includes("admin") && !principal.roles.includes("compliance")) {
+      throw new NotFoundException("Integracoes nao encontradas");
+    }
+
+    return Promise.all([
+      this.paymentProviderGateway.getReadiness(),
+      this.reminderProviderGateway.getReadiness()
+    ]).then(([payments, reminders]) => ({
+      checkedAt: new Date().toISOString(),
+      payments,
+      reminders
+    }));
   }
 
   @Post("operations/run-maintenance")

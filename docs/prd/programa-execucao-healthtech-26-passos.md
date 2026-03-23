@@ -397,6 +397,8 @@ Ja entregue:
 - conciliacao manual
 - webhook de cobranca
 - resumo financeiro da agenda
+- readiness operacional do provider de pagamento
+- webhook com verificacao HMAC opcional
 
 Falta para fechar:
 
@@ -414,6 +416,7 @@ Ja entregue:
 - provider gateway configuravel
 - retry de lembretes falhos
 - visibilidade operacional de falhas
+- readiness operacional do provider de lembretes
 
 Falta para fechar:
 

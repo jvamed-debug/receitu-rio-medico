@@ -44,3 +44,23 @@ export type PaymentCaptureResult = {
   paidAt: string;
   providerMetadata: Record<string, unknown>;
 };
+
+export type PaymentProviderReadinessResult = {
+  mode: "mock" | "remote";
+  checkedAt: string;
+  configured: boolean;
+  webhookVerificationMode: "shared-secret" | "hmac";
+  capabilities: {
+    authorize: boolean;
+    capture: boolean;
+    checkout: boolean;
+    webhookSupport: boolean;
+    hmacVerification: boolean;
+  };
+  connectivity: {
+    status: "mock" | "ok" | "degraded" | "unavailable";
+    httpStatus?: number;
+  };
+  issues: string[];
+  metadata: Record<string, unknown>;
+};

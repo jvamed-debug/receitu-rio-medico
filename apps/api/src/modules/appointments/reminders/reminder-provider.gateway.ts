@@ -6,7 +6,8 @@ import { ConfigService } from "@nestjs/config";
 
 import type {
   ReminderDispatchInput,
-  ReminderDispatchResult
+  ReminderDispatchResult,
+  ReminderProviderReadinessResult
 } from "./reminder-provider.port";
 
 @Injectable()
@@ -93,7 +94,128 @@ export class ReminderProviderGateway {
     }
   }
 
+  async getReadiness(): Promise<ReminderProviderReadinessResult> {
+    const mode = this.getProviderMode();
+    const checkedAt = new Date().toISOString();
+    const baseUrl = this.configService.get<string>("REMINDER_PROVIDER_BASE_URL");
+    const apiKey = this.configService.get<string>("REMINDER_PROVIDER_API_KEY");
+    const issues: string[] = [];
+
+    if (mode === "mock") {
+      return {
+        mode,
+        checkedAt,
+        configured: true,
+        capabilities: {
+          dispatch: true,
+          deliveryCallbackSupport: false
+        },
+        connectivity: {
+          status: "mock"
+        },
+        issues,
+        metadata: {
+          providerMode: "mock"
+        }
+      };
+    }
+
+    if (!baseUrl || !apiKey) {
+      issues.push("REMINDER_PROVIDER_BASE_URL ou REMINDER_PROVIDER_API_KEY ausentes");
+      return {
+        mode,
+        checkedAt,
+        configured: false,
+        capabilities: {
+          dispatch: false,
+          deliveryCallbackSupport: false
+        },
+        connectivity: {
+          status: "unavailable"
+        },
+        issues,
+        metadata: {
+          providerMode: "remote"
+        }
+      };
+    }
+
+    const healthResult = await this.checkRemoteHealth(baseUrl, apiKey);
+
+    if (healthResult.status !== "ok") {
+      issues.push(
+        healthResult.status === "degraded"
+          ? "Provider de lembretes retornou estado degradado"
+          : "Provider de lembretes indisponivel"
+      );
+    }
+
+    return {
+      mode,
+      checkedAt,
+      configured: true,
+      capabilities: {
+        dispatch: true,
+        deliveryCallbackSupport: false
+      },
+      connectivity: {
+        status: healthResult.status,
+        httpStatus: healthResult.httpStatus
+      },
+      issues,
+      metadata: {
+        providerMode: "remote",
+        providerHealth: healthResult.providerHealth ?? null
+      }
+    };
+  }
+
   private getProviderMode() {
-    return (this.configService.get<string>("REMINDER_PROVIDER_MODE") ?? "mock").toLowerCase();
+    return (this.configService.get<string>("REMINDER_PROVIDER_MODE") ?? "mock").toLowerCase() as
+      | "mock"
+      | "remote";
+  }
+
+  private async checkRemoteHealth(baseUrl: string, apiKey: string) {
+    const timeoutMs = Number(
+      this.configService.get<string>("REMINDER_PROVIDER_TIMEOUT_MS") ?? "10000"
+    );
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/health`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${apiKey}`
+        },
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        return {
+          status: response.status >= 500 ? "unavailable" : "degraded",
+          httpStatus: response.status
+        } as const;
+      }
+
+      const payload = (await response.json()) as {
+        status?: string;
+        health?: string;
+      };
+      const providerHealth = (payload.health ?? payload.status ?? "ok").toLowerCase();
+
+      return {
+        status: ["ok", "healthy", "ready"].includes(providerHealth) ? "ok" : "degraded",
+        httpStatus: response.status,
+        providerHealth
+      } as const;
+    } catch {
+      return {
+        status: "unavailable"
+      } as const;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

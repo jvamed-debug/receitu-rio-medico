@@ -6,24 +6,26 @@ import {
   UnauthorizedException
 } from "@nestjs/common";
 import { BillingStatus } from "@prisma/client";
-import { ConfigService } from "@nestjs/config";
 
 import { PrismaService } from "../../../persistence/prisma.service";
 import { AuditService } from "../../audit/audit.service";
 import { AppointmentBillingService } from "./appointment-billing.service";
+import { PaymentProviderGateway } from "./payment-provider.gateway";
 
 @Controller("appointments/billing/webhooks")
 export class AppointmentBillingWebhookController {
   constructor(
     private readonly billingService: AppointmentBillingService,
-    private readonly configService: ConfigService,
     private readonly auditService: AuditService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly paymentProviderGateway: PaymentProviderGateway
   ) {}
 
   @Post("provider")
   async receiveProviderEvent(
     @Headers("x-webhook-secret") secret: string | undefined,
+    @Headers("x-webhook-timestamp") timestamp: string | undefined,
+    @Headers("x-webhook-signature") signature: string | undefined,
     @Body()
     input: {
       eventId?: string;
@@ -33,11 +35,14 @@ export class AppointmentBillingWebhookController {
       status: "authorized" | "paid" | "cancelled" | "refunded";
     }
   ) {
-    const expectedSecret =
-      this.configService.get<string>("PAYMENT_PROVIDER_WEBHOOK_SECRET") ??
-      "receituario-webhook-secret";
+    const webhookAuthorized = this.paymentProviderGateway.verifyWebhook({
+      secret,
+      timestamp,
+      signature,
+      payload: input
+    });
 
-    if (!secret || secret !== expectedSecret) {
+    if (!webhookAuthorized) {
       throw new UnauthorizedException("Webhook nao autorizado");
     }
 

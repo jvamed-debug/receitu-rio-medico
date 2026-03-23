@@ -12,3 +12,19 @@ export type ReminderDispatchResult = {
   deliveredAt: string;
   providerMetadata: Record<string, unknown>;
 };
+
+export type ReminderProviderReadinessResult = {
+  mode: "mock" | "remote";
+  checkedAt: string;
+  configured: boolean;
+  capabilities: {
+    dispatch: boolean;
+    deliveryCallbackSupport: boolean;
+  };
+  connectivity: {
+    status: "mock" | "ok" | "degraded" | "unavailable";
+    httpStatus?: number;
+  };
+  issues: string[];
+  metadata: Record<string, unknown>;
+};

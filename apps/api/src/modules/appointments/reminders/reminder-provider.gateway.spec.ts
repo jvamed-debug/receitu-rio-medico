@@ -26,3 +26,42 @@ test("gateway mock de lembretes gera referencia externa", async () => {
   assert.equal(result.providerReference, "reminder-whatsapp-rem-1");
   assert.equal(result.providerMetadata.providerMode, "mock");
 });
+
+test("gateway readiness remoto de lembretes reporta configuracao e health", async () => {
+  const originalFetch = global.fetch;
+
+  global.fetch = (async () => {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: "healthy"
+      })
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const gateway = new ReminderProviderGateway({
+      get: (key: string) => {
+        switch (key) {
+          case "REMINDER_PROVIDER_MODE":
+            return "remote";
+          case "REMINDER_PROVIDER_BASE_URL":
+            return "https://messaging.vendor.example";
+          case "REMINDER_PROVIDER_API_KEY":
+            return "secret";
+          default:
+            return undefined;
+        }
+      }
+    } as never);
+
+    const result = await gateway.getReadiness();
+
+    assert.equal(result.configured, true);
+    assert.equal(result.connectivity.status, "ok");
+    assert.equal(result.capabilities.dispatch, true);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
