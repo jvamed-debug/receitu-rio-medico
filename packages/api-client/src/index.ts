@@ -129,6 +129,23 @@ export interface OrganizationDetail {
   membershipRole?: string;
   memberCount: number;
   professionalCount: number;
+  settings?: OrganizationSettings;
+}
+
+export interface OrganizationSettings {
+  documentSharePolicy: {
+    maxUsesDefault: number;
+    expirationHoursDefault: number;
+    allowHighRiskExternalShare: boolean;
+  };
+  overridePolicy: {
+    minimumReviewerRole: "professional" | "admin" | "compliance";
+    requireInstitutionalReviewForHighSeverity: boolean;
+  };
+  brandingPolicy: {
+    allowCustomLogo: boolean;
+    lockedLayoutVersion?: string;
+  };
 }
 
 export interface ClinicalDocumentAnalyticsSnapshot {
@@ -140,6 +157,11 @@ export interface ClinicalDocumentAnalyticsSnapshot {
   signed: number;
   issued: number;
   delivered: number;
+  funnel: {
+    createdToSignedRate: number;
+    signedToIssuedRate: number;
+    issuedToDeliveredRate: number;
+  };
   byType: Array<{
     type: string;
     total: number;
@@ -889,6 +911,10 @@ export class ApiClient {
 
   switchOrganization(organizationId: string) {
     return this.post<AuthTokens>("/me/organization/switch", { organizationId });
+  }
+
+  updateCurrentOrganizationSettings(input: OrganizationSettings) {
+    return this.patch<OrganizationDetail>("/organizations/current/settings", input);
   }
 
   saveTemplateFavorite(input: {

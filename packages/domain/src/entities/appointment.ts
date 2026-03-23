@@ -114,6 +114,11 @@ export interface AppointmentAnalyticsSnapshot {
   telehealth: number;
   billingPendingCents: number;
   billingPaidCents: number;
+  funnel: {
+    scheduledToConfirmedRate: number;
+    confirmedToCompletedRate: number;
+    completedToPaidRate: number;
+  };
   periods: AppointmentAnalyticsPeriodPoint[];
   professionals: AppointmentAnalyticsProfessionalSummary[];
 }

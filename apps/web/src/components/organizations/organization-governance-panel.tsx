@@ -4,6 +4,7 @@ import {
   ApiClient,
   type OrganizationDetail,
   type OrganizationMembershipSummary,
+  type OrganizationSettings,
   type OrganizationSummary
 } from "@receituario/api-client";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,27 @@ export function OrganizationGovernancePanel({
   );
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState("member");
+  const [settings, setSettings] = useState<OrganizationSettings>({
+    documentSharePolicy: {
+      maxUsesDefault: currentOrganization?.settings?.documentSharePolicy.maxUsesDefault ?? 3,
+      expirationHoursDefault:
+        currentOrganization?.settings?.documentSharePolicy.expirationHoursDefault ?? 72,
+      allowHighRiskExternalShare:
+        currentOrganization?.settings?.documentSharePolicy.allowHighRiskExternalShare ?? false
+    },
+    overridePolicy: {
+      minimumReviewerRole:
+        currentOrganization?.settings?.overridePolicy.minimumReviewerRole ?? "compliance",
+      requireInstitutionalReviewForHighSeverity:
+        currentOrganization?.settings?.overridePolicy.requireInstitutionalReviewForHighSeverity ??
+        true
+    },
+    brandingPolicy: {
+      allowCustomLogo: currentOrganization?.settings?.brandingPolicy.allowCustomLogo ?? false,
+      lockedLayoutVersion:
+        currentOrganization?.settings?.brandingPolicy.lockedLayoutVersion ?? ""
+    }
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -113,6 +135,62 @@ export function OrganizationGovernancePanel({
         submitError instanceof Error
           ? submitError.message
           : "Falha ao atualizar membership."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveSettings() {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.updateCurrentOrganizationSettings({
+        documentSharePolicy: {
+          maxUsesDefault: settings.documentSharePolicy.maxUsesDefault,
+          expirationHoursDefault: settings.documentSharePolicy.expirationHoursDefault,
+          allowHighRiskExternalShare: settings.documentSharePolicy.allowHighRiskExternalShare
+        },
+        overridePolicy: {
+          minimumReviewerRole: settings.overridePolicy.minimumReviewerRole,
+          requireInstitutionalReviewForHighSeverity:
+            settings.overridePolicy.requireInstitutionalReviewForHighSeverity
+        },
+        brandingPolicy: {
+          allowCustomLogo: settings.brandingPolicy.allowCustomLogo,
+          lockedLayoutVersion: settings.brandingPolicy.lockedLayoutVersion || undefined
+        }
+      });
+
+      setSettings({
+        documentSharePolicy: {
+          maxUsesDefault: updated.settings?.documentSharePolicy.maxUsesDefault ?? 3,
+          expirationHoursDefault:
+            updated.settings?.documentSharePolicy.expirationHoursDefault ?? 72,
+          allowHighRiskExternalShare:
+            updated.settings?.documentSharePolicy.allowHighRiskExternalShare ?? false
+        },
+        overridePolicy: {
+          minimumReviewerRole:
+            updated.settings?.overridePolicy.minimumReviewerRole ?? "compliance",
+          requireInstitutionalReviewForHighSeverity:
+            updated.settings?.overridePolicy.requireInstitutionalReviewForHighSeverity ?? true
+        },
+        brandingPolicy: {
+          allowCustomLogo: updated.settings?.brandingPolicy.allowCustomLogo ?? false,
+          lockedLayoutVersion: updated.settings?.brandingPolicy.lockedLayoutVersion ?? ""
+        }
+      });
+
+      setMessage("Politicas institucionais atualizadas.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Falha ao atualizar politicas da organizacao."
       );
     } finally {
       setSaving(false);
@@ -226,6 +304,164 @@ export function OrganizationGovernancePanel({
         {error ? <div style={{ color: "var(--danger)", fontWeight: 700 }}>{error}</div> : null}
         {message ? <div style={{ color: "var(--primary)", fontWeight: 700 }}>{message}</div> : null}
       </section>
+
+      <section style={panelStyle}>
+        <h2 style={{ margin: 0 }}>Politicas institucionais</h2>
+        <div
+          style={{
+            display: "grid",
+            gap: 18,
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))"
+          }}
+        >
+          <div style={policySectionStyle}>
+            <h3 style={{ margin: 0 }}>Compartilhamento externo</h3>
+            <label style={fieldStyle}>
+              <span>Maximo de usos por link</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={settings.documentSharePolicy.maxUsesDefault}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    documentSharePolicy: {
+                      ...current.documentSharePolicy,
+                      maxUsesDefault: Number(event.target.value) || 1
+                    }
+                  }))
+                }
+                style={inputStyle}
+              />
+            </label>
+            <label style={fieldStyle}>
+              <span>Expiracao padrao do link em horas</span>
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={settings.documentSharePolicy.expirationHoursDefault}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    documentSharePolicy: {
+                      ...current.documentSharePolicy,
+                      expirationHoursDefault: Number(event.target.value) || 1
+                    }
+                  }))
+                }
+                style={inputStyle}
+              />
+            </label>
+            <label style={checkboxLabelStyle}>
+              <input
+                type="checkbox"
+                checked={settings.documentSharePolicy.allowHighRiskExternalShare}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    documentSharePolicy: {
+                      ...current.documentSharePolicy,
+                      allowHighRiskExternalShare: event.target.checked
+                    }
+                  }))
+                }
+              />
+              <span>Permitir compartilhamento externo de documentos de maior risco</span>
+            </label>
+          </div>
+
+          <div style={policySectionStyle}>
+            <h3 style={{ margin: 0 }}>Governanca clinica</h3>
+            <label style={fieldStyle}>
+              <span>Menor papel revisor para override critico</span>
+              <select
+                value={settings.overridePolicy.minimumReviewerRole}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    overridePolicy: {
+                      ...current.overridePolicy,
+                      minimumReviewerRole: event.target.value as
+                        | "professional"
+                        | "admin"
+                        | "compliance"
+                    }
+                  }))
+                }
+                style={inputStyle}
+              >
+                <option value="professional">professional</option>
+                <option value="admin">admin</option>
+                <option value="compliance">compliance</option>
+              </select>
+            </label>
+            <label style={checkboxLabelStyle}>
+              <input
+                type="checkbox"
+                checked={settings.overridePolicy.requireInstitutionalReviewForHighSeverity}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    overridePolicy: {
+                      ...current.overridePolicy,
+                      requireInstitutionalReviewForHighSeverity: event.target.checked
+                    }
+                  }))
+                }
+              />
+              <span>Exigir revisao institucional para alertas de alta severidade</span>
+            </label>
+          </div>
+
+          <div style={policySectionStyle}>
+            <h3 style={{ margin: 0 }}>Branding e layout</h3>
+            <label style={checkboxLabelStyle}>
+              <input
+                type="checkbox"
+                checked={settings.brandingPolicy.allowCustomLogo}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    brandingPolicy: {
+                      ...current.brandingPolicy,
+                      allowCustomLogo: event.target.checked
+                    }
+                  }))
+                }
+              />
+              <span>Permitir identidade visual propria da organizacao</span>
+            </label>
+            <label style={fieldStyle}>
+              <span>Versao de layout travada</span>
+              <input
+                value={settings.brandingPolicy.lockedLayoutVersion}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    brandingPolicy: {
+                      ...current.brandingPolicy,
+                      lockedLayoutVersion: event.target.value
+                    }
+                  }))
+                }
+                placeholder="ex: v1-clinica-a"
+                style={inputStyle}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button type="button" onClick={handleSaveSettings} disabled={saving} style={buttonStyle}>
+            {saving ? "Salvando..." : "Salvar politicas"}
+          </button>
+        </div>
+
+        {error ? <div style={{ color: "var(--danger)", fontWeight: 700 }}>{error}</div> : null}
+        {message ? <div style={{ color: "var(--primary)", fontWeight: 700 }}>{message}</div> : null}
+      </section>
     </div>
   );
 }
@@ -254,6 +490,12 @@ const panelStyle = {
 const fieldStyle = {
   display: "grid",
   gap: 8
+};
+
+const checkboxLabelStyle = {
+  display: "flex",
+  gap: 10,
+  alignItems: "center"
 };
 
 const inputStyle = {
@@ -287,5 +529,14 @@ const membershipCardStyle = {
   borderRadius: 14,
   border: "1px solid #d4e1ef",
   padding: 14,
+  background: "#f8fbff"
+};
+
+const policySectionStyle = {
+  display: "grid",
+  gap: 14,
+  borderRadius: 16,
+  border: "1px solid #d4e1ef",
+  padding: 16,
   background: "#f8fbff"
 };

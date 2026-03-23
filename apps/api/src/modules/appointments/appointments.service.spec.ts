@@ -220,4 +220,7 @@ test("gera analytics por periodo e profissional", async () => {
   assert.equal(result.periods.length, 2);
   assert.equal(result.professionals[0]?.professionalName, "Dra. Ana");
   assert.equal(result.professionals[0]?.paidCents, 10000);
+  assert.equal(result.funnel.scheduledToConfirmedRate, 33.3);
+  assert.equal(result.funnel.confirmedToCompletedRate, 100);
+  assert.equal(result.funnel.completedToPaidRate, 100);
 });

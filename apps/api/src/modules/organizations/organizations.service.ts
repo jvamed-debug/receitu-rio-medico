@@ -60,7 +60,8 @@ export class OrganizationsService {
       slug: organization.slug,
       membershipRole: membership.membershipRole,
       memberCount: organization.memberships.length,
-      professionalCount: organization.primaryProfiles.length
+      professionalCount: organization.primaryProfiles.length,
+      settings: normalizeOrganizationSettings(organization.settings)
     };
   }
 
@@ -231,6 +232,69 @@ export class OrganizationsService {
     return mapMembership(refreshed);
   }
 
+  async updateCurrentSettings(
+    principal: AccessPrincipal,
+    input: {
+      documentSharePolicy?: {
+        maxUsesDefault?: number;
+        expirationHoursDefault?: number;
+        allowHighRiskExternalShare?: boolean;
+      };
+      overridePolicy?: {
+        minimumReviewerRole?: "professional" | "admin" | "compliance";
+        requireInstitutionalReviewForHighSeverity?: boolean;
+      };
+      brandingPolicy?: {
+        allowCustomLogo?: boolean;
+        lockedLayoutVersion?: string;
+      };
+    }
+  ) {
+    const organizationId = principal.organizationId;
+    if (!organizationId) {
+      throw new NotFoundException("Organizacao nao encontrada");
+    }
+
+    await this.assertCanManageMemberships(principal, organizationId);
+
+    const current = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        memberships: true,
+        primaryProfiles: true
+      }
+    });
+
+    if (!current) {
+      throw new NotFoundException("Organizacao nao encontrada");
+    }
+
+    const mergedSettings = mergeOrganizationSettings(current.settings, input);
+
+    const updated = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        settings: mergedSettings
+      },
+      include: {
+        memberships: true,
+        primaryProfiles: true
+      }
+    });
+
+    const membership = await this.findMembership(principal, organizationId);
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      slug: updated.slug,
+      membershipRole: membership?.membershipRole,
+      memberCount: updated.memberships.length,
+      professionalCount: updated.primaryProfiles.length,
+      settings: normalizeOrganizationSettings(updated.settings)
+    };
+  }
+
   private async assertCanReadMemberships(principal: AccessPrincipal, organizationId: string) {
     const membership = await this.findMembership(principal, organizationId);
 
@@ -331,4 +395,95 @@ function mapMembership(membership: {
     isDefault: membership.isDefault,
     createdAt: membership.createdAt.toISOString()
   };
+}
+
+function normalizeOrganizationSettings(input: unknown) {
+  const value = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const share = readObject(value.documentSharePolicy);
+  const override = readObject(value.overridePolicy);
+  const branding = readObject(value.brandingPolicy);
+
+  return {
+    documentSharePolicy: {
+      maxUsesDefault:
+        typeof share.maxUsesDefault === "number" ? share.maxUsesDefault : 3,
+      expirationHoursDefault:
+        typeof share.expirationHoursDefault === "number" ? share.expirationHoursDefault : 72,
+      allowHighRiskExternalShare:
+        typeof share.allowHighRiskExternalShare === "boolean"
+          ? share.allowHighRiskExternalShare
+          : false
+    },
+    overridePolicy: {
+      minimumReviewerRole:
+        override.minimumReviewerRole === "professional" ||
+        override.minimumReviewerRole === "admin" ||
+        override.minimumReviewerRole === "compliance"
+          ? override.minimumReviewerRole
+          : "compliance",
+      requireInstitutionalReviewForHighSeverity:
+        typeof override.requireInstitutionalReviewForHighSeverity === "boolean"
+          ? override.requireInstitutionalReviewForHighSeverity
+          : true
+    },
+    brandingPolicy: {
+      allowCustomLogo:
+        typeof branding.allowCustomLogo === "boolean" ? branding.allowCustomLogo : false,
+      lockedLayoutVersion:
+        typeof branding.lockedLayoutVersion === "string"
+          ? branding.lockedLayoutVersion
+          : undefined
+    }
+  };
+}
+
+function mergeOrganizationSettings(current: unknown, patch: unknown) {
+  const base = normalizeOrganizationSettings(current);
+  const next = patch && typeof patch === "object" ? (patch as Record<string, unknown>) : {};
+  const share = readObject(next.documentSharePolicy);
+  const override = readObject(next.overridePolicy);
+  const branding = readObject(next.brandingPolicy);
+
+  return {
+    documentSharePolicy: {
+      maxUsesDefault:
+        typeof share.maxUsesDefault === "number"
+          ? share.maxUsesDefault
+          : base.documentSharePolicy.maxUsesDefault,
+      expirationHoursDefault:
+        typeof share.expirationHoursDefault === "number"
+          ? share.expirationHoursDefault
+          : base.documentSharePolicy.expirationHoursDefault,
+      allowHighRiskExternalShare:
+        typeof share.allowHighRiskExternalShare === "boolean"
+          ? share.allowHighRiskExternalShare
+          : base.documentSharePolicy.allowHighRiskExternalShare
+    },
+    overridePolicy: {
+      minimumReviewerRole:
+        override.minimumReviewerRole === "professional" ||
+        override.minimumReviewerRole === "admin" ||
+        override.minimumReviewerRole === "compliance"
+          ? override.minimumReviewerRole
+          : base.overridePolicy.minimumReviewerRole,
+      requireInstitutionalReviewForHighSeverity:
+        typeof override.requireInstitutionalReviewForHighSeverity === "boolean"
+          ? override.requireInstitutionalReviewForHighSeverity
+          : base.overridePolicy.requireInstitutionalReviewForHighSeverity
+    },
+    brandingPolicy: {
+      allowCustomLogo:
+        typeof branding.allowCustomLogo === "boolean"
+          ? branding.allowCustomLogo
+          : base.brandingPolicy.allowCustomLogo,
+      lockedLayoutVersion:
+        typeof branding.lockedLayoutVersion === "string"
+          ? branding.lockedLayoutVersion
+          : base.brandingPolicy.lockedLayoutVersion
+    }
+  };
+}
+
+function readObject(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }

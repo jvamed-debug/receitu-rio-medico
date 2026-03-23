@@ -143,6 +143,7 @@ export class AppointmentsService {
         paidCents: number;
       }
     >();
+    let paidAppointments = 0;
 
     const summary = appointments.reduce<AppointmentAnalyticsSnapshot>(
       (acc, appointment) => {
@@ -179,6 +180,13 @@ export class AppointmentsService {
         if (appointment.status === "COMPLETED") professionalBucket.completed += 1;
         if (appointment.status === "NO_SHOW") professionalBucket.noShow += 1;
 
+        const appointmentPaid = appointment.billingEntries.some(
+          (billing) => billing.status === "PAID"
+        );
+        if (appointmentPaid) {
+          paidAppointments += 1;
+        }
+
         for (const billing of appointment.billingEntries) {
           if (billing.status === "PENDING") {
             acc.billingPendingCents += billing.amountCents;
@@ -209,6 +217,11 @@ export class AppointmentsService {
         telehealth: 0,
         billingPendingCents: 0,
         billingPaidCents: 0,
+        funnel: {
+          scheduledToConfirmedRate: 0,
+          confirmedToCompletedRate: 0,
+          completedToPaidRate: 0
+        },
         periods: [],
         professionals: []
       }
@@ -221,6 +234,11 @@ export class AppointmentsService {
     summary.professionals = [...professionalMap.values()].sort(
       (left, right) => right.total - left.total
     );
+    summary.funnel = {
+      scheduledToConfirmedRate: toRate(summary.confirmed, summary.scheduled || summary.total),
+      confirmedToCompletedRate: toRate(summary.completed, summary.confirmed),
+      completedToPaidRate: toRate(paidAppointments, summary.completed)
+    };
 
     return summary;
   }
@@ -567,4 +585,12 @@ function severityWeight(value: "low" | "medium" | "high") {
     default:
       return 1;
   }
+}
+
+function toRate(numerator: number, denominator: number) {
+  if (denominator <= 0) {
+    return 0;
+  }
+
+  return Number(((numerator / denominator) * 100).toFixed(1));
 }

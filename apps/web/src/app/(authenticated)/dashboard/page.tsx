@@ -197,6 +197,32 @@ export default async function DashboardPage() {
             <div
               style={{
                 display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+              }}
+            >
+              <FinanceCard
+                label="Criado para assinado"
+                amount={documentAnalytics.funnel.createdToSignedRate}
+                detail="taxa de assinatura no funil documental"
+                percentMode
+              />
+              <FinanceCard
+                label="Assinado para emitido"
+                amount={documentAnalytics.funnel.signedToIssuedRate}
+                detail="taxa de emissao apos assinatura"
+                percentMode
+              />
+              <FinanceCard
+                label="Emitido para entregue"
+                amount={documentAnalytics.funnel.issuedToDeliveredRate}
+                detail="taxa de entrega com rastreabilidade"
+                percentMode
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
                 gap: 18,
                 gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)"
               }}
@@ -307,6 +333,32 @@ export default async function DashboardPage() {
                 label="Receita recebida"
                 amount={analytics.billingPaidCents}
                 detail="cobrancas pagas no periodo"
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+              }}
+            >
+              <FinanceCard
+                label="Agendado para confirmado"
+                amount={analytics.funnel.scheduledToConfirmedRate}
+                detail="conversao da agenda em confirmacao"
+                percentMode
+              />
+              <FinanceCard
+                label="Confirmado para concluido"
+                amount={analytics.funnel.confirmedToCompletedRate}
+                detail="consultas realizadas apos confirmacao"
+                percentMode
+              />
+              <FinanceCard
+                label="Concluido para pago"
+                amount={analytics.funnel.completedToPaidRate}
+                detail="captura financeira apos atendimento"
+                percentMode
               />
             </div>
             <div
@@ -599,13 +651,24 @@ function FinanceCard({
   label,
   amount,
   detail,
-  countMode
+  countMode,
+  percentMode
 }: {
   label: string;
   amount: number;
   detail: string;
   countMode?: boolean;
+  percentMode?: boolean;
 }) {
+  const formattedValue = countMode
+    ? String(amount)
+    : percentMode
+      ? `${amount.toFixed(1)}%`
+      : new Intl.NumberFormat("pt-BR", {
+          style: "currency",
+          currency: "BRL"
+        }).format(amount / 100);
+
   return (
     <article
       style={{
@@ -616,14 +679,7 @@ function FinanceCard({
       }}
     >
       <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
-      <div style={{ fontSize: 28, marginTop: 10 }}>
-        {countMode
-          ? String(amount)
-          : new Intl.NumberFormat("pt-BR", {
-              style: "currency",
-              currency: "BRL"
-            }).format(amount / 100)}
-      </div>
+      <div style={{ fontSize: 28, marginTop: 10 }}>{formattedValue}</div>
       <div style={{ color: "var(--muted)", marginTop: 8 }}>{detail}</div>
     </article>
   );

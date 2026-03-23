@@ -25,6 +25,29 @@ export class OrganizationsController {
     return this.organizationsService.listCurrentMemberships(principal);
   }
 
+  @Patch("current/settings")
+  updateCurrentSettings(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Body()
+    input: {
+      documentSharePolicy?: {
+        maxUsesDefault?: number;
+        expirationHoursDefault?: number;
+        allowHighRiskExternalShare?: boolean;
+      };
+      overridePolicy?: {
+        minimumReviewerRole?: "professional" | "admin" | "compliance";
+        requireInstitutionalReviewForHighSeverity?: boolean;
+      };
+      brandingPolicy?: {
+        allowCustomLogo?: boolean;
+        lockedLayoutVersion?: string;
+      };
+    }
+  ) {
+    return this.organizationsService.updateCurrentSettings(principal, input);
+  }
+
   @Post("current/memberships")
   addMembershipByEmail(
     @CurrentPrincipal() principal: AccessPrincipal,

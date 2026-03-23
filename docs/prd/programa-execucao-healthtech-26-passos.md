@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 10. contratos documentais mais especificos por tipo
-- 23. analytics clinico-operacional mais forte
-- 24. governanca institucional na UI
+- 24. fechar politicas institucionais e lifecycle de memberships
+- 23. fechar analytics clinico-operacional por tenant e cohort
+- 10. fechar versionamento e contratos documentais mais rigidos
 
 ## Checklist dos 26 passos
 
@@ -495,11 +495,18 @@ Ja entregue:
 - serie diaria de consultas e receita
 - snapshots operacionais de assinatura, pagamentos, lembretes e farmacia
 - analytics documental por tipo, status e serie recente no dashboard
+- metricas de funil operacional na agenda:
+  - agendado para confirmado
+  - confirmado para concluido
+  - concluido para pago
+- metricas de funil documental:
+  - criado para assinado
+  - assinado para emitido
+  - emitido para entregue
 
 Falta para fechar:
 
-- funil operacional e clinico
-- visao por profissional e tenant
+- visao por tenant e comparativo entre organizacoes
 - cohort e tendencia longitudinal
 
 ### 24. Multitenancy
@@ -518,11 +525,14 @@ Ja entregue:
 - listagem de organizacoes do profissional
 - memberships da organizacao ativa
 - troca de organizacao ativa com renovacao de token
+- painel de politicas institucionais na UI com:
+  - politica padrao de compartilhamento externo
+  - governanca de override clinico
+  - travas basicas de branding/layout
 
 Falta para fechar:
 
 - governanca completa por tenant
-- politicas institucionais mais fortes
 - lifecycle mais rico de memberships e convites
 
 ## Trilha 7: Escala e governanca
@@ -571,7 +581,7 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 24: governanca institucional na UI
+1. passo 24: fechar politicas institucionais e lifecycle de memberships
 2. passo 23: fechar analytics clinico-operacional por tenant e cohort
 3. passo 10: fechar versionamento e contratos documentais mais rigidos
 
@@ -579,7 +589,7 @@ Falta para fechar:
 
 4. aprofundar passo 18 com fonte clinica homologada e graduacao mais fina
 5. aprofundar passo 12 com evolucao clinica longitudinal
-6. aprofundar passo 24 com politicas institucionais mais fortes
+6. ampliar analytics documentais e assistenciais por coorte e desfecho
 
 ### Bloco posterior
 

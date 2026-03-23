@@ -146,6 +146,7 @@ model Organization {
   id                 String                   @id @default(cuid())
   name               String
   slug               String                   @unique
+  settings           Json?
   memberships        OrganizationMembership[]
   primaryProfiles    ProfessionalProfile[]    @relation("PrimaryOrganizationProfiles")
   patients           Patient[]

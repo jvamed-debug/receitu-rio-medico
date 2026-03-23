@@ -351,8 +351,11 @@ test("consolida analytics documentais por tipo e status", async () => {
   });
 
   assert.equal(analytics.total, 3);
-  assert.equal(analytics.issued, 1);
+  assert.equal(analytics.issued, 2);
   assert.equal(analytics.delivered, 1);
+  assert.equal(analytics.funnel.createdToSignedRate, 66.7);
+  assert.equal(analytics.funnel.signedToIssuedRate, 100);
+  assert.equal(analytics.funnel.issuedToDeliveredRate, 50);
   assert.equal(analytics.byType.length, 3);
   assert.equal(analytics.byStatus[0]?.total, 1);
   assert.equal(analytics.recentDays.length, 2);

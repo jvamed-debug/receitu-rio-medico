@@ -212,8 +212,8 @@ export class DocumentsService {
     const summary = documents.reduce(
       (acc, document) => {
         acc.total += 1;
-        if (document.status === DocumentStatus.SIGNED) acc.signed += 1;
-        if (document.status === DocumentStatus.ISSUED) acc.issued += 1;
+        if (hasReachedSignedStage(document)) acc.signed += 1;
+        if (hasReachedIssuedStage(document)) acc.issued += 1;
         if (document.status === DocumentStatus.DELIVERED) acc.delivered += 1;
 
         const typeKey = document.type.toLowerCase();
@@ -224,8 +224,8 @@ export class DocumentsService {
           delivered: 0
         };
         typeBucket.total += 1;
-        if (document.status === DocumentStatus.SIGNED) typeBucket.signed += 1;
-        if (document.status === DocumentStatus.ISSUED) typeBucket.issued += 1;
+        if (hasReachedSignedStage(document)) typeBucket.signed += 1;
+        if (hasReachedIssuedStage(document)) typeBucket.issued += 1;
         if (document.status === DocumentStatus.DELIVERED) typeBucket.delivered += 1;
         byType.set(typeKey, typeBucket);
 
@@ -256,6 +256,11 @@ export class DocumentsService {
         signed: 0,
         issued: 0,
         delivered: 0,
+        funnel: {
+          createdToSignedRate: 0,
+          signedToIssuedRate: 0,
+          issuedToDeliveredRate: 0
+        },
         byType: [] as Array<{
           type: string;
           total: number;
@@ -285,6 +290,11 @@ export class DocumentsService {
       day,
       ...values
     }));
+    summary.funnel = {
+      createdToSignedRate: toRate(summary.signed, summary.total),
+      signedToIssuedRate: toRate(summary.issued, summary.signed),
+      issuedToDeliveredRate: toRate(summary.delivered, summary.issued)
+    };
 
     return summary;
   }
@@ -492,6 +502,37 @@ export class DocumentsService {
       }
     });
   }
+}
+
+function toRate(numerator: number, denominator: number) {
+  if (denominator <= 0) {
+    return 0;
+  }
+
+  return Number(((numerator / denominator) * 100).toFixed(1));
+}
+
+function hasReachedSignedStage(document: {
+  status: DocumentStatus;
+  issuedAt: Date | null;
+}) {
+  return (
+    document.status === DocumentStatus.SIGNED ||
+    document.status === DocumentStatus.ISSUED ||
+    document.status === DocumentStatus.DELIVERED ||
+    Boolean(document.issuedAt)
+  );
+}
+
+function hasReachedIssuedStage(document: {
+  status: DocumentStatus;
+  issuedAt: Date | null;
+}) {
+  return (
+    document.status === DocumentStatus.ISSUED ||
+    document.status === DocumentStatus.DELIVERED ||
+    Boolean(document.issuedAt)
+  );
 }
 
 function ensureCdsOverrideCompliance(
