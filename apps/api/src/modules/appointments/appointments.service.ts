@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import type {
   Appointment,
+  AppointmentAnalyticsSnapshot,
   AppointmentBillingWebhookEventSummary,
   AppointmentOperationsSnapshot,
   AppointmentSummary
@@ -12,14 +13,18 @@ import type {
 
 import { PrismaService } from "../../persistence/prisma.service";
 import type { AccessPrincipal } from "../auth/auth.types";
+import {
+  type AppointmentAnalyticsFilters,
+  buildAppointmentScope
+} from "./appointments.scope";
 
 @Injectable()
 export class AppointmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(principal: AccessPrincipal) {
+  async list(principal: AccessPrincipal, filters?: AppointmentAnalyticsFilters) {
     const appointments = await this.prisma.appointment.findMany({
-      where: buildAppointmentScope(principal),
+      where: buildAppointmentScope(principal, filters),
       include: {
         patient: {
           select: {
@@ -36,9 +41,12 @@ export class AppointmentsService {
     return appointments.map(mapAppointmentRecord);
   }
 
-  async summary(principal: AccessPrincipal): Promise<AppointmentSummary> {
+  async summary(
+    principal: AccessPrincipal,
+    filters?: AppointmentAnalyticsFilters
+  ): Promise<AppointmentSummary> {
     const appointments = await this.prisma.appointment.findMany({
-      where: buildAppointmentScope(principal),
+      where: buildAppointmentScope(principal, filters),
       include: {
         reminders: true,
         billingEntries: true
@@ -91,8 +99,137 @@ export class AppointmentsService {
     );
   }
 
-  async operations(principal: AccessPrincipal): Promise<AppointmentOperationsSnapshot> {
-    const scope = buildAppointmentScope(principal);
+  async analytics(
+    principal: AccessPrincipal,
+    filters?: AppointmentAnalyticsFilters
+  ): Promise<AppointmentAnalyticsSnapshot> {
+    const appointments = await this.prisma.appointment.findMany({
+      where: buildAppointmentScope(principal, filters),
+      include: {
+        professional: {
+          select: {
+            user: {
+              select: {
+                fullName: true
+              }
+            }
+          }
+        },
+        billingEntries: true
+      },
+      orderBy: {
+        appointmentAt: "asc"
+      }
+    });
+
+    const periodMap = new Map<
+      string,
+      {
+        total: number;
+        completed: number;
+        cancelled: number;
+        noShow: number;
+        paidCents: number;
+      }
+    >();
+    const professionalMap = new Map<
+      string,
+      {
+        professionalId: string;
+        professionalName?: string;
+        total: number;
+        completed: number;
+        noShow: number;
+        paidCents: number;
+      }
+    >();
+
+    const summary = appointments.reduce<AppointmentAnalyticsSnapshot>(
+      (acc, appointment) => {
+        acc.total += 1;
+        if (appointment.status === "SCHEDULED") acc.scheduled += 1;
+        if (appointment.status === "CONFIRMED") acc.confirmed += 1;
+        if (appointment.status === "COMPLETED") acc.completed += 1;
+        if (appointment.status === "CANCELLED") acc.cancelled += 1;
+        if (appointment.status === "NO_SHOW") acc.noShow += 1;
+        if (appointment.telehealth) acc.telehealth += 1;
+
+        const periodKey = appointment.appointmentAt.toISOString().slice(0, 10);
+        const periodBucket = periodMap.get(periodKey) ?? {
+          total: 0,
+          completed: 0,
+          cancelled: 0,
+          noShow: 0,
+          paidCents: 0
+        };
+        periodBucket.total += 1;
+        if (appointment.status === "COMPLETED") periodBucket.completed += 1;
+        if (appointment.status === "CANCELLED") periodBucket.cancelled += 1;
+        if (appointment.status === "NO_SHOW") periodBucket.noShow += 1;
+
+        const professionalBucket = professionalMap.get(appointment.professionalId) ?? {
+          professionalId: appointment.professionalId,
+          professionalName: appointment.professional.user.fullName,
+          total: 0,
+          completed: 0,
+          noShow: 0,
+          paidCents: 0
+        };
+        professionalBucket.total += 1;
+        if (appointment.status === "COMPLETED") professionalBucket.completed += 1;
+        if (appointment.status === "NO_SHOW") professionalBucket.noShow += 1;
+
+        for (const billing of appointment.billingEntries) {
+          if (billing.status === "PENDING") {
+            acc.billingPendingCents += billing.amountCents;
+          }
+          if (billing.status === "PAID") {
+            acc.billingPaidCents += billing.amountCents;
+            periodBucket.paidCents += billing.amountCents;
+            professionalBucket.paidCents += billing.amountCents;
+          }
+        }
+
+        periodMap.set(periodKey, periodBucket);
+        professionalMap.set(appointment.professionalId, professionalBucket);
+
+        return acc;
+      },
+      {
+        range: {
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo
+        },
+        total: 0,
+        scheduled: 0,
+        confirmed: 0,
+        completed: 0,
+        cancelled: 0,
+        noShow: 0,
+        telehealth: 0,
+        billingPendingCents: 0,
+        billingPaidCents: 0,
+        periods: [],
+        professionals: []
+      }
+    );
+
+    summary.periods = [...periodMap.entries()].map(([period, values]) => ({
+      period,
+      ...values
+    }));
+    summary.professionals = [...professionalMap.values()].sort(
+      (left, right) => right.total - left.total
+    );
+
+    return summary;
+  }
+
+  async operations(
+    principal: AccessPrincipal,
+    filters?: AppointmentAnalyticsFilters
+  ): Promise<AppointmentOperationsSnapshot> {
+    const scope = buildAppointmentScope(principal, filters);
     const appointments = await this.prisma.appointment.findMany({
       where: scope,
       select: {
@@ -107,6 +244,8 @@ export class AppointmentsService {
         remindersAwaitingRetry: 0,
         webhookFailures: 0,
         pendingWebhookProcessing: 0,
+        highestSeverity: "none",
+        alerts: [],
         recentWebhookEvents: []
       };
     }
@@ -138,12 +277,26 @@ export class AppointmentsService {
       })
     ]);
 
+    const webhookFailures = recentWebhookEvents.filter(
+      (event) => event.resultStatus === "failed"
+    ).length;
+    const pendingWebhookProcessing = recentWebhookEvents.filter(
+      (event) => !event.processedAt
+    ).length;
+    const alerts = buildOperationalAlerts({
+      failedReminders,
+      retryableReminders,
+      webhookFailures,
+      pendingWebhookProcessing
+    });
+
     return {
       failedReminders,
       remindersAwaitingRetry: retryableReminders,
-      webhookFailures: recentWebhookEvents.filter((event) => event.resultStatus === "failed")
-        .length,
-      pendingWebhookProcessing: recentWebhookEvents.filter((event) => !event.processedAt).length,
+      webhookFailures,
+      pendingWebhookProcessing,
+      highestSeverity: alerts.at(0)?.severity ?? "none",
+      alerts,
       recentWebhookEvents: recentWebhookEvents.map(mapWebhookEventRecord)
     };
   }
@@ -224,17 +377,6 @@ export class AppointmentsService {
 
     return mapAppointmentRecord(appointment);
   }
-}
-
-function buildAppointmentScope(principal: AccessPrincipal) {
-  if (principal.roles.some((role) => role === "admin" || role === "compliance")) {
-    return undefined;
-  }
-
-  return {
-    organizationId: principal.organizationId ?? null,
-    professionalId: principal.professionalId ?? "__no_access__"
-  };
 }
 
 function mapStatusToPrisma(status: Appointment["status"]) {
@@ -363,4 +505,66 @@ function mapWebhookEventRecord(event: {
     processedAt: event.processedAt?.toISOString(),
     createdAt: event.createdAt.toISOString()
   };
+}
+
+function buildOperationalAlerts(input: {
+  failedReminders: number;
+  retryableReminders: number;
+  webhookFailures: number;
+  pendingWebhookProcessing: number;
+}) {
+  const alerts: AppointmentOperationsSnapshot["alerts"] = [];
+
+  if (input.failedReminders > 0) {
+    alerts.push({
+      code: "reminders.failed",
+      severity: input.failedReminders >= 5 ? "high" : "medium",
+      label: "Lembretes com falha",
+      count: input.failedReminders,
+      detail: "Existem lembretes que nao chegaram ao paciente."
+    });
+  }
+
+  if (input.retryableReminders > 0) {
+    alerts.push({
+      code: "reminders.retry_pending",
+      severity: input.retryableReminders >= 5 ? "medium" : "low",
+      label: "Retries pendentes",
+      count: input.retryableReminders,
+      detail: "Ha lembretes aguardando nova tentativa automatica."
+    });
+  }
+
+  if (input.webhookFailures > 0) {
+    alerts.push({
+      code: "billing.webhook_failed",
+      severity: input.webhookFailures >= 3 ? "high" : "medium",
+      label: "Webhooks falhos",
+      count: input.webhookFailures,
+      detail: "Eventos de cobranca falharam ao conciliar automaticamente."
+    });
+  }
+
+  if (input.pendingWebhookProcessing > 0) {
+    alerts.push({
+      code: "billing.webhook_pending",
+      severity: input.pendingWebhookProcessing >= 5 ? "medium" : "low",
+      label: "Inbox pendente",
+      count: input.pendingWebhookProcessing,
+      detail: "Existem eventos externos aguardando processamento."
+    });
+  }
+
+  return alerts.sort((left, right) => severityWeight(right.severity) - severityWeight(left.severity));
+}
+
+function severityWeight(value: "low" | "medium" | "high") {
+  switch (value) {
+    case "high":
+      return 3;
+    case "medium":
+      return 2;
+    default:
+      return 1;
+  }
 }

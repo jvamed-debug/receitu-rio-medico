@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 23. analytics por periodo
-- 25. observabilidade com paineis e alertas
-- 26. jobs assincronos leves para retries e processamento
+- 8. LGPD operacional com retention/disposal e anonimizaÃ§Ã£o
+- 13. provider real de assinatura
+- 18. CDS com interacoes e override
 
 ## Checklist dos 26 passos
 
@@ -428,19 +428,22 @@ Falta para fechar:
 
 ### 23. Analytics
 
-Status: em progresso inicial
+Status: em progresso avancado
 
 Ja entregue:
 
 - metricas da API
 - resumo financeiro da agenda
 - snapshot operacional
+- analytics por periodo
+- visao por profissional
+- serie diaria de consultas e receita
 
 Falta para fechar:
 
-- analytics por periodo
 - funil operacional e clinico
 - visao por profissional e tenant
+- cohort e tendencia longitudinal
 
 ### 24. Multitenancy
 
@@ -464,7 +467,7 @@ Falta para fechar:
 
 ### 25. Observabilidade
 
-Status: em progresso inicial
+Status: em progresso avancado
 
 Ja entregue:
 
@@ -473,16 +476,18 @@ Ja entregue:
 - metricas in-memory
 - contexto operacional
 - auditoria herdando correlacao
+- dashboard com alertas operacionais
+- severidade consolidada de anomalias externas
 
 Falta para fechar:
 
-- dashboards mais fortes
 - alertas reais
 - tracing distribuido
+- exportacao para stack externa de observabilidade
 
 ### 26. Filas, eventos e operacao segura
 
-Status: em progresso inicial
+Status: em progresso avancado
 
 Ja entregue:
 
@@ -490,10 +495,11 @@ Ja entregue:
 - idempotencia por `eventKey`
 - retries de lembrete
 - visibilidade operacional de falhas
+- job runner leve para retries pendentes
+- reprocessamento de webhooks pendentes/falhos
 
 Falta para fechar:
 
-- jobs assincronos
 - workers
 - retries automaticos centralizados
 - circuit breaker
@@ -509,7 +515,7 @@ Falta para fechar:
 
 ### Bloco seguinte
 
-4. aprofundar passo 10 com contratos documentais mais estritos
+4. aprofundar passo 8 com retention/disposal e base de analytics anonimizados
 5. aprofundar passo 13 com provider real de assinatura
 6. aprofundar passo 18 com novas regras de CDS
 

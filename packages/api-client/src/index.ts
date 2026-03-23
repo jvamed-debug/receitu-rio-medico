@@ -1,6 +1,8 @@
 import type {
   Appointment,
+  AppointmentAnalyticsSnapshot,
   AppointmentBilling,
+  AppointmentMaintenanceRunSummary,
   AppointmentOperationsSnapshot,
   AppointmentSummary,
   AppointmentReminder,
@@ -9,7 +11,9 @@ import type {
 } from "@receituario/domain";
 export type {
   Appointment,
+  AppointmentAnalyticsSnapshot,
   AppointmentBilling,
+  AppointmentMaintenanceRunSummary,
   AppointmentOperationsSnapshot,
   AppointmentSummary,
   AppointmentReminder,
@@ -161,6 +165,12 @@ export interface CreateAppointmentBillingInput {
   amountCents: number;
   description: string;
   paymentProvider?: string;
+}
+
+export interface AppointmentAnalyticsQuery {
+  dateFrom?: string;
+  dateTo?: string;
+  professionalId?: string;
 }
 
 export interface HealthStatus {
@@ -368,6 +378,19 @@ export class ApiClient {
 
   getAppointmentOperations() {
     return this.get<AppointmentOperationsSnapshot>("/appointments/operations");
+  }
+
+  getAppointmentAnalytics(query?: AppointmentAnalyticsQuery) {
+    return this.get<AppointmentAnalyticsSnapshot>(
+      `/appointments/analytics${buildQueryString(query)}`
+    );
+  }
+
+  runAppointmentMaintenance() {
+    return this.post<AppointmentMaintenanceRunSummary>(
+      "/appointments/operations/run-maintenance",
+      {}
+    );
   }
 
   createAppointment(input: CreateAppointmentInput) {
@@ -606,4 +629,23 @@ export class ApiClient {
 
     return headers;
   }
+}
+
+function buildQueryString(
+  query?: Record<string, string | undefined> | AppointmentAnalyticsQuery
+) {
+  if (!query) {
+    return "";
+  }
+
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : "";
 }

@@ -161,5 +161,63 @@ test("gera snapshot operacional com falhas de lembrete e eventos de webhook", as
   assert.equal(result.remindersAwaitingRetry, 1);
   assert.equal(result.webhookFailures, 1);
   assert.equal(result.pendingWebhookProcessing, 1);
+  assert.equal(result.highestSeverity, "medium");
+  assert.equal(result.alerts.length, 4);
   assert.equal(result.recentWebhookEvents.length, 2);
+});
+
+test("gera analytics por periodo e profissional", async () => {
+  const service = new AppointmentsService({
+    appointment: {
+      findMany: async () => [
+        {
+          id: "apt-1",
+          professionalId: "prof-1",
+          status: "COMPLETED",
+          telehealth: true,
+          appointmentAt: new Date("2026-03-20T10:00:00.000Z"),
+          billingEntries: [{ status: "PAID", amountCents: 10000 }],
+          professional: { user: { fullName: "Dra. Ana" } }
+        },
+        {
+          id: "apt-2",
+          professionalId: "prof-1",
+          status: "NO_SHOW",
+          telehealth: false,
+          appointmentAt: new Date("2026-03-20T14:00:00.000Z"),
+          billingEntries: [{ status: "PENDING", amountCents: 5000 }],
+          professional: { user: { fullName: "Dra. Ana" } }
+        },
+        {
+          id: "apt-3",
+          professionalId: "prof-2",
+          status: "CONFIRMED",
+          telehealth: false,
+          appointmentAt: new Date("2026-03-21T09:00:00.000Z"),
+          billingEntries: [],
+          professional: { user: { fullName: "Dr. Bruno" } }
+        }
+      ]
+    }
+  } as never);
+
+  const result = await service.analytics(
+    {
+      userId: "admin-1",
+      roles: [UserRole.ADMIN.toLowerCase()]
+    },
+    {
+      dateFrom: "2026-03-20T00:00:00.000Z",
+      dateTo: "2026-03-21T23:59:59.000Z"
+    }
+  );
+
+  assert.equal(result.total, 3);
+  assert.equal(result.completed, 1);
+  assert.equal(result.noShow, 1);
+  assert.equal(result.billingPendingCents, 5000);
+  assert.equal(result.billingPaidCents, 10000);
+  assert.equal(result.periods.length, 2);
+  assert.equal(result.professionals[0]?.professionalName, "Dra. Ana");
+  assert.equal(result.professionals[0]?.paidCents, 10000);
 });

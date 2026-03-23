@@ -4,6 +4,7 @@ import { PersistenceModule } from "../../persistence/persistence.module";
 import { AuditModule } from "../audit/audit.module";
 import { AccessModule } from "../access/access.module";
 import { AuthModule } from "../auth/auth.module";
+import { AppointmentMaintenanceService } from "./appointment-maintenance.service";
 import { AppointmentsController } from "./appointments.controller";
 import { AppointmentBillingService } from "./billing/appointment-billing.service";
 import { AppointmentBillingWebhookController } from "./billing/appointment-billing-webhook.controller";
@@ -22,6 +23,7 @@ import { TelehealthService } from "./telehealth/telehealth.service";
     AppointmentRemindersService,
     ReminderProviderGateway,
     AppointmentBillingService,
+    AppointmentMaintenanceService,
     PaymentProviderGateway,
     TelehealthProviderGateway,
     TelehealthService

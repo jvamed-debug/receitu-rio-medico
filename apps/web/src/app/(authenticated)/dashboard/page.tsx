@@ -33,11 +33,28 @@ async function loadAppointmentOperations() {
   }
 }
 
+async function loadAppointmentAnalytics() {
+  const api = createApiClient();
+  const today = new Date();
+  const dateTo = today.toISOString();
+  const dateFrom = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    return await api.getAppointmentAnalytics({
+      dateFrom,
+      dateTo
+    });
+  } catch {
+    return null;
+  }
+}
+
 export default async function DashboardPage() {
-  const [health, agenda, operations] = await Promise.all([
+  const [health, agenda, operations, analytics] = await Promise.all([
     loadHealth(),
     loadAppointmentsSummary(),
-    loadAppointmentOperations()
+    loadAppointmentOperations(),
+    loadAppointmentAnalytics()
   ]);
 
   const cards = [
@@ -125,9 +142,172 @@ export default async function DashboardPage() {
           boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
         }}
       >
+        <h2 style={{ marginTop: 0 }}>Analytics dos ultimos 30 dias</h2>
+        {analytics ? (
+          <div style={{ display: "grid", gap: 18 }}>
+            <div
+              style={{
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+              }}
+            >
+              <FinanceCard
+                label="Consultas concluidas"
+                amount={analytics.completed}
+                detail={`${analytics.total} consultas no periodo`}
+                countMode
+              />
+              <FinanceCard
+                label="Canceladas"
+                amount={analytics.cancelled}
+                detail="monitorar perda de agenda"
+                countMode
+              />
+              <FinanceCard
+                label="No-show"
+                amount={analytics.noShow}
+                detail="faltas no periodo"
+                countMode
+              />
+              <FinanceCard
+                label="Receita recebida"
+                amount={analytics.billingPaidCents}
+                detail="cobrancas pagas no periodo"
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gap: 18,
+                gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)"
+              }}
+            >
+              <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Serie diaria</h3>
+                {analytics.periods.length > 0 ? (
+                  analytics.periods.map((point) => (
+                    <article
+                      key={point.period}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {new Date(`${point.period}T12:00:00Z`).toLocaleDateString("pt-BR")}
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {point.total} consultas | {point.completed} concluidas | {point.noShow} faltas
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        Receita:{" "}
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL"
+                        }).format(point.paidCents / 100)}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Ainda nao ha serie suficiente no periodo filtrado.
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Profissionais</h3>
+                {analytics.professionals.length > 0 ? (
+                  analytics.professionals.map((professional) => (
+                    <article
+                      key={professional.professionalId}
+                      style={{
+                        borderRadius: 14,
+                        border: "1px solid #d9e8f5",
+                        padding: 14,
+                        background: "#f8fbff",
+                        display: "grid",
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {professional.professionalName ?? professional.professionalId}
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        {professional.total} consultas | {professional.completed} concluidas |{" "}
+                        {professional.noShow} faltas
+                      </div>
+                      <div style={{ color: "var(--muted)" }}>
+                        Receita:{" "}
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL"
+                        }).format(professional.paidCents / 100)}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--muted)" }}>
+                    Nenhum profissional com eventos no periodo.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: "var(--muted)" }}>
+            Nao foi possivel carregar os analytics operacionais.
+          </div>
+        )}
+      </section>
+
+      <section
+        style={{
+          marginTop: 24,
+          background: "white",
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: "0 18px 40px rgba(16, 36, 24, 0.08)"
+        }}
+      >
         <h2 style={{ marginTop: 0 }}>Operacao externa</h2>
         {operations ? (
           <div style={{ display: "grid", gap: 18 }}>
+            <div
+              style={{
+                borderRadius: 16,
+                padding: 16,
+                background:
+                  operations.highestSeverity === "high"
+                    ? "#fff1ef"
+                    : operations.highestSeverity === "medium"
+                      ? "#fff7e8"
+                      : operations.highestSeverity === "low"
+                        ? "#f5fbff"
+                        : "#f7faf8",
+                border:
+                  operations.highestSeverity === "high"
+                    ? "1px solid #f0c4bd"
+                    : operations.highestSeverity === "medium"
+                      ? "1px solid #f4d59a"
+                      : operations.highestSeverity === "low"
+                        ? "1px solid #d9e8f5"
+                        : "1px solid #d9e8de"
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                Nivel de alerta: {operations.highestSeverity}
+              </div>
+              <div style={{ color: "var(--muted)" }}>
+                {operations.alerts.length > 0
+                  ? operations.alerts.map((alert) => `${alert.label} (${alert.count})`).join(" | ")
+                  : "Nenhuma anomalia operacional relevante no momento."}
+              </div>
+            </div>
             <div
               style={{
                 display: "grid",
@@ -160,6 +340,30 @@ export default async function DashboardPage() {
                 countMode
               />
             </div>
+            {operations.alerts.length > 0 ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                <h3 style={{ margin: 0 }}>Alertas operacionais</h3>
+                {operations.alerts.map((alert) => (
+                  <article
+                    key={alert.code}
+                    style={{
+                      borderRadius: 14,
+                      border: "1px solid #d9e8f5",
+                      padding: 14,
+                      background: "#f8fbff",
+                      display: "grid",
+                      gap: 6
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>
+                      {alert.label} | severidade {alert.severity}
+                    </div>
+                    <div style={{ color: "var(--muted)" }}>{alert.detail}</div>
+                    <div style={{ color: "var(--muted)" }}>Quantidade: {alert.count}</div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
             <div style={{ display: "grid", gap: 10 }}>
               <h3 style={{ margin: 0 }}>Eventos recentes de cobranca</h3>
               {operations.recentWebhookEvents.length > 0 ? (

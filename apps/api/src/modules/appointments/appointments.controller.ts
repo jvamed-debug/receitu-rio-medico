@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards
 } from "@nestjs/common";
 
@@ -14,6 +15,7 @@ import { AuthGuard } from "../auth/auth.guard";
 import { CurrentPrincipal } from "../auth/current-principal.decorator";
 import type { AccessPrincipal } from "../auth/auth.types";
 import { AppointmentBillingService } from "./billing/appointment-billing.service";
+import { AppointmentMaintenanceService } from "./appointment-maintenance.service";
 import { AppointmentsService } from "./appointments.service";
 import { AppointmentRemindersService } from "./reminders/appointment-reminders.service";
 import { TelehealthService } from "./telehealth/telehealth.service";
@@ -26,7 +28,8 @@ export class AppointmentsController {
     private readonly resourceAccessService: ResourceAccessService,
     private readonly appointmentRemindersService: AppointmentRemindersService,
     private readonly appointmentBillingService: AppointmentBillingService,
-    private readonly telehealthService: TelehealthService
+    private readonly telehealthService: TelehealthService,
+    private readonly appointmentMaintenanceService: AppointmentMaintenanceService
   ) {}
 
   @Get()
@@ -35,13 +38,47 @@ export class AppointmentsController {
   }
 
   @Get("summary")
-  summary(@CurrentPrincipal() principal: AccessPrincipal) {
-    return this.appointmentsService.summary(principal);
+  summary(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Query()
+    query?: {
+      dateFrom?: string;
+      dateTo?: string;
+      professionalId?: string;
+    }
+  ) {
+    return this.appointmentsService.summary(principal, query);
   }
 
   @Get("operations")
-  operations(@CurrentPrincipal() principal: AccessPrincipal) {
-    return this.appointmentsService.operations(principal);
+  operations(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Query()
+    query?: {
+      dateFrom?: string;
+      dateTo?: string;
+      professionalId?: string;
+    }
+  ) {
+    return this.appointmentsService.operations(principal, query);
+  }
+
+  @Get("analytics")
+  analytics(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Query()
+    query?: {
+      dateFrom?: string;
+      dateTo?: string;
+      professionalId?: string;
+    }
+  ) {
+    return this.appointmentsService.analytics(principal, query);
+  }
+
+  @Post("operations/run-maintenance")
+  runMaintenance(@CurrentPrincipal() principal: AccessPrincipal) {
+    return this.appointmentMaintenanceService.run(principal);
   }
 
   @Post()

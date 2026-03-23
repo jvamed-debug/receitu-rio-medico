@@ -82,6 +82,42 @@ export interface AppointmentSummary {
   billingPaidCents: number;
 }
 
+export interface AppointmentAnalyticsPeriodPoint {
+  period: string;
+  total: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+  paidCents: number;
+}
+
+export interface AppointmentAnalyticsProfessionalSummary {
+  professionalId: string;
+  professionalName?: string;
+  total: number;
+  completed: number;
+  noShow: number;
+  paidCents: number;
+}
+
+export interface AppointmentAnalyticsSnapshot {
+  range: {
+    dateFrom?: string;
+    dateTo?: string;
+  };
+  total: number;
+  scheduled: number;
+  confirmed: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+  telehealth: number;
+  billingPendingCents: number;
+  billingPaidCents: number;
+  periods: AppointmentAnalyticsPeriodPoint[];
+  professionals: AppointmentAnalyticsProfessionalSummary[];
+}
+
 export interface AppointmentBillingWebhookEventSummary {
   id: string;
   appointmentId: string;
@@ -99,5 +135,23 @@ export interface AppointmentOperationsSnapshot {
   remindersAwaitingRetry: number;
   webhookFailures: number;
   pendingWebhookProcessing: number;
+  highestSeverity: "none" | "low" | "medium" | "high";
+  alerts: Array<{
+    code: string;
+    severity: "low" | "medium" | "high";
+    label: string;
+    count: number;
+    detail: string;
+  }>;
   recentWebhookEvents: AppointmentBillingWebhookEventSummary[];
+}
+
+export interface AppointmentMaintenanceRunSummary {
+  ranAt: string;
+  retryableRemindersFound: number;
+  remindersRetried: number;
+  remindersStillFailing: number;
+  pendingWebhookEventsFound: number;
+  webhooksReprocessed: number;
+  webhookFailures: number;
 }
