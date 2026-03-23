@@ -236,6 +236,48 @@ export function AgendaBoard({
     }
   }
 
+  async function createBillingCheckout(appointmentId: string, billingId: string) {
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.createAppointmentBillingCheckout(appointmentId, billingId);
+      setBillingByAppointment((current) => ({
+        ...current,
+        [appointmentId]: (current[appointmentId] ?? []).map((entry) =>
+          entry.id === billingId ? updated : entry
+        )
+      }));
+      setMessage("Checkout de pagamento gerado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao gerar checkout."
+      );
+    }
+  }
+
+  async function reconcileBilling(
+    appointmentId: string,
+    billingId: string,
+    status: "authorized" | "paid" | "cancelled" | "refunded"
+  ) {
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.reconcileAppointmentBilling(appointmentId, billingId, {
+        status
+      });
+      setBillingByAppointment((current) => ({
+        ...current,
+        [appointmentId]: (current[appointmentId] ?? []).map((entry) =>
+          entry.id === billingId ? updated : entry
+        )
+      }));
+      setMessage("Cobranca conciliada.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Falha ao conciliar cobranca."
+      );
+    }
+  }
+
   async function createTelehealthRoom(appointmentId: string) {
     try {
       const api = createBrowserApiClient();
@@ -440,23 +482,76 @@ export function AgendaBoard({
                             {entry.paymentProvider ?? "manual"}
                             {entry.externalReference ? ` | ref ${entry.externalReference}` : ""}
                           </div>
+                          {entry.checkoutUrl ? (
+                            <a
+                              href={entry.checkoutUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: "var(--primary)", fontWeight: 700 }}
+                            >
+                              Abrir checkout
+                            </a>
+                          ) : null}
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {entry.status === "pending" ? (
-                              <button
-                                type="button"
-                                style={secondaryButtonStyle}
-                                onClick={() => authorizeBilling(appointment.id, entry.id)}
-                              >
-                                Autorizar
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  style={secondaryButtonStyle}
+                                  onClick={() => createBillingCheckout(appointment.id, entry.id)}
+                                >
+                                  Gerar checkout
+                                </button>
+                                <button
+                                  type="button"
+                                  style={secondaryButtonStyle}
+                                  onClick={() => authorizeBilling(appointment.id, entry.id)}
+                                >
+                                  Autorizar
+                                </button>
+                                <button
+                                  type="button"
+                                  style={secondaryButtonStyle}
+                                  onClick={() => reconcileBilling(appointment.id, entry.id, "paid")}
+                                >
+                                  Conciliar pago
+                                </button>
+                              </>
                             ) : null}
                             {entry.status === "authorized" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  style={secondaryButtonStyle}
+                                  onClick={() => createBillingCheckout(appointment.id, entry.id)}
+                                >
+                                  Atualizar checkout
+                                </button>
+                                <button
+                                  type="button"
+                                  style={secondaryButtonStyle}
+                                  onClick={() => payBilling(appointment.id, entry.id)}
+                                >
+                                  Marcar pago
+                                </button>
+                              </>
+                            ) : null}
+                            {(entry.status === "pending" || entry.status === "authorized") ? (
                               <button
                                 type="button"
                                 style={secondaryButtonStyle}
-                                onClick={() => payBilling(appointment.id, entry.id)}
+                                onClick={() => reconcileBilling(appointment.id, entry.id, "cancelled")}
                               >
-                                Marcar pago
+                                Cancelar
+                              </button>
+                            ) : null}
+                            {entry.status === "paid" ? (
+                              <button
+                                type="button"
+                                style={secondaryButtonStyle}
+                                onClick={() => reconcileBilling(appointment.id, entry.id, "refunded")}
+                              >
+                                Estornar
                               </button>
                             ) : null}
                           </div>

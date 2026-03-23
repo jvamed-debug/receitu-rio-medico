@@ -95,6 +95,103 @@ export class AppointmentBillingService {
     );
   }
 
+  async createCheckout(
+    appointmentId: string,
+    billingId: string,
+    principal: AccessPrincipal
+  ) {
+    const existing = await this.prisma.appointmentBilling.findFirst({
+      where: {
+        id: billingId,
+        appointmentId
+      }
+    });
+
+    if (!existing) {
+      throw new NotFoundException("Cobranca nao encontrada");
+    }
+
+    const paymentProvider = existing.paymentProvider ?? "manual";
+    const checkout = await this.paymentProviderGateway.createCheckout({
+      billingId: existing.id,
+      appointmentId: existing.appointmentId,
+      amountCents: existing.amountCents,
+      currency: existing.currency,
+      description: existing.description,
+      paymentProvider,
+      existingExternalReference: existing.externalReference
+    });
+
+    const updated = await this.prisma.appointmentBilling.update({
+      where: { id: billingId },
+      data: {
+        externalReference: checkout.externalReference,
+        metadata: normalizeJsonRecord({
+          ...(typeof existing.metadata === "object" && existing.metadata ? existing.metadata : {}),
+          checkoutUrl: checkout.checkoutUrl,
+          checkoutProvider: paymentProvider,
+          checkoutMetadata: normalizeJsonRecord(checkout.providerMetadata)
+        })
+      }
+    });
+
+    await this.auditService.log({
+      actorUserId: principal.userId,
+      actorProfessionalId: principal.professionalId,
+      entityType: "appointment_billing",
+      entityId: billingId,
+      action: "appointment_billing_checkout_created",
+      origin: "api.appointments",
+      metadata: {
+        appointmentId,
+        externalReference: updated.externalReference,
+        checkoutUrl: checkout.checkoutUrl
+      }
+    });
+
+    return mapBillingRecord(updated);
+  }
+
+  async reconcileEntry(
+    appointmentId: string,
+    billingId: string,
+    input: {
+      status: "authorized" | "paid" | "cancelled" | "refunded";
+    },
+    principal: AccessPrincipal
+  ) {
+    const existing = await this.prisma.appointmentBilling.findFirst({
+      where: {
+        id: billingId,
+        appointmentId
+      }
+    });
+
+    if (!existing) {
+      throw new NotFoundException("Cobranca nao encontrada");
+    }
+
+    const updated = await this.prisma.appointmentBilling.update({
+      where: { id: billingId },
+      data: buildBillingReconciliationUpdate(existing, input.status)
+    });
+
+    await this.auditService.log({
+      actorUserId: principal.userId,
+      actorProfessionalId: principal.professionalId,
+      entityType: "appointment_billing",
+      entityId: billingId,
+      action: "appointment_billing_reconciled",
+      origin: "api.appointments",
+      metadata: {
+        appointmentId,
+        status: updated.status
+      }
+    });
+
+    return mapBillingRecord(updated);
+  }
+
   private async transitionBilling(
     appointmentId: string,
     billingId: string,
@@ -207,6 +304,39 @@ function normalizeJsonRecord(value: Record<string, unknown>): Prisma.InputJsonOb
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
 }
 
+function buildBillingReconciliationUpdate(
+  existing: {
+    authorizedAt: Date | null;
+    paidAt: Date | null;
+  },
+  status: "authorized" | "paid" | "cancelled" | "refunded"
+) {
+  if (status === "authorized") {
+    return {
+      status: "AUTHORIZED" as const,
+      authorizedAt: existing.authorizedAt ?? new Date()
+    };
+  }
+
+  if (status === "paid") {
+    return {
+      status: "PAID" as const,
+      authorizedAt: existing.authorizedAt ?? new Date(),
+      paidAt: existing.paidAt ?? new Date()
+    };
+  }
+
+  if (status === "refunded") {
+    return {
+      status: "REFUNDED" as const
+    };
+  }
+
+  return {
+    status: "CANCELLED" as const
+  };
+}
+
 function mapBillingRecord(entry: {
   id: string;
   appointmentId: string;
@@ -216,6 +346,7 @@ function mapBillingRecord(entry: {
   description: string;
   paymentProvider: string | null;
   externalReference: string | null;
+  metadata?: unknown;
   authorizedAt: Date | null;
   paidAt: Date | null;
   createdAt: Date;
@@ -230,9 +361,19 @@ function mapBillingRecord(entry: {
     description: entry.description,
     paymentProvider: entry.paymentProvider ?? undefined,
     externalReference: entry.externalReference ?? undefined,
+    checkoutUrl: readCheckoutUrl(entry.metadata),
     authorizedAt: entry.authorizedAt?.toISOString(),
     paidAt: entry.paidAt?.toISOString(),
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString()
   };
+}
+
+function readCheckoutUrl(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+
+  const checkoutUrl = (metadata as { checkoutUrl?: unknown }).checkoutUrl;
+  return typeof checkoutUrl === "string" ? checkoutUrl : undefined;
 }

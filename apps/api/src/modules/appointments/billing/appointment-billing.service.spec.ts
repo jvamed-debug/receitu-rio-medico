@@ -26,6 +26,7 @@ test("cria cobranca inicial para consulta", async () => {
     { log: async () => undefined } as never,
     {
       authorize: async () => undefined,
+      createCheckout: async () => undefined,
       capture: async () => undefined
     } as never
   );
@@ -88,6 +89,11 @@ test("marca cobranca como paga e gera referencia externa", async () => {
         authorizedAt: "2026-03-22T18:00:00.000Z",
         providerMetadata: { providerMode: "mock" }
       }),
+      createCheckout: async () => ({
+        externalReference: "manual-bill-1",
+        checkoutUrl: "https://payments.receituario.local/checkout/manual-bill-1",
+        providerMetadata: { providerMode: "mock" }
+      }),
       capture: async () => ({
         externalReference: "manual-bill-1",
         paidAt: "2026-03-22T18:15:00.000Z",
@@ -109,4 +115,73 @@ test("marca cobranca como paga e gera referencia externa", async () => {
 
   assert.equal(result.status, "paid");
   assert.equal(result.externalReference, "manual-bill-1");
+});
+
+test("gera checkout para cobranca pendente", async () => {
+  const service = new AppointmentBillingService(
+    {
+      appointmentBilling: {
+        findFirst: async () => ({
+          id: "bill-1",
+          appointmentId: "apt-1",
+          status: "PENDING",
+          amountCents: 18000,
+          currency: "BRL",
+          description: "Consulta particular",
+          paymentProvider: "manual",
+          externalReference: null,
+          metadata: {},
+          authorizedAt: null,
+          paidAt: null
+        }),
+        update: async () => ({
+          id: "bill-1",
+          appointmentId: "apt-1",
+          status: "PENDING",
+          amountCents: 18000,
+          currency: "BRL",
+          description: "Consulta particular",
+          paymentProvider: "manual",
+          externalReference: "manual-bill-1",
+          metadata: {
+            checkoutUrl: "https://payments.receituario.local/checkout/manual-bill-1"
+          },
+          authorizedAt: null,
+          paidAt: null,
+          createdAt: new Date("2026-03-22T17:00:00.000Z"),
+          updatedAt: new Date("2026-03-22T18:15:00.000Z")
+        })
+      }
+    } as never,
+    { log: async () => undefined } as never,
+    {
+      authorize: async () => ({
+        externalReference: "manual-bill-1",
+        authorizedAt: "2026-03-22T18:00:00.000Z",
+        providerMetadata: { providerMode: "mock" }
+      }),
+      createCheckout: async () => ({
+        externalReference: "manual-bill-1",
+        checkoutUrl: "https://payments.receituario.local/checkout/manual-bill-1",
+        providerMetadata: { providerMode: "mock" }
+      }),
+      capture: async () => ({
+        externalReference: "manual-bill-1",
+        paidAt: "2026-03-22T18:15:00.000Z",
+        providerMetadata: { providerMode: "mock" }
+      })
+    } as never
+  );
+
+  const result = await service.createCheckout("apt-1", "bill-1", {
+    userId: "user-1",
+    professionalId: "prof-1",
+    organizationId: "org-1",
+    roles: ["professional"]
+  });
+
+  assert.equal(
+    result.checkoutUrl,
+    "https://payments.receituario.local/checkout/manual-bill-1"
+  );
 });

@@ -57,6 +57,7 @@ export interface AppointmentBilling {
   description: string;
   paymentProvider?: string;
   externalReference?: string;
+  checkoutUrl?: string;
   authorizedAt?: string;
   paidAt?: string;
   createdAt: string;

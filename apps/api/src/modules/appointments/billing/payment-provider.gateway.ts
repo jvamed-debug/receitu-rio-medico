@@ -7,6 +7,8 @@ import { ConfigService } from "@nestjs/config";
 import type {
   PaymentAuthorizationInput,
   PaymentAuthorizationResult,
+  PaymentCheckoutInput,
+  PaymentCheckoutResult,
   PaymentCaptureInput,
   PaymentCaptureResult
 } from "./payment-provider.port";
@@ -34,6 +36,30 @@ export class PaymentProviderGateway {
     }
 
     return this.executeRemoteAuthorization(input);
+  }
+
+  async createCheckout(
+    input: PaymentCheckoutInput
+  ): Promise<PaymentCheckoutResult> {
+    if (this.getProviderMode() === "mock") {
+      const externalReference =
+        input.existingExternalReference ??
+        `${input.paymentProvider.toLowerCase()}-${input.billingId}`;
+      const checkoutBaseUrl =
+        this.configService.get<string>("PAYMENT_PROVIDER_CHECKOUT_BASE_URL") ??
+        "https://payments.receituario.local";
+
+      return {
+        externalReference,
+        checkoutUrl: `${checkoutBaseUrl.replace(/\/$/, "")}/checkout/${externalReference}`,
+        providerMetadata: {
+          providerMode: "mock",
+          stage: "checkout"
+        }
+      };
+    }
+
+    return this.executeRemoteCheckout(input);
   }
 
   async capture(input: PaymentCaptureInput): Promise<PaymentCaptureResult> {
@@ -68,6 +94,24 @@ export class PaymentProviderGateway {
     return {
       externalReference: payload.externalReference,
       authorizedAt: payload.authorizedAt,
+      providerMetadata: payload.providerMetadata ?? {}
+    };
+  }
+
+  private async executeRemoteCheckout(
+    input: PaymentCheckoutInput
+  ): Promise<PaymentCheckoutResult> {
+    const payload = await this.executeRemoteCall("/payments/checkout", input);
+
+    if (!payload.externalReference || !payload.checkoutUrl) {
+      throw new ServiceUnavailableException(
+        "Provider de pagamento retornou checkout incompleto"
+      );
+    }
+
+    return {
+      externalReference: payload.externalReference,
+      checkoutUrl: payload.checkoutUrl,
       providerMetadata: payload.providerMetadata ?? {}
     };
   }
@@ -125,6 +169,7 @@ export class PaymentProviderGateway {
 
       return (await response.json()) as {
         externalReference?: string;
+        checkoutUrl?: string;
         authorizedAt?: string;
         paidAt?: string;
         providerMetadata?: Record<string, unknown>;

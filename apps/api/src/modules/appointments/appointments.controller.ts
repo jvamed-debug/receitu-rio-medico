@@ -153,6 +153,30 @@ export class AppointmentsController {
     return this.appointmentBillingService.payEntry(id, billingId, principal);
   }
 
+  @Post(":id/billing/:billingId/checkout")
+  async createBillingCheckout(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Param("billingId") billingId: string
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.appointmentBillingService.createCheckout(id, billingId, principal);
+  }
+
+  @Post(":id/billing/:billingId/reconcile")
+  async reconcileBilling(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Param("billingId") billingId: string,
+    @Body()
+    input: {
+      status: "authorized" | "paid" | "cancelled" | "refunded";
+    }
+  ) {
+    await this.assertAppointmentAccess(principal, id);
+    return this.appointmentBillingService.reconcileEntry(id, billingId, input, principal);
+  }
+
   @Post(":id/telehealth/room")
   async createTelehealthRoom(
     @CurrentPrincipal() principal: AccessPrincipal,

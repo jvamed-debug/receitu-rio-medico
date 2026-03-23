@@ -14,6 +14,22 @@ export type PaymentAuthorizationResult = {
   providerMetadata: Record<string, unknown>;
 };
 
+export type PaymentCheckoutInput = {
+  billingId: string;
+  appointmentId: string;
+  amountCents: number;
+  currency: string;
+  description: string;
+  paymentProvider: string;
+  existingExternalReference?: string | null;
+};
+
+export type PaymentCheckoutResult = {
+  externalReference: string;
+  checkoutUrl: string;
+  providerMetadata: Record<string, unknown>;
+};
+
 export type PaymentCaptureInput = {
   billingId: string;
   appointmentId: string;

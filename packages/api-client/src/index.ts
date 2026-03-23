@@ -387,6 +387,26 @@ export class ApiClient {
     );
   }
 
+  createAppointmentBillingCheckout(id: string, billingId: string) {
+    return this.post<AppointmentBilling>(
+      `/appointments/${id}/billing/${billingId}/checkout`,
+      {}
+    );
+  }
+
+  reconcileAppointmentBilling(
+    id: string,
+    billingId: string,
+    input: {
+      status: "authorized" | "paid" | "cancelled" | "refunded";
+    }
+  ) {
+    return this.post<AppointmentBilling>(
+      `/appointments/${id}/billing/${billingId}/reconcile`,
+      input
+    );
+  }
+
   createTelehealthRoom(id: string) {
     return this.post<Appointment>(`/appointments/${id}/telehealth/room`, {});
   }
