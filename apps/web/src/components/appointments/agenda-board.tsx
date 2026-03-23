@@ -7,7 +7,7 @@ import {
   type AppointmentReminder,
   type PatientSummary
 } from "@receituario/api-client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { getBrowserApiBaseUrl } from "../../lib/browser-api";
 
@@ -48,6 +48,77 @@ export function AgendaBoard({
   const [reminderDateTime, setReminderDateTime] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<Appointment["status"] | "all">("all");
+  const [modalityFilter, setModalityFilter] = useState<"all" | "telehealth" | "in_person">("all");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredAppointments = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return appointments.filter((appointment) => {
+      if (statusFilter !== "all" && appointment.status !== statusFilter) {
+        return false;
+      }
+
+      if (modalityFilter === "telehealth" && !appointment.telehealth) {
+        return false;
+      }
+
+      if (modalityFilter === "in_person" && appointment.telehealth) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = [
+        appointment.title,
+        appointment.patientName,
+        appointment.notes
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [appointments, modalityFilter, searchTerm, statusFilter]);
+
+  const operationalSummary = useMemo(() => {
+    return filteredAppointments.reduce(
+      (acc, appointment) => {
+        acc.total += 1;
+        if (appointment.status === "scheduled") acc.scheduled += 1;
+        if (appointment.status === "confirmed") acc.confirmed += 1;
+        if (appointment.status === "completed") acc.completed += 1;
+        if (appointment.telehealth) acc.telehealth += 1;
+
+        const billingEntries =
+          billingByAppointment[appointment.id] ?? appointment.billingEntries ?? [];
+
+        for (const billingEntry of billingEntries) {
+          if (billingEntry.status === "pending") {
+            acc.pendingRevenueCents += billingEntry.amountCents;
+          }
+          if (billingEntry.status === "paid") {
+            acc.paidRevenueCents += billingEntry.amountCents;
+          }
+        }
+
+        return acc;
+      },
+      {
+        total: 0,
+        scheduled: 0,
+        confirmed: 0,
+        completed: 0,
+        telehealth: 0,
+        pendingRevenueCents: 0,
+        paidRevenueCents: 0
+      }
+    );
+  }, [billingByAppointment, filteredAppointments]);
 
   async function createAppointment() {
     if (!patientId || !appointmentAt) {
@@ -339,9 +410,67 @@ export function AgendaBoard({
 
       <section style={panelStyle}>
         <h2 style={{ marginTop: 0 }}>Agenda clinica</h2>
+        <div style={metricsGridStyle}>
+          <SummaryCard label="Consultas visiveis" value={String(operationalSummary.total)} />
+          <SummaryCard label="Agendadas" value={String(operationalSummary.scheduled)} />
+          <SummaryCard label="Confirmadas" value={String(operationalSummary.confirmed)} />
+          <SummaryCard label="Teleconsulta" value={String(operationalSummary.telehealth)} />
+          <SummaryCard
+            label="Receita pendente"
+            value={formatCurrency(operationalSummary.pendingRevenueCents, "BRL")}
+          />
+          <SummaryCard
+            label="Receita paga"
+            value={formatCurrency(operationalSummary.paidRevenueCents, "BRL")}
+          />
+        </div>
+        <div style={filterBarStyle}>
+          <label style={fieldStyle}>
+            <span>Status</span>
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as Appointment["status"] | "all")
+              }
+              style={inputStyle}
+            >
+              <option value="all">Todos</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={fieldStyle}>
+            <span>Modalidade</span>
+            <select
+              value={modalityFilter}
+              onChange={(event) =>
+                setModalityFilter(
+                  event.target.value as "all" | "telehealth" | "in_person"
+                )
+              }
+              style={inputStyle}
+            >
+              <option value="all">Todas</option>
+              <option value="telehealth">Teleconsulta</option>
+              <option value="in_person">Presencial</option>
+            </select>
+          </label>
+          <label style={{ ...fieldStyle, minWidth: 260, flex: 1 }}>
+            <span>Buscar</span>
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Paciente, titulo ou observacoes"
+              style={inputStyle}
+            />
+          </label>
+        </div>
         <div style={{ display: "grid", gap: 12 }}>
-          {appointments.length > 0 ? (
-            appointments.map((appointment) => (
+          {filteredAppointments.length > 0 ? (
+            filteredAppointments.map((appointment) => (
               <article key={appointment.id} style={cardStyle}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
                   <div>
@@ -564,7 +693,7 @@ export function AgendaBoard({
             ))
           ) : (
             <div style={{ color: "var(--muted)" }}>
-              Nenhuma consulta agendada ainda.
+              Nenhuma consulta encontrada para os filtros atuais.
             </div>
           )}
         </div>
@@ -590,6 +719,15 @@ function createBrowserApiClient() {
   return new ApiClient(baseUrl, accessToken ? decodeURIComponent(accessToken) : undefined);
 }
 
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={summaryCardStyle}>
+      <div style={{ color: "var(--muted)", fontSize: 14 }}>{label}</div>
+      <strong style={{ fontSize: 24 }}>{value}</strong>
+    </div>
+  );
+}
+
 const panelStyle = {
   background: "white",
   padding: 24,
@@ -603,6 +741,19 @@ const formGridStyle = {
   display: "grid",
   gap: 16,
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+};
+
+const metricsGridStyle = {
+  display: "grid",
+  gap: 12,
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))"
+};
+
+const filterBarStyle = {
+  display: "flex",
+  gap: 12,
+  flexWrap: "wrap" as const,
+  alignItems: "end"
 };
 
 const fieldStyle = {
@@ -645,6 +796,15 @@ const cardStyle = {
   border: "1px solid #d4e1ef",
   padding: 18,
   background: "#f8fbff"
+};
+
+const summaryCardStyle = {
+  borderRadius: 16,
+  border: "1px solid #d4e1ef",
+  padding: 16,
+  background: "#f5faff",
+  display: "grid",
+  gap: 6
 };
 
 const reminderRowStyle = {
