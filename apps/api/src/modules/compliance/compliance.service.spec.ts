@@ -99,15 +99,85 @@ test("gera snapshot regulatorio para trilha probatoria", () => {
   assert.equal(record.professional.rqe, "9988");
 });
 
+test("gera snapshot de retencao com categorias configuradas", () => {
+  const service = createService(undefined, {
+    RETENTION_CLINICAL_RECORD_DAYS: "4000",
+    RETENTION_MEDICAL_CERTIFICATE_DAYS: "2000",
+    RETENTION_PRESCRIPTION_DAYS: "1500",
+    RETENTION_ARCHIVE_AFTER_DAYS: "120"
+  });
+
+  const snapshot = service.getRetentionPolicySnapshot();
+
+  assert.equal(snapshot.archiveAfterDays, 120);
+  assert.equal(snapshot.categories.clinical_record, 4000);
+  assert.equal(
+    snapshot.documentTypes.find((item) => item.documentType === "prescription")?.retentionDays,
+    1500
+  );
+});
+
+test("gera analytics anonimizados sem ids de paciente", async () => {
+  const service = createService(
+    {
+      clinicalDocument: {
+        findMany: async () => [
+          {
+            type: DocumentType.PRESCRIPTION,
+            status: DocumentStatus.ISSUED,
+            createdAt: new Date("2026-03-20T10:00:00.000Z")
+          },
+          {
+            type: DocumentType.EXAM_REQUEST,
+            status: DocumentStatus.SIGNED,
+            createdAt: new Date("2026-03-20T11:00:00.000Z")
+          }
+        ]
+      },
+      appointment: {
+        findMany: async () => [
+          {
+            status: "COMPLETED",
+            telehealth: true,
+            appointmentAt: new Date("2026-03-20T12:00:00.000Z")
+          }
+        ]
+      }
+    },
+    {}
+  );
+
+  const snapshot = await service.getAnonymizedAnalyticsSnapshot({
+    userId: "user-1",
+    professionalId: "prof-1",
+    organizationId: "org-1",
+    roles: ["professional"]
+  });
+
+  assert.equal(snapshot.documents.total, 2);
+  assert.equal(snapshot.documents.byType["prescription"], 1);
+  assert.equal(snapshot.appointments.telehealth, 1);
+  assert.equal(snapshot.dailyActivity[0]?.documents, 2);
+  assert.equal("patientId" in snapshot, false);
+});
+
 function createService(
   prismaOverrides?: Partial<{
     clinicalDocument: {
       findUnique?: (...args: any[]) => Promise<any>;
+      findMany?: (...args: any[]) => Promise<any>;
     };
     professionalProfile: {
       findUnique?: (...args: any[]) => Promise<any>;
     };
-  }>
+    appointment: {
+      findMany?: (...args: any[]) => Promise<any>;
+    };
+    documentShareToken: {
+      findMany?: (...args: any[]) => Promise<any>;
+    };
+  }>,
+  configValues?: Record<string, string>
 ) {
   const prisma = {
     clinicalDocument: {
@@ -117,6 +187,7 @@ function createService(
         status: DocumentStatus.READY_FOR_REVIEW,
         authorProfessionalId: "prof-1"
       }),
+      findMany: async () => [],
       ...prismaOverrides?.clinicalDocument
     },
     professionalProfile: {
@@ -131,8 +202,21 @@ function createService(
         signatureValidatedAt: new Date("2026-03-22T15:00:00.000Z")
       }),
       ...prismaOverrides?.professionalProfile
+    },
+    appointment: {
+      findMany: async () => [],
+      ...prismaOverrides?.appointment
+    },
+    documentShareToken: {
+      findMany: async () => [],
+      ...prismaOverrides?.documentShareToken
     }
   };
 
-  return new ComplianceService(prisma as never);
+  return new ComplianceService(
+    prisma as never,
+    {
+      get: (key: string) => configValues?.[key]
+    } as never
+  );
 }

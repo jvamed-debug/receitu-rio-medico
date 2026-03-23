@@ -9,7 +9,8 @@ test("detecta alergia e duplicidade terapeutica na prescricao", async () => {
       findUnique: async () => ({
         clinicalProfile: {
           allergies: [{ substance: "dipirona" }],
-          chronicMedications: [{ name: "losartana" }]
+          chronicMedications: [{ name: "losartana" }],
+          conditions: [{ name: "Insuficiencia renal cronica", status: "active" }]
         }
       })
     }
@@ -25,12 +26,18 @@ test("detecta alergia e duplicidade terapeutica na prescricao", async () => {
       {
         medicationName: "Losartana",
         dosage: "50mg"
+      },
+      {
+        medicationName: "Ibuprofeno",
+        dosage: "400mg"
       }
     ]
   });
 
   assert.equal(result.severity, "high");
-  assert.equal(result.alerts.length, 2);
+  assert.equal(result.alerts.length, 3);
   assert.equal(result.alerts[0]?.category, "allergy");
   assert.equal(result.alerts[1]?.category, "duplicate_therapy");
+  assert.equal(result.alerts[2]?.category, "condition");
+  assert.equal(result.alerts[2]?.requiresOverrideJustification, true);
 });

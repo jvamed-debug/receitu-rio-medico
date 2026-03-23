@@ -26,7 +26,8 @@ export class CdsService {
     const profile = mapPatientClinicalProfile(patient?.clinicalProfile);
     const alerts = [
       ...buildAllergyAlerts(profile, input.items),
-      ...buildDuplicateTherapyAlerts(profile, input.items)
+      ...buildDuplicateTherapyAlerts(profile, input.items),
+      ...buildConditionAlerts(profile, input.items)
     ];
 
     return {
@@ -41,17 +42,22 @@ function mapPatientClinicalProfile(
   profile:
     | {
         allergies: unknown;
+        conditions: unknown;
         chronicMedications: unknown;
       }
     | null
     | undefined
 ): PatientClinicalProfile {
   return {
-    allergies: Array.isArray(profile?.allergies) ? (profile?.allergies as PatientClinicalProfile["allergies"]) : [],
+    allergies: Array.isArray(profile?.allergies)
+      ? (profile?.allergies as PatientClinicalProfile["allergies"])
+      : [],
+    conditions: Array.isArray(profile?.conditions)
+      ? (profile?.conditions as PatientClinicalProfile["conditions"])
+      : [],
     chronicMedications: Array.isArray(profile?.chronicMedications)
       ? (profile?.chronicMedications as PatientClinicalProfile["chronicMedications"])
       : [],
-    conditions: [],
     carePlan: []
   };
 }
@@ -115,6 +121,81 @@ function buildDuplicateTherapyAlerts(
         message: `Possivel duplicidade terapeutica com medicacao cronica registrada: ${duplicate}.`
       }
     ];
+  });
+}
+
+function buildConditionAlerts(
+  profile: PatientClinicalProfile,
+  items: PrescriptionItem[]
+): ClinicalDecisionSupportAlert[] {
+  const activeConditions = profile.conditions
+    .filter((condition) => condition.status !== "resolved")
+    .map((condition) => ({
+      normalizedName: condition.name.toLowerCase(),
+      displayName: condition.name
+    }));
+
+  const conditionRules = [
+    {
+      match: ["gravidez", "gestante", "gestacao"],
+      medicationMatches: ["isotretinoina", "warfarina", "misoprostol"],
+      severity: "high" as const,
+      code: "condition_pregnancy_risk",
+      requiresOverrideJustification: true,
+      message: (medicationName: string, conditionName: string) =>
+        `${medicationName} exige revisao clinica em contexto de ${conditionName}.`
+    },
+    {
+      match: ["insuficiencia renal", "doenca renal", "renal cronica"],
+      medicationMatches: ["ibuprofeno", "diclofenaco", "cetoprofeno"],
+      severity: "moderate" as const,
+      code: "condition_renal_risk",
+      requiresOverrideJustification: true,
+      message: (medicationName: string, conditionName: string) =>
+        `${medicationName} pode demandar cautela adicional em pacientes com ${conditionName}.`
+    },
+    {
+      match: ["insuficiencia hepatica", "doenca hepatica", "hepatopatia"],
+      medicationMatches: ["paracetamol", "nimesulida"],
+      severity: "moderate" as const,
+      code: "condition_hepatic_risk",
+      requiresOverrideJustification: false,
+      message: (medicationName: string, conditionName: string) =>
+        `${medicationName} pode demandar revisao de seguranca em contexto de ${conditionName}.`
+    }
+  ];
+
+  return items.flatMap((item) => {
+    const medicationName = item.medicationName.toLowerCase();
+    const activeIngredient = item.activeIngredient?.toLowerCase() ?? "";
+
+    return conditionRules.flatMap((rule) => {
+      const matchingCondition = activeConditions.find((condition) =>
+        rule.match.some((term) => condition.normalizedName.includes(term))
+      );
+
+      if (!matchingCondition) {
+        return [];
+      }
+
+      const medicationMatched = rule.medicationMatches.some(
+        (term) => medicationName.includes(term) || activeIngredient.includes(term)
+      );
+
+      if (!medicationMatched) {
+        return [];
+      }
+
+      return [
+        {
+          code: rule.code,
+          severity: rule.severity,
+          category: "condition",
+          message: rule.message(item.medicationName, matchingCondition.displayName),
+          requiresOverrideJustification: rule.requiresOverrideJustification
+        }
+      ];
+    });
   });
 }
 

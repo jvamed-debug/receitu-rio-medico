@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   DocumentStatus,
   DocumentType,
@@ -12,6 +13,7 @@ import {
 import type { ClinicalDocumentType } from "@receituario/domain";
 
 import { PrismaService } from "../../persistence/prisma.service";
+import type { AccessPrincipal } from "../auth/auth.types";
 
 type SignatureLevel = "advanced" | "qualified";
 
@@ -118,7 +120,10 @@ const prismaTypeToDomain: Record<DocumentType, ClinicalDocumentType> = {
 
 @Injectable()
 export class ComplianceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService
+  ) {}
 
   listPolicies() {
     return Object.values(policies);
@@ -356,6 +361,210 @@ export class ComplianceService {
     };
   }
 
+  getRetentionPolicySnapshot() {
+    const categoryDays = {
+      clinical_record: this.getRetentionDays("clinical_record", 3650),
+      medical_certificate: this.getRetentionDays("medical_certificate", 1825),
+      prescription: this.getRetentionDays("prescription", 1825)
+    } as const;
+    const archiveAfterDays = this.getArchiveAfterDays();
+
+    return {
+      policyVersion: "2026.03-retention",
+      archiveAfterDays,
+      categories: categoryDays,
+      documentTypes: Object.values(policies).map((policy) => ({
+        documentType: policy.documentType,
+        retentionCategory: policy.retentionCategory,
+        retentionDays: categoryDays[policy.retentionCategory],
+        archiveAfterDays,
+        disposalMode: "review_before_disposal",
+        anonymizedAnalyticsAllowed: true
+      }))
+    };
+  }
+
+  async getRetentionOperationsSummary(principal: AccessPrincipal) {
+    const documents = await this.prisma.clinicalDocument.findMany({
+      where: buildDocumentComplianceScope(principal),
+      select: {
+        id: true,
+        type: true,
+        issuedAt: true,
+        createdAt: true,
+        status: true
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+    const documentIds = documents.map((document) => document.id);
+    const shareTokens = await this.prisma.documentShareToken.findMany({
+      where: {
+        documentId: {
+          in: documentIds.length > 0 ? documentIds : ["__none__"]
+        }
+      },
+      select: {
+        revokedAt: true,
+        expiresAt: true
+      }
+    });
+
+    const now = Date.now();
+    const archiveAfterMs = this.getArchiveAfterDays() * DAY_MS;
+    let archiveCandidates = 0;
+    let disposalCandidates = 0;
+    let oldestArchiveCandidateAt: string | undefined;
+    let oldestDisposalCandidateAt: string | undefined;
+
+    for (const document of documents) {
+      const policy = this.getPolicy(prismaTypeToDomain[document.type]);
+      const basisDate = document.issuedAt ?? document.createdAt;
+      const ageMs = now - basisDate.getTime();
+
+      if (ageMs >= archiveAfterMs && document.status !== DocumentStatus.ARCHIVED) {
+        archiveCandidates += 1;
+        if (!oldestArchiveCandidateAt) {
+          oldestArchiveCandidateAt = basisDate.toISOString();
+        }
+      }
+
+      if (ageMs >= this.getRetentionDays(policy.retentionCategory, 3650) * DAY_MS) {
+        disposalCandidates += 1;
+        if (!oldestDisposalCandidateAt) {
+          oldestDisposalCandidateAt = basisDate.toISOString();
+        }
+      }
+    }
+
+    const activeShareLinks = shareTokens.filter(
+      (token) => !token.revokedAt && token.expiresAt.getTime() > now
+    ).length;
+    const expiredShareLinks = shareTokens.filter(
+      (token) => token.expiresAt.getTime() <= now
+    ).length;
+
+    return {
+      retentionPolicy: this.getRetentionPolicySnapshot(),
+      totals: {
+        documentsInScope: documents.length,
+        archiveCandidates,
+        disposalCandidates,
+        activeShareLinks,
+        expiredShareLinks
+      },
+      oldestArchiveCandidateAt,
+      oldestDisposalCandidateAt
+    };
+  }
+
+  async getAnonymizedAnalyticsSnapshot(
+    principal: AccessPrincipal,
+    filters?: {
+      dateFrom?: string;
+      dateTo?: string;
+    }
+  ) {
+    const dateFrom = filters?.dateFrom ? new Date(filters.dateFrom) : undefined;
+    const dateTo = filters?.dateTo ? new Date(filters.dateTo) : undefined;
+    const documents = await this.prisma.clinicalDocument.findMany({
+      where: {
+        ...buildDocumentComplianceScope(principal),
+        ...(dateFrom || dateTo
+          ? {
+              createdAt: {
+                ...(dateFrom ? { gte: dateFrom } : {}),
+                ...(dateTo ? { lte: dateTo } : {})
+              }
+            }
+          : {})
+      },
+      select: {
+        type: true,
+        status: true,
+        createdAt: true
+      }
+    });
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        ...buildAppointmentComplianceScope(principal),
+        ...(dateFrom || dateTo
+          ? {
+              appointmentAt: {
+                ...(dateFrom ? { gte: dateFrom } : {}),
+                ...(dateTo ? { lte: dateTo } : {})
+              }
+            }
+          : {})
+      },
+      select: {
+        status: true,
+        telehealth: true,
+        appointmentAt: true
+      }
+    });
+
+    const documentsByType = documents.reduce<Record<string, number>>((acc, document) => {
+      const key = prismaTypeToDomain[document.type];
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    const documentsByStatus = documents.reduce<Record<string, number>>((acc, document) => {
+      const key = document.status.toLowerCase();
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    const appointmentsByStatus = appointments.reduce<Record<string, number>>((acc, appointment) => {
+      const key = appointment.status.toLowerCase();
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    const dailyActivity = new Map<string, { documents: number; appointments: number }>();
+
+    for (const document of documents) {
+      const day = document.createdAt.toISOString().slice(0, 10);
+      const bucket = dailyActivity.get(day) ?? { documents: 0, appointments: 0 };
+      bucket.documents += 1;
+      dailyActivity.set(day, bucket);
+    }
+
+    for (const appointment of appointments) {
+      const day = appointment.appointmentAt.toISOString().slice(0, 10);
+      const bucket = dailyActivity.get(day) ?? { documents: 0, appointments: 0 };
+      bucket.appointments += 1;
+      dailyActivity.set(day, bucket);
+    }
+
+    return {
+      scope: {
+        organizationScoped: !principal.roles.some(
+          (role) => role === "admin" || role === "compliance"
+        ),
+        range: {
+          dateFrom: dateFrom?.toISOString(),
+          dateTo: dateTo?.toISOString()
+        }
+      },
+      documents: {
+        total: documents.length,
+        byType: documentsByType,
+        byStatus: documentsByStatus
+      },
+      appointments: {
+        total: appointments.length,
+        telehealth: appointments.filter((appointment) => appointment.telehealth).length,
+        byStatus: appointmentsByStatus
+      },
+      dailyActivity: [...dailyActivity.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([date, counts]) => ({
+          date,
+          ...counts
+        }))
+    };
+  }
+
   private validateProfessionalReadiness(
     professional: {
       documentNumber: string;
@@ -391,4 +600,58 @@ export class ComplianceService {
       });
     }
   }
+
+  private getRetentionDays(
+    category: "clinical_record" | "medical_certificate" | "prescription",
+    fallback: number
+  ) {
+    const envKey =
+      category === "clinical_record"
+        ? "RETENTION_CLINICAL_RECORD_DAYS"
+        : category === "medical_certificate"
+          ? "RETENTION_MEDICAL_CERTIFICATE_DAYS"
+          : "RETENTION_PRESCRIPTION_DAYS";
+
+    return Number(this.configService.get(envKey) ?? fallback);
+  }
+
+  private getArchiveAfterDays() {
+    return Number(this.configService.get("RETENTION_ARCHIVE_AFTER_DAYS") ?? 90);
+  }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function buildDocumentComplianceScope(principal: AccessPrincipal) {
+  if (principal.roles.some((role) => role === "admin" || role === "compliance")) {
+    return {};
+  }
+
+  return {
+    OR: [
+      {
+        organizationId: principal.organizationId ?? null
+      },
+      {
+        authorProfessionalId: principal.professionalId ?? "__no_access__"
+      }
+    ]
+  };
+}
+
+function buildAppointmentComplianceScope(principal: AccessPrincipal) {
+  if (principal.roles.some((role) => role === "admin" || role === "compliance")) {
+    return {};
+  }
+
+  return {
+    OR: [
+      {
+        organizationId: principal.organizationId ?? null
+      },
+      {
+        professionalId: principal.professionalId ?? "__no_access__"
+      }
+    ]
+  };
 }

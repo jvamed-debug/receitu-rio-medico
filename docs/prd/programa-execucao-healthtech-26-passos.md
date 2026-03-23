@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 8. LGPD operacional com retention/disposal e anonimizaÃ§Ã£o
 - 13. provider real de assinatura
 - 18. CDS com interacoes e override
+- 22. provider farmaceutico real e anti-corruption
 
 ## Checklist dos 26 passos
 
@@ -159,20 +159,23 @@ Falta para fechar:
 
 ### 8. Fortalecer LGPD
 
-Status: em progresso inicial
+Status: em progresso avancado
 
 Ja entregue:
 
 - segregacao inicial de acesso
 - auditoria de acesso e acao
 - reducao de exposicao por recurso e link
+- snapshot de retencao e descarte
+- analytics anonimizados por periodo
+- parametrizacao de retention por categoria documental
 
 Falta para fechar:
 
-- retention/disposal plan
 - logs com base legal e finalidade onde fizer sentido
 - anonimização para analytics
 - governanca mais forte para consentimento
+- descarte automatizado com workflow de aprovacao
 
 ## Trilha 2: Dominio clinico
 
@@ -509,15 +512,15 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 23: analytics por periodo e profissional
-2. passo 25: observabilidade com paines/alertas
-3. passo 26: jobs assincronos leves para retries e processamento
+1. passo 13: provider real de assinatura
+2. passo 18: CDS com interacoes graves e override governado
+3. passo 22: provider farmaceutico real com camada anti-corruption
 
 ### Bloco seguinte
 
-4. aprofundar passo 8 com retention/disposal e base de analytics anonimizados
-5. aprofundar passo 13 com provider real de assinatura
-6. aprofundar passo 18 com novas regras de CDS
+4. aprofundar passo 20 com provider real de pagamentos
+5. aprofundar passo 21 com provider real de mensageria
+6. aprofundar passo 24 com governanca institucional na UI
 
 ### Bloco posterior
 

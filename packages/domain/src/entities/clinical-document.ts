@@ -44,6 +44,7 @@ export interface ClinicalDecisionSupportAlert {
   severity: "low" | "moderate" | "high";
   category: "allergy" | "interaction" | "duplicate_therapy" | "condition";
   message: string;
+  requiresOverrideJustification?: boolean;
 }
 
 export interface ClinicalDecisionSupportSummary {
