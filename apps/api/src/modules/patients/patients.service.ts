@@ -36,7 +36,8 @@ export class PatientsService {
         phone: input.phone,
         email: input.email,
         notes: input.notes,
-        primaryProfessionalId: principal.professionalId
+        primaryProfessionalId: principal.professionalId,
+        organizationId: principal.organizationId
       }
     });
 

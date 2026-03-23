@@ -53,6 +53,29 @@ test("nega acesso a documento de outro profissional e audita a negacao", async (
   assert.equal(auditCalls.length, 1);
 });
 
+test("nega acesso a documento fora da organizacao da sessao", async () => {
+  const service = createService({
+    clinicalDocument: {
+      findUnique: async () => ({
+        id: "doc-3",
+        patientId: "patient-3",
+        authorProfessionalId: "prof-1",
+        organizationId: "org-2"
+      })
+    }
+  });
+
+  const principal = createPrincipal({
+    professionalId: "prof-1",
+    organizationId: "org-1"
+  });
+
+  await assert.rejects(
+    service.assertDocumentAccess(principal, "doc-3", "document_read"),
+    NotFoundException
+  );
+});
+
 test("permite acesso ao paciente pelo owner primario", async () => {
   const service = createService({
     patient: {
@@ -142,9 +165,23 @@ test("buildPatientScope restringe profissional comum e libera admin", () => {
   assert.deepEqual(professionalScope, {
     OR: [
       {
+        organizationId: "org-1",
         primaryProfessionalId: "prof-1"
       },
       {
+        organizationId: "org-1",
+        documents: {
+          some: {
+            authorProfessionalId: "prof-1"
+          }
+        }
+      },
+      {
+        organizationId: null,
+        primaryProfessionalId: "prof-1"
+      },
+      {
+        organizationId: null,
         documents: {
           some: {
             authorProfessionalId: "prof-1"
@@ -199,6 +236,7 @@ function createPrincipal(
   return {
     userId: "user-1",
     professionalId: "prof-1",
+    organizationId: "org-1",
     roles: ["professional"],
     ...overrides
   };

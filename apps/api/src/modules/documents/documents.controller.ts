@@ -37,7 +37,10 @@ export class DocumentsController {
 
   @Get()
   list(@CurrentPrincipal() principal: AccessPrincipal) {
-    return this.documentsService.listForProfessional(scopeProfessionalId(principal));
+    return this.documentsService.listForProfessional(
+      scopeProfessionalId(principal),
+      principal.organizationId
+    );
   }
 
   @RequireRoles("professional", "admin")
@@ -50,7 +53,8 @@ export class DocumentsController {
     const document = await this.documentsService.createPrescription({
       ...input,
       patientId: input.patientId,
-      authorProfessionalId: principal.professionalId ?? ""
+      authorProfessionalId: principal.professionalId ?? "",
+      organizationId: principal.organizationId
     });
     await this.auditService.log({
       actorUserId: principal.userId,
@@ -77,7 +81,8 @@ export class DocumentsController {
     const document = await this.documentsService.createExamRequest({
       ...input,
       patientId: input.patientId,
-      authorProfessionalId: principal.professionalId ?? ""
+      authorProfessionalId: principal.professionalId ?? "",
+      organizationId: principal.organizationId
     });
     await this.auditService.log({
       actorUserId: principal.userId,
@@ -104,7 +109,8 @@ export class DocumentsController {
     const document = await this.documentsService.createMedicalCertificate({
       ...input,
       patientId: input.patientId,
-      authorProfessionalId: principal.professionalId ?? ""
+      authorProfessionalId: principal.professionalId ?? "",
+      organizationId: principal.organizationId
     });
     await this.auditService.log({
       actorUserId: principal.userId,
@@ -131,7 +137,8 @@ export class DocumentsController {
     const document = await this.documentsService.createFreeDocument({
       ...input,
       patientId: input.patientId,
-      authorProfessionalId: principal.professionalId ?? ""
+      authorProfessionalId: principal.professionalId ?? "",
+      organizationId: principal.organizationId
     });
     await this.auditService.log({
       actorUserId: principal.userId,

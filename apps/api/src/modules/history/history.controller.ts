@@ -16,7 +16,10 @@ export class HistoryController {
 
   @Get("history")
   history(@CurrentPrincipal() principal: AccessPrincipal) {
-    return this.historyService.getHistory(scopeProfessionalId(principal));
+    return this.historyService.getHistory(
+      scopeProfessionalId(principal),
+      principal.organizationId
+    );
   }
 
   @Get("patients/:id/history")
@@ -25,7 +28,11 @@ export class HistoryController {
     @Param("id") id: string
   ) {
     await this.resourceAccessService.assertPatientAccess(principal, id, "patient_history_read");
-    return this.historyService.getPatientHistory(id, scopeProfessionalId(principal));
+    return this.historyService.getPatientHistory(
+      id,
+      scopeProfessionalId(principal),
+      principal.organizationId
+    );
   }
 }
 

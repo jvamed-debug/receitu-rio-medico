@@ -47,6 +47,12 @@ export interface ProfessionalProfileSummary {
   signatureValidatedAt?: string | null;
 }
 
+export interface OrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface PrescriptionItemInput {
   medicationName: string;
   activeIngredient?: string;
@@ -277,6 +283,7 @@ export class ApiClient {
         email?: string;
         fullName?: string;
         professionalProfile?: ProfessionalProfileSummary;
+        organization?: OrganizationSummary | null;
       }
     >("/me");
   }

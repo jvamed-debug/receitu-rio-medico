@@ -27,36 +27,44 @@ export class DocumentsService {
   ) {}
 
   async createPrescription(
-    input: Omit<
-      PrescriptionDocument,
-      "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+    input: CreateDocumentInput<
+      Omit<
+        PrescriptionDocument,
+        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+      >
     >
   ) {
     return this.createDocument("prescription", input);
   }
 
   async createExamRequest(
-    input: Omit<
-      ExamRequestDocument,
-      "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+    input: CreateDocumentInput<
+      Omit<
+        ExamRequestDocument,
+        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+      >
     >
   ) {
     return this.createDocument("exam-request", input);
   }
 
   async createMedicalCertificate(
-    input: Omit<
-      MedicalCertificateDocument,
-      "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+    input: CreateDocumentInput<
+      Omit<
+        MedicalCertificateDocument,
+        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+      >
     >
   ) {
     return this.createDocument("medical-certificate", input);
   }
 
   async createFreeDocument(
-    input: Omit<
-      FreeDocument,
-      "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+    input: CreateDocumentInput<
+      Omit<
+        FreeDocument,
+        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
+      >
     >
   ) {
     return this.createDocument("free-document", input);
@@ -115,13 +123,12 @@ export class DocumentsService {
     return this.listForProfessional();
   }
 
-  async listForProfessional(authorProfessionalId?: string) {
+  async listForProfessional(authorProfessionalId?: string, organizationId?: string) {
     const documents = await this.prisma.clinicalDocument.findMany({
-      where: authorProfessionalId
-        ? {
-            authorProfessionalId
-          }
-        : undefined,
+      where: {
+        ...(authorProfessionalId ? { authorProfessionalId } : {}),
+        ...(organizationId ? { OR: [{ organizationId }, { organizationId: null }] } : {})
+      },
       orderBy: {
         createdAt: "desc"
       }
@@ -142,6 +149,7 @@ export class DocumentsService {
       data: {
         type: source.type,
         status: toPrismaDocumentStatus("draft"),
+        organizationId: source.organizationId,
         patientId: source.patientId,
         authorProfessionalId: source.authorProfessionalId,
         title: source.title,
@@ -156,12 +164,14 @@ export class DocumentsService {
 
   async listByPatient(
     patientId: string,
-    authorProfessionalId?: string
+    authorProfessionalId?: string,
+    organizationId?: string
   ): Promise<ClinicalDocument[]> {
     const documents = await this.prisma.clinicalDocument.findMany({
       where: {
         patientId,
-        ...(authorProfessionalId ? { authorProfessionalId } : {})
+        ...(authorProfessionalId ? { authorProfessionalId } : {}),
+        ...(organizationId ? { OR: [{ organizationId }, { organizationId: null }] } : {})
       },
       orderBy: {
         createdAt: "desc"
@@ -181,6 +191,10 @@ export class DocumentsService {
       data: {
         type: toPrismaDocumentType(type),
         status: toPrismaDocumentStatus(compliance.status),
+        organizationId:
+          typeof input.organizationId === "string" && input.organizationId.length > 0
+            ? input.organizationId
+            : null,
         patientId: String(input.patientId),
         authorProfessionalId: String(input.authorProfessionalId),
         title: String(input.title),
@@ -244,3 +258,7 @@ function buildPreviewSections(type: DocumentType, payload: Record<string, unknow
       ];
   }
 }
+
+type CreateDocumentInput<T extends Record<string, unknown>> = T & {
+  organizationId?: string;
+};

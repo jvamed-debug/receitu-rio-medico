@@ -21,7 +21,8 @@ export class ResourceAccessService {
       select: {
         id: true,
         patientId: true,
-        authorProfessionalId: true
+        authorProfessionalId: true,
+        organizationId: true
       }
     });
 
@@ -38,6 +39,7 @@ export class ResourceAccessService {
     }
 
     if (document.authorProfessionalId === principal.professionalId) {
+      this.assertOrganizationAccess(principal.organizationId, document.organizationId);
       return document;
     }
 
@@ -57,7 +59,8 @@ export class ResourceAccessService {
       where: { id: patientId },
       select: {
         id: true,
-        primaryProfessionalId: true
+        primaryProfessionalId: true,
+        organizationId: true
       }
     });
 
@@ -74,6 +77,7 @@ export class ResourceAccessService {
     }
 
     if (patient.primaryProfessionalId === principal.professionalId) {
+      this.assertOrganizationAccess(principal.organizationId, patient.organizationId);
       return patient;
     }
 
@@ -86,6 +90,7 @@ export class ResourceAccessService {
     });
 
     if (hasDocumentAccess) {
+      this.assertOrganizationAccess(principal.organizationId, patient.organizationId);
       return patient;
     }
 
@@ -110,9 +115,23 @@ export class ResourceAccessService {
     return {
       OR: [
         {
+          organizationId: principal.organizationId,
           primaryProfessionalId: principal.professionalId
         },
         {
+          organizationId: principal.organizationId,
+          documents: {
+            some: {
+              authorProfessionalId: principal.professionalId
+            }
+          }
+        },
+        {
+          organizationId: null,
+          primaryProfessionalId: principal.professionalId
+        },
+        {
+          organizationId: null,
           documents: {
             some: {
               authorProfessionalId: principal.professionalId
@@ -125,6 +144,19 @@ export class ResourceAccessService {
 
   private canBypass(principal: AccessPrincipal) {
     return principal.roles.some((role) => role === "admin" || role === "compliance");
+  }
+
+  private assertOrganizationAccess(
+    principalOrganizationId: string | undefined,
+    resourceOrganizationId: string | null
+  ) {
+    if (!resourceOrganizationId || !principalOrganizationId) {
+      return;
+    }
+
+    if (principalOrganizationId !== resourceOrganizationId) {
+      throw new NotFoundException("Recurso fora da organizacao da sessao");
+    }
   }
 
   private async logDeniedAccess(

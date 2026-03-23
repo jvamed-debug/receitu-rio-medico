@@ -7,6 +7,7 @@ export interface AuthTokens {
 export interface SessionPrincipal {
   userId: string;
   professionalId?: string;
+  organizationId?: string;
   roles: string[];
 }
 

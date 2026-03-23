@@ -42,13 +42,36 @@ export class AuthService {
       }
     });
 
-    await this.prisma.professionalProfile.create({
+    const professionalProfile = await this.prisma.professionalProfile.create({
       data: {
         userId: user.id,
         documentNumber: "pendente",
         councilType: "CRM",
         councilState: "SP",
         status: ProfessionalStatus.PENDING_VALIDATION
+      }
+    });
+
+    const organization = await this.prisma.organization.create({
+      data: {
+        name: `Clinica de ${user.fullName}`,
+        slug: buildOrganizationSlug(user.fullName, user.id)
+      }
+    });
+
+    await this.prisma.organizationMembership.create({
+      data: {
+        organizationId: organization.id,
+        professionalId: professionalProfile.id,
+        membershipRole: "owner",
+        isDefault: true
+      }
+    });
+
+    await this.prisma.professionalProfile.update({
+      where: { id: professionalProfile.id },
+      data: {
+        primaryOrganizationId: organization.id
       }
     });
 
@@ -64,7 +87,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
       include: {
-        professionalProfile: true
+        professionalProfile: {
+          include: {
+            primaryOrganization: true
+          }
+        }
       }
     });
 
@@ -72,7 +99,15 @@ export class AuthService {
       throw new UnauthorizedException("Credenciais invalidas");
     }
 
-    return this.issueTokens(user.id, user.email, [mapRole(user.role)], user.professionalProfile?.id);
+    return this.issueTokens(
+      user.id,
+      user.email,
+      [mapRole(user.role)],
+      user.professionalProfile?.id,
+      {
+        organizationId: user.professionalProfile?.primaryOrganizationId ?? undefined
+      }
+    );
   }
 
   async refresh(input: RefreshInput) {
@@ -85,7 +120,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: {
-        professionalProfile: true
+        professionalProfile: {
+          include: {
+            primaryOrganization: true
+          }
+        }
       }
     });
 
@@ -93,7 +132,15 @@ export class AuthService {
       throw new UnauthorizedException("Usuario nao encontrado");
     }
 
-    return this.issueTokens(user.id, user.email, [mapRole(user.role)], user.professionalProfile?.id);
+    return this.issueTokens(
+      user.id,
+      user.email,
+      [mapRole(user.role)],
+      user.professionalProfile?.id,
+      {
+        organizationId: user.professionalProfile?.primaryOrganizationId ?? undefined
+      }
+    );
   }
 
   async stepUp(authorization: string | undefined, input: StepUpInput) {
@@ -102,7 +149,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: principal.userId },
       include: {
-        professionalProfile: true
+        professionalProfile: {
+          include: {
+            primaryOrganization: true
+          }
+        }
       }
     });
 
@@ -116,6 +167,7 @@ export class AuthService {
       [mapRole(user.role)],
       user.professionalProfile?.id,
       {
+        organizationId: user.professionalProfile?.primaryOrganizationId ?? undefined,
         stepUpUntil: Date.now() + this.stepUpTtlMs
       }
     );
@@ -134,7 +186,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: principal.userId },
       include: {
-        professionalProfile: true
+        professionalProfile: {
+          include: {
+            primaryOrganization: true
+          }
+        }
       }
     });
 
@@ -145,11 +201,19 @@ export class AuthService {
     return {
       userId: user.id,
       professionalId: user.professionalProfile?.id,
+      organizationId: user.professionalProfile?.primaryOrganizationId ?? undefined,
       email: user.email,
       fullName: user.fullName,
       roles: principal.roles,
       stepUpUntil: principal.stepUpUntil,
-      professionalProfile: user.professionalProfile
+      professionalProfile: user.professionalProfile,
+      organization: user.professionalProfile?.primaryOrganization
+        ? {
+            id: user.professionalProfile.primaryOrganization.id,
+            name: user.professionalProfile.primaryOrganization.name,
+            slug: user.professionalProfile.primaryOrganization.slug
+          }
+        : null
     };
   }
 
@@ -163,7 +227,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: principal.userId },
       include: {
-        professionalProfile: true
+        professionalProfile: {
+          include: {
+            primaryOrganization: true
+          }
+        }
       }
     });
 
@@ -204,7 +272,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: principal.userId },
       include: {
-        professionalProfile: true
+        professionalProfile: {
+          include: {
+            primaryOrganization: true
+          }
+        }
       }
     });
 
@@ -249,6 +321,7 @@ export class AuthService {
       userId: payload.sub,
       roles: payload.roles,
       professionalId: payload.professionalId,
+      organizationId: payload.organizationId,
       stepUpUntil: payload.stepUpUntil
     };
   }
@@ -259,6 +332,7 @@ export class AuthService {
     roles: string[],
     professionalId?: string,
     options?: {
+      organizationId?: string;
       stepUpUntil?: number;
     }
   ) {
@@ -268,6 +342,7 @@ export class AuthService {
         email,
         roles,
         professionalId,
+        organizationId: options?.organizationId,
         stepUpUntil: options?.stepUpUntil,
         type: "access",
         exp: Date.now() + this.accessTokenTtlMs
@@ -281,6 +356,7 @@ export class AuthService {
         email,
         roles,
         professionalId,
+        organizationId: options?.organizationId,
         type: "refresh",
         exp: Date.now() + this.refreshTokenTtlMs
       },
@@ -309,4 +385,18 @@ function stringOrNullable(value: unknown) {
 
 function mapRole(role: UserRole) {
   return role.toLowerCase();
+}
+
+function buildOrganizationSlug(fullName: string, userId: string) {
+  const normalized = fullName
+    .normalize("NFD")
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .slice(0, 40);
+
+  const suffix = userId.slice(0, 6).toLowerCase();
+  return `${normalized || "clinica"}-${suffix}`;
 }

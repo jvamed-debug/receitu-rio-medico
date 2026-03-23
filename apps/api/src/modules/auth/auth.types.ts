@@ -25,6 +25,7 @@ export interface BiometricEnrollmentInput {
 export interface AccessPrincipal {
   userId: string;
   professionalId?: string;
+  organizationId?: string;
   roles: string[];
   stepUpUntil?: number;
 }

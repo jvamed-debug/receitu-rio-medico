@@ -65,6 +65,7 @@ model User {
 model ProfessionalProfile {
   id                   String             @id @default(cuid())
   userId               String             @unique
+  primaryOrganizationId String?
   documentNumber       String
   councilType          String
   councilState         String
@@ -76,6 +77,8 @@ model ProfessionalProfile {
   signatureValidatedAt DateTime?
   status               ProfessionalStatus @default(PENDING_VALIDATION)
   user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryOrganization  Organization?      @relation("PrimaryOrganizationProfiles", fields: [primaryOrganizationId], references: [id], onDelete: SetNull)
+  memberships          OrganizationMembership[]
   documents            ClinicalDocument[]
   primaryPatients      Patient[]          @relation("PrimaryProfessionalPatients")
   signatureSessions    SignatureSession[]
@@ -84,8 +87,35 @@ model ProfessionalProfile {
   updatedAt            DateTime           @updatedAt
 }
 
+model Organization {
+  id                 String                   @id @default(cuid())
+  name               String
+  slug               String                   @unique
+  memberships        OrganizationMembership[]
+  primaryProfiles    ProfessionalProfile[]    @relation("PrimaryOrganizationProfiles")
+  patients           Patient[]
+  documents          ClinicalDocument[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+}
+
+model OrganizationMembership {
+  id               String               @id @default(cuid())
+  organizationId   String
+  professionalId   String
+  membershipRole   String               @default("owner")
+  isDefault        Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional     ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, professionalId])
+  @@index([professionalId, isDefault])
+}
+
 model Patient {
   id         String             @id @default(cuid())
+  organizationId String?
   fullName   String
   cpf        String?            @unique
   cns        String?            @unique
@@ -95,17 +125,20 @@ model Patient {
   notes      String?
   primaryProfessionalId String?
   documents  ClinicalDocument[]
+  organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
 
   @@index([primaryProfessionalId])
+  @@index([organizationId])
 }
 
 model ClinicalDocument {
   id                    String               @id @default(cuid())
   type                  DocumentType
   status                DocumentStatus       @default(DRAFT)
+  organizationId        String?
   patientId             String
   authorProfessionalId  String
   title                 String
@@ -114,6 +147,7 @@ model ClinicalDocument {
   payloadHash           String?
   issuedAt              DateTime?
   derivedFromDocumentId String?
+  organization          Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   patient               Patient              @relation(fields: [patientId], references: [id], onDelete: Restrict)
   authorProfessional    ProfessionalProfile  @relation(fields: [authorProfessionalId], references: [id], onDelete: Restrict)
   signatures            SignatureSession[]
@@ -122,6 +156,8 @@ model ClinicalDocument {
   pdfArtifact           PdfArtifact?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
+
+  @@index([organizationId, authorProfessionalId])
 }
 
 model Template {

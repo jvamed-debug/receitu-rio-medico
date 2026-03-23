@@ -298,13 +298,21 @@ Status: pendente
 
 ### 24. Multitenancy
 
-Status: pendente
+Status: em progresso inicial
 
 Prioridade:
 
 - organizacao
 - membership
 - governanca por tenant
+
+Ja entregue:
+
+- `Organization`
+- `OrganizationMembership`
+- `primaryOrganizationId` no perfil profissional
+- `organizationId` em pacientes e documentos
+- emissao e listagem respeitando organizacao quando presente
 
 ## Trilha 7: Escala e governanca
 

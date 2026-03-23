@@ -16,6 +16,7 @@ export class AuthGuard implements CanActivate {
       [AUTH_PRINCIPAL_KEY]?: {
         userId: string;
         professionalId?: string;
+        organizationId?: string;
         roles: string[];
         stepUpUntil?: number;
       };
@@ -40,6 +41,7 @@ export class AuthGuard implements CanActivate {
     request[AUTH_PRINCIPAL_KEY] = {
       userId: payload.sub,
       professionalId: payload.professionalId,
+      organizationId: payload.organizationId,
       roles: payload.roles,
       stepUpUntil: payload.stepUpUntil
     };
