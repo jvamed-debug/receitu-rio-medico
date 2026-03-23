@@ -54,6 +54,7 @@ type FormState = {
   restDays: string;
   observations: string;
   body: string;
+  cdsOverrideJustification: string;
 };
 
 type FormPreset = {
@@ -79,7 +80,8 @@ const initialState: FormState = {
   purpose: "",
   restDays: "",
   observations: "",
-  body: ""
+  body: "",
+  cdsOverrideJustification: ""
 };
 
 const defaultValuesByKind: Record<FormKind, Partial<FormState>> = {
@@ -558,13 +560,30 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
           context: {
             encounterType: "ambulatory",
             specialty: specialtyTrack ?? undefined
-          }
+          },
+          cdsOverride: state.cdsOverrideJustification.trim()
+            ? {
+                justification: state.cdsOverrideJustification.trim(),
+                acceptedAlertCodes: [
+                  "condition_pregnancy_risk",
+                  "condition_renal_risk",
+                  "condition_hepatic_risk",
+                  "allergy_match",
+                  "duplicate_therapy"
+                ]
+              }
+            : undefined
         };
         const created = await api.createPrescription(payload);
         if (created.type === "prescription" && created.cdsSummary?.alerts.length) {
           setMessage(
             `Rascunho criado com ${created.cdsSummary.alerts.length} alerta(s) clinico(s) para revisao.`
           );
+          if (created.cdsSummary.alerts.some((alert) => alert.requiresOverrideJustification)) {
+            setMessage(
+              `Rascunho criado com ${created.cdsSummary.alerts.length} alerta(s). Ha alertas que exigem justificativa formal de override.`
+            );
+          }
         }
       }
 
@@ -752,6 +771,18 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
                 onChange={(event) => updateField("notes", event.target.value)}
                 style={textAreaStyle}
                 disabled={submitting}
+              />
+            </label>
+            <label style={fieldStyle}>
+              <span>Justificativa de override clinico</span>
+              <textarea
+                value={state.cdsOverrideJustification}
+                onChange={(event) =>
+                  updateField("cdsOverrideJustification", event.target.value)
+                }
+                style={textAreaStyle}
+                disabled={submitting}
+                placeholder="Preencha apenas se decidir manter a prescricao apesar de alertas clinicos relevantes."
               />
             </label>
           </>

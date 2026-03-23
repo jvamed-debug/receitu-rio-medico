@@ -1,6 +1,7 @@
 import type {
   ClinicalDocument,
   ClinicalDocumentContext,
+  ClinicalDecisionSupportOverride,
   ClinicalDecisionSupportSummary,
   ClinicalDocumentStatus,
   ClinicalDocumentType,
@@ -68,6 +69,7 @@ export function toDomainDocument(document: PrismaClinicalDocument): ClinicalDocu
     schemaVersion: readSchemaVersion(document.payload),
     context: readClinicalContext(document.payload),
     cdsSummary: readCdsSummary(document.payload),
+    cdsOverride: readCdsOverride(document.payload),
     issuedAt: document.issuedAt?.toISOString(),
     derivedFromDocumentId: document.derivedFromDocumentId ?? undefined,
     createdAt: document.createdAt.toISOString(),
@@ -124,6 +126,7 @@ export function buildDocumentPayload(
       return {
         ...baseMetadata,
         _cds: normalizeCdsSummary(input.cdsSummary),
+        _cdsOverride: normalizeCdsOverride(input.cdsOverride),
         items: ((input.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
           id: item.id ?? null,
           medicationName: item.medicationName,
@@ -192,6 +195,19 @@ function readCdsSummary(payload: unknown): ClinicalDecisionSupportSummary | unde
   return summary as ClinicalDecisionSupportSummary;
 }
 
+function readCdsOverride(payload: unknown): ClinicalDecisionSupportOverride | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const summary = (payload as { _cdsOverride?: unknown })._cdsOverride;
+  if (!summary || typeof summary !== "object") {
+    return undefined;
+  }
+
+  return summary as ClinicalDecisionSupportOverride;
+}
+
 function normalizeContext(input: unknown) {
   if (!input || typeof input !== "object") {
     return null;
@@ -201,6 +217,14 @@ function normalizeContext(input: unknown) {
 }
 
 function normalizeCdsSummary(input: unknown) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  return JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;
+}
+
+function normalizeCdsOverride(input: unknown) {
   if (!input || typeof input !== "object") {
     return null;
   }

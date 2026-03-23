@@ -30,6 +30,7 @@ export interface ClinicalDocumentBase {
   schemaVersion?: string;
   context?: ClinicalDocumentContext;
   cdsSummary?: ClinicalDecisionSupportSummary;
+  cdsOverride?: ClinicalDecisionSupportOverride;
 }
 
 export interface ClinicalDocumentContext {
@@ -51,6 +52,12 @@ export interface ClinicalDecisionSupportSummary {
   severity: "none" | "low" | "moderate" | "high";
   alerts: ClinicalDecisionSupportAlert[];
   reviewedAt: string;
+}
+
+export interface ClinicalDecisionSupportOverride {
+  justification: string;
+  acceptedAlertCodes: string[];
+  createdAt?: string;
 }
 
 export interface PrescriptionItem {

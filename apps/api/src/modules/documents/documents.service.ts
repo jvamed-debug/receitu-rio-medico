@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { DocumentType, Prisma } from "@prisma/client";
 import type {
@@ -226,11 +226,62 @@ export class DocumentsService {
         ? (input.items as PrescriptionDocument["items"])
         : []
     });
+    const rawCdsOverride =
+      input.cdsOverride && typeof input.cdsOverride === "object"
+        ? (input.cdsOverride as Record<string, unknown>)
+        : undefined;
+
+    ensureCdsOverrideCompliance(cdsSummary, rawCdsOverride);
+
+    const cdsOverride = rawCdsOverride
+      ? {
+          ...rawCdsOverride,
+          createdAt: new Date().toISOString()
+        }
+      : undefined;
 
     return {
       ...input,
-      cdsSummary
+      cdsSummary,
+      cdsOverride
     };
+  }
+}
+
+function ensureCdsOverrideCompliance(
+  cdsSummary: ClinicalDocument["cdsSummary"],
+  cdsOverride:
+    | {
+        justification?: unknown;
+        acceptedAlertCodes?: unknown;
+      }
+    | undefined
+) {
+  const requiredAlerts =
+    cdsSummary?.alerts.filter((alert) => alert.requiresOverrideJustification) ?? [];
+
+  if (requiredAlerts.length === 0) {
+    return;
+  }
+
+  const justification =
+    typeof cdsOverride?.justification === "string" ? cdsOverride.justification.trim() : "";
+  const acceptedAlertCodes = Array.isArray(cdsOverride?.acceptedAlertCodes)
+    ? cdsOverride.acceptedAlertCodes.filter(
+        (item): item is string => typeof item === "string" && item.trim().length > 0
+      )
+    : [];
+  const missingCodes = requiredAlerts
+    .map((alert) => alert.code)
+    .filter((code) => !acceptedAlertCodes.includes(code));
+
+  if (!justification || missingCodes.length > 0) {
+    throw new BadRequestException({
+      message: "Prescricao com alerta clinico exige justificativa formal de override",
+      requiredAlertCodes: requiredAlerts.map((alert) => alert.code),
+      providedAlertCodes: acceptedAlertCodes,
+      missingAlertCodes: missingCodes
+    });
   }
 }
 

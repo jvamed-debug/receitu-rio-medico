@@ -351,13 +351,15 @@ Ja entregue:
 - CDS basico para prescricoes
 - alerta de alergia por correspondencia simples
 - alerta de duplicidade com medicacao cronica
+- alerta por condicao clinica em contexto gestacional, renal e hepatica
+- suporte a override justificado no contrato documental
 - severidade resumida no documento
 
 Falta para fechar:
 
 - interacoes graves
-- alertas por condicao clinica
 - graduacao e governanca de override
+- override com workflow institucional
 
 ## Trilha 5: Operacao da clinica
 

@@ -120,6 +120,10 @@ export interface CreatePrescriptionInput {
     clinicalReason?: string;
     diagnosisCode?: string;
   };
+  cdsOverride?: {
+    justification: string;
+    acceptedAlertCodes: string[];
+  };
 }
 
 export interface CreateExamRequestInput {

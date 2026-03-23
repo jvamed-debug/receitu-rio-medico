@@ -65,7 +65,11 @@ export class DocumentsController {
       origin: "api.documents",
       metadata: {
         type: document.type,
-        status: document.status
+        status: document.status,
+        cdsSeverity: document.cdsSummary?.severity,
+        cdsAlerts: document.cdsSummary?.alerts.length ?? 0,
+        cdsOverrideUsed: Boolean(document.cdsOverride),
+        cdsOverrideJustification: document.cdsOverride?.justification
       }
     });
     return document;

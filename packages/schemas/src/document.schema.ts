@@ -13,6 +13,11 @@ export const clinicalDocumentContextSchema = z.object({
   diagnosisCode: z.string().min(2).optional()
 });
 
+export const clinicalDecisionSupportOverrideSchema = z.object({
+  justification: z.string().min(10),
+  acceptedAlertCodes: z.array(z.string().min(3)).min(1)
+});
+
 export const prescriptionItemSchema = z.object({
   medicationName: z.string().min(2),
   activeIngredient: z.string().optional(),
@@ -27,7 +32,8 @@ export const prescriptionItemSchema = z.object({
 export const createPrescriptionSchema = patientReferenceSchema.extend({
   title: z.string().min(3),
   items: z.array(prescriptionItemSchema).min(1),
-  context: clinicalDocumentContextSchema.optional()
+  context: clinicalDocumentContextSchema.optional(),
+  cdsOverride: clinicalDecisionSupportOverrideSchema.optional()
 });
 
 export const createExamRequestSchema = patientReferenceSchema.extend({
