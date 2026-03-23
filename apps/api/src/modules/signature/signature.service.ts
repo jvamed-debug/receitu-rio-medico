@@ -13,6 +13,7 @@ import {
 import { AuditService } from "../audit/audit.service";
 import { ComplianceService } from "../compliance/compliance.service";
 import { PrismaService } from "../../persistence/prisma.service";
+import { SignatureProviderGateway } from "./signature-provider.gateway";
 
 type SignatureWindowRecord = {
   id: string;
@@ -29,7 +30,8 @@ export class SignatureService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-    private readonly complianceService: ComplianceService
+    private readonly complianceService: ComplianceService,
+    private readonly signatureProviderGateway: SignatureProviderGateway
   ) {}
 
   async createSession(input: {
@@ -157,12 +159,69 @@ export class SignatureService {
       expiresAt: activeWindow ? new Date(activeWindow.validUntil) : undefined
     });
 
+    let providerResult;
+
+    try {
+      providerResult = await this.signatureProviderGateway.sign({
+        sessionId: session.id,
+        documentId: input.documentId,
+        professionalId: input.professionalId,
+        provider,
+        signatureLevel: compliance.policy.signatureLevel,
+        policyVersion: compliance.policy.policyVersion,
+        expiresAt: session.expiresAt,
+        requestContext: input.requestContext
+      });
+    } catch (error) {
+      await this.prisma.signatureSession.update({
+        where: { id: session.id },
+        data: {
+          status: SignatureSessionStatus.FAILED,
+          evidence: {
+            ...complianceRecord,
+            requestContext: {
+              ip: input.requestContext?.ip ?? undefined,
+              userAgent: input.requestContext?.userAgent ?? undefined,
+              origin: input.requestContext?.origin ?? undefined
+            },
+            temporaryWindowUsed: activeWindow != null,
+            failure: error instanceof Error ? error.message : "provider_failed"
+          } as unknown as Prisma.InputJsonValue
+        }
+      });
+
+      await this.auditService.log({
+        actorProfessionalId: input.professionalId,
+        entityType: "signature_session",
+        entityId: session.id,
+        action: "signature_failed",
+        origin: "api.signature",
+        metadata: {
+          provider,
+          policyVersion: compliance.policy.policyVersion,
+          reason: error instanceof Error ? error.message : "provider_failed"
+        }
+      });
+
+      throw error;
+    }
+
     await this.prisma.signatureSession.update({
       where: { id: session.id },
       data: {
         status: SignatureSessionStatus.SIGNED,
-        signedAt: new Date(),
-        providerReference: `sigref-${session.id}`
+        signedAt: new Date(providerResult.signedAt),
+        providerReference: providerResult.externalReference,
+        evidence: {
+          ...complianceRecord,
+          requestContext: {
+            ip: input.requestContext?.ip ?? undefined,
+            userAgent: input.requestContext?.userAgent ?? undefined,
+            origin: input.requestContext?.origin ?? undefined
+          },
+          temporaryWindowUsed: activeWindow != null,
+          providerEvidence: providerResult.evidence
+        } as unknown as Prisma.InputJsonValue
       }
     });
 
@@ -185,6 +244,7 @@ export class SignatureService {
       metadata: {
         provider,
         sessionId: session.id,
+        providerReference: providerResult.externalReference,
         usedWindow: activeWindow != null,
         pdfArtifactId: pdfArtifact.id,
         signatureLevel: compliance.policy.signatureLevel,

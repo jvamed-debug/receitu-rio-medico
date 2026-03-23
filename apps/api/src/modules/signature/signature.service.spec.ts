@@ -91,7 +91,7 @@ test("signDocument persiste evidencia e referencia de provider", async () => {
   assert.equal(result.sessionId, "sig-1");
   assert.equal(result.status, DocumentStatus.ISSUED);
   assert.equal(updatedSessionPayload?.status, SignatureSessionStatus.SIGNED);
-  assert.equal(updatedSessionPayload?.providerReference, "sigref-sig-1");
+  assert.equal(updatedSessionPayload?.providerReference, "icpbr-sig-1");
   assert.equal(
     ((createdSessionPayload?.evidence as Record<string, unknown>) ?? {}).policyVersion,
     "2026.03"
@@ -116,6 +116,9 @@ function createService(
   complianceOverrides?: Partial<{
     validateBeforeSignature: (...args: any[]) => Promise<any>;
     buildSignatureComplianceRecord: (...args: any[]) => Record<string, unknown>;
+  }>,
+  gatewayOverrides?: Partial<{
+    sign: (...args: any[]) => Promise<any>;
   }>
 ) {
   const prisma = {
@@ -187,9 +190,21 @@ function createService(
     ...complianceOverrides
   };
 
+  const gateway = {
+    sign: async () => ({
+      externalReference: "icpbr-sig-1",
+      signedAt: "2026-03-22T16:00:30.000Z",
+      evidence: {
+        providerMode: "mock"
+      }
+    }),
+    ...gatewayOverrides
+  };
+
   return new SignatureService(
     prisma as never,
     auditService as never,
-    compliance as never
+    compliance as never,
+    gateway as never
   );
 }
