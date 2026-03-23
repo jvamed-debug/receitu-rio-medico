@@ -118,8 +118,27 @@ export interface OrganizationMembershipSummary {
   professionalName: string;
   professionalEmail?: string;
   membershipRole: string;
+  status: "active" | "suspended" | "removed";
   isDefault: boolean;
+  invitedByUserId?: string | null;
+  deactivatedAt?: string | null;
   createdAt: string;
+}
+
+export interface OrganizationInvitationSummary {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  email: string;
+  membershipRole: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  invitedByUserId?: string | null;
+  expiresAt?: string | null;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OrganizationDetail {
@@ -888,6 +907,10 @@ export class ApiClient {
     return this.get<OrganizationMembershipSummary[]>("/organizations/current/memberships");
   }
 
+  listCurrentOrganizationInvitations() {
+    return this.get<OrganizationInvitationSummary[]>("/organizations/current/invitations");
+  }
+
   addOrganizationMembershipByEmail(input: {
     email: string;
     membershipRole?: string;
@@ -896,16 +919,35 @@ export class ApiClient {
     return this.post<OrganizationMembershipSummary>("/organizations/current/memberships", input);
   }
 
+  createOrganizationInvitation(input: {
+    email: string;
+    membershipRole?: string;
+    expiresAt?: string;
+  }) {
+    return this.post<OrganizationInvitationSummary>(
+      "/organizations/current/invitations",
+      input
+    );
+  }
+
   updateOrganizationMembership(
     membershipId: string,
     input: {
       membershipRole?: string;
       isDefault?: boolean;
+      status?: "active" | "suspended" | "removed";
     }
   ) {
     return this.patch<OrganizationMembershipSummary>(
       `/organizations/current/memberships/${membershipId}`,
       input
+    );
+  }
+
+  revokeOrganizationInvitation(invitationId: string) {
+    return this.post<OrganizationInvitationSummary>(
+      `/organizations/current/invitations/${invitationId}/revoke`,
+      {}
     );
   }
 

@@ -25,6 +25,11 @@ export class OrganizationsController {
     return this.organizationsService.listCurrentMemberships(principal);
   }
 
+  @Get("current/invitations")
+  listCurrentInvitations(@CurrentPrincipal() principal: AccessPrincipal) {
+    return this.organizationsService.listCurrentInvitations(principal);
+  }
+
   @Patch("current/settings")
   updateCurrentSettings(
     @CurrentPrincipal() principal: AccessPrincipal,
@@ -61,6 +66,19 @@ export class OrganizationsController {
     return this.organizationsService.addMembershipByEmail(principal, input);
   }
 
+  @Post("current/invitations")
+  createInvitation(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Body()
+    input: {
+      email: string;
+      membershipRole?: string;
+      expiresAt?: string;
+    }
+  ) {
+    return this.organizationsService.createInvitation(principal, input);
+  }
+
   @Patch("current/memberships/:membershipId")
   updateMembership(
     @CurrentPrincipal() principal: AccessPrincipal,
@@ -69,8 +87,17 @@ export class OrganizationsController {
     input: {
       membershipRole?: string;
       isDefault?: boolean;
+      status?: "active" | "suspended" | "removed";
     }
   ) {
     return this.organizationsService.updateMembership(principal, membershipId, input);
+  }
+
+  @Post("current/invitations/:invitationId/revoke")
+  revokeInvitation(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("invitationId") invitationId: string
+  ) {
+    return this.organizationsService.revokeInvitation(principal, invitationId);
   }
 }

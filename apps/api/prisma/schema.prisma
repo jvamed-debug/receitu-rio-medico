@@ -100,6 +100,19 @@ enum EncounterType {
   CLINICAL_NOTE
 }
 
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 model User {
   id                 String               @id @default(cuid())
   email              String               @unique
@@ -148,6 +161,7 @@ model Organization {
   slug               String                   @unique
   settings           Json?
   memberships        OrganizationMembership[]
+  invitations        OrganizationInvitation[]
   primaryProfiles    ProfessionalProfile[]    @relation("PrimaryOrganizationProfiles")
   patients           Patient[]
   documents          ClinicalDocument[]
@@ -162,13 +176,34 @@ model OrganizationMembership {
   organizationId   String
   professionalId   String
   membershipRole   String               @default("owner")
+  status           MembershipStatus     @default(ACTIVE)
   isDefault        Boolean              @default(false)
+  invitedByUserId  String?
+  deactivatedAt    DateTime?
   createdAt        DateTime             @default(now())
   organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   professional     ProfessionalProfile  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, professionalId])
   @@index([professionalId, isDefault])
+}
+
+model OrganizationInvitation {
+  id                String            @id @default(cuid())
+  organizationId    String
+  email             String
+  membershipRole    String            @default("member")
+  status            InvitationStatus  @default(PENDING)
+  invitedByUserId   String?
+  expiresAt         DateTime?
+  acceptedAt        DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt])
+  @@index([email, status])
 }
 
 model Patient {

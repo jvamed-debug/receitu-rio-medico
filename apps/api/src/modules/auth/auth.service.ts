@@ -3,7 +3,7 @@ import {
   Injectable,
   UnauthorizedException
 } from "@nestjs/common";
-import { ProfessionalStatus, SignatureProvider, UserRole } from "@prisma/client";
+import { MembershipStatus, ProfessionalStatus, SignatureProvider, UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../persistence/prisma.service";
 import { hashPassword, verifyPassword } from "./auth.crypto";
@@ -314,7 +314,8 @@ export class AuthService {
     const membership = await this.prisma.organizationMembership.findFirst({
       where: {
         organizationId,
-        professionalId: principal.professionalId
+        professionalId: principal.professionalId,
+        status: MembershipStatus.ACTIVE
       },
       include: {
         professional: {

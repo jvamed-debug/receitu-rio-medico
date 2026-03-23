@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import { InvitationStatus, MembershipStatus } from "@prisma/client";
 
 import { PrismaService } from "../../persistence/prisma.service";
 import type { AccessPrincipal } from "../auth/auth.types";
@@ -18,7 +19,8 @@ export class OrganizationsService {
 
     const memberships = await this.prisma.organizationMembership.findMany({
       where: {
-        professionalId: principal.professionalId
+        professionalId: principal.professionalId,
+        status: MembershipStatus.ACTIVE
       },
       include: {
         organization: true
@@ -131,12 +133,15 @@ export class OrganizationsService {
         }
       },
       update: {
-        membershipRole: input.membershipRole ?? "member"
+        membershipRole: input.membershipRole ?? "member",
+        status: MembershipStatus.ACTIVE,
+        deactivatedAt: null
       },
       create: {
         organizationId,
         professionalId: user.professionalProfile.id,
         membershipRole: input.membershipRole ?? "member",
+        status: MembershipStatus.ACTIVE,
         isDefault: Boolean(input.isDefault)
       },
       include: {
@@ -174,6 +179,7 @@ export class OrganizationsService {
     input: {
       membershipRole?: string;
       isDefault?: boolean;
+      status?: "active" | "suspended" | "removed";
     }
   ) {
     const membership = await this.prisma.organizationMembership.findUnique({
@@ -201,7 +207,12 @@ export class OrganizationsService {
         id: membershipId
       },
       data: {
-        membershipRole: input.membershipRole ?? membership.membershipRole
+        membershipRole: input.membershipRole ?? membership.membershipRole,
+        status: mapMembershipStatus(input.status) ?? membership.status,
+        deactivatedAt:
+          input.status && input.status !== "active" ? new Date() : input.status === "active" ? null : membership.deactivatedAt,
+        isDefault:
+          input.status && input.status !== "active" ? false : membership.isDefault
       },
       include: {
         organization: true,
@@ -232,6 +243,90 @@ export class OrganizationsService {
     return mapMembership(refreshed);
   }
 
+  async listCurrentInvitations(principal: AccessPrincipal) {
+    const organizationId = principal.organizationId;
+    if (!organizationId) {
+      throw new NotFoundException("Organizacao nao encontrada");
+    }
+
+    await this.assertCanReadMemberships(principal, organizationId);
+
+    const invitations = await this.prisma.organizationInvitation.findMany({
+      where: {
+        organizationId
+      },
+      include: {
+        organization: true
+      },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }]
+    });
+
+    return invitations.map((invitation) => mapInvitation(invitation));
+  }
+
+  async createInvitation(
+    principal: AccessPrincipal,
+    input: {
+      email: string;
+      membershipRole?: string;
+      expiresAt?: string;
+    }
+  ) {
+    const organizationId = principal.organizationId;
+    if (!organizationId) {
+      throw new NotFoundException("Organizacao nao encontrada");
+    }
+
+    await this.assertCanManageMemberships(principal, organizationId);
+
+    const invitation = await this.prisma.organizationInvitation.create({
+      data: {
+        organizationId,
+        email: input.email.trim().toLowerCase(),
+        membershipRole: input.membershipRole ?? "member",
+        invitedByUserId: principal.userId,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null
+      },
+      include: {
+        organization: true
+      }
+    });
+
+    return mapInvitation(invitation);
+  }
+
+  async revokeInvitation(principal: AccessPrincipal, invitationId: string) {
+    const invitation = await this.prisma.organizationInvitation.findUnique({
+      where: {
+        id: invitationId
+      },
+      include: {
+        organization: true
+      }
+    });
+
+    if (!invitation) {
+      throw new NotFoundException("Convite nao encontrado");
+    }
+
+    await this.assertCanManageMemberships(principal, invitation.organizationId);
+
+    const updated = await this.prisma.organizationInvitation.update({
+      where: {
+        id: invitationId
+      },
+      data: {
+        status: InvitationStatus.REVOKED,
+        revokedAt: new Date()
+      },
+      include: {
+        organization: true
+      }
+    });
+
+    return mapInvitation(updated);
+  }
+
   async updateCurrentSettings(
     principal: AccessPrincipal,
     input: {
@@ -260,7 +355,11 @@ export class OrganizationsService {
     const current = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       include: {
-        memberships: true,
+        memberships: {
+          where: {
+            status: MembershipStatus.ACTIVE
+          }
+        },
         primaryProfiles: true
       }
     });
@@ -277,7 +376,11 @@ export class OrganizationsService {
         settings: mergedSettings
       },
       include: {
-        memberships: true,
+        memberships: {
+          where: {
+            status: MembershipStatus.ACTIVE
+          }
+        },
         primaryProfiles: true
       }
     });
@@ -322,7 +425,8 @@ export class OrganizationsService {
     return this.prisma.organizationMembership.findFirst({
       where: {
         organizationId,
-        professionalId: principal.professionalId
+        professionalId: principal.professionalId,
+        status: MembershipStatus.ACTIVE
       }
     });
   }
@@ -330,7 +434,8 @@ export class OrganizationsService {
   private async setDefaultMembership(organizationId: string, professionalId: string) {
     await this.prisma.organizationMembership.updateMany({
       where: {
-        professionalId
+        professionalId,
+        status: MembershipStatus.ACTIVE
       },
       data: {
         isDefault: false
@@ -368,7 +473,10 @@ function mapMembership(membership: {
   id: string;
   organizationId: string;
   membershipRole: string;
+  status: MembershipStatus;
   isDefault: boolean;
+  invitedByUserId: string | null;
+  deactivatedAt: Date | null;
   createdAt: Date;
   organization: {
     id: string;
@@ -392,9 +500,62 @@ function mapMembership(membership: {
     professionalName: membership.professional.user.fullName,
     professionalEmail: membership.professional.user.email,
     membershipRole: membership.membershipRole,
+    status: membership.status.toLowerCase(),
     isDefault: membership.isDefault,
+    invitedByUserId: membership.invitedByUserId,
+    deactivatedAt: membership.deactivatedAt?.toISOString() ?? null,
     createdAt: membership.createdAt.toISOString()
   };
+}
+
+function mapInvitation(invitation: {
+  id: string;
+  organizationId: string;
+  email: string;
+  membershipRole: string;
+  status: InvitationStatus;
+  invitedByUserId: string | null;
+  expiresAt: Date | null;
+  acceptedAt: Date | null;
+  revokedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+}) {
+  return {
+    id: invitation.id,
+    organizationId: invitation.organizationId,
+    organizationName: invitation.organization.name,
+    organizationSlug: invitation.organization.slug,
+    email: invitation.email,
+    membershipRole: invitation.membershipRole,
+    status: invitation.status.toLowerCase(),
+    invitedByUserId: invitation.invitedByUserId,
+    expiresAt: invitation.expiresAt?.toISOString() ?? null,
+    acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
+    revokedAt: invitation.revokedAt?.toISOString() ?? null,
+    createdAt: invitation.createdAt.toISOString(),
+    updatedAt: invitation.updatedAt.toISOString()
+  };
+}
+
+function mapMembershipStatus(status?: "active" | "suspended" | "removed") {
+  if (!status) {
+    return undefined;
+  }
+
+  switch (status) {
+    case "active":
+      return MembershipStatus.ACTIVE;
+    case "suspended":
+      return MembershipStatus.SUSPENDED;
+    case "removed":
+      return MembershipStatus.REMOVED;
+  }
 }
 
 function normalizeOrganizationSettings(input: unknown) {

@@ -8,28 +8,31 @@ async function loadOrganizationContext() {
   const api = await createServerApiClient();
 
   try {
-    const [currentOrganization, organizations, memberships] = await Promise.all([
+    const [currentOrganization, organizations, memberships, invitations] = await Promise.all([
       api.getCurrentOrganization(),
       api.listMyOrganizations(),
-      api.listCurrentOrganizationMemberships()
+      api.listCurrentOrganizationMemberships(),
+      api.listCurrentOrganizationInvitations()
     ]);
 
     return {
       currentOrganization,
       organizations,
-      memberships
+      memberships,
+      invitations
     };
   } catch {
     return {
       currentOrganization: null,
       organizations: [],
-      memberships: []
+      memberships: [],
+      invitations: []
     };
   }
 }
 
 export default async function OrganizationPage() {
-  const { currentOrganization, organizations, memberships } =
+  const { currentOrganization, organizations, memberships, invitations } =
     await loadOrganizationContext();
 
   return (
@@ -41,6 +44,7 @@ export default async function OrganizationPage() {
         currentOrganization={currentOrganization}
         organizations={organizations}
         initialMemberships={memberships}
+        initialInvitations={invitations}
       />
     </Shell>
   );

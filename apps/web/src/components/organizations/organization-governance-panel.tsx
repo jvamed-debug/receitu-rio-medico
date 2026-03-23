@@ -3,6 +3,7 @@
 import {
   ApiClient,
   type OrganizationDetail,
+  type OrganizationInvitationSummary,
   type OrganizationMembershipSummary,
   type OrganizationSettings,
   type OrganizationSummary
@@ -15,19 +16,25 @@ import { getBrowserApiBaseUrl } from "../../lib/browser-api";
 export function OrganizationGovernancePanel({
   currentOrganization,
   organizations,
-  initialMemberships
+  initialMemberships,
+  initialInvitations
 }: {
   currentOrganization: OrganizationDetail | null;
   organizations: OrganizationSummary[];
   initialMemberships: OrganizationMembershipSummary[];
+  initialInvitations: OrganizationInvitationSummary[];
 }) {
   const router = useRouter();
   const [memberships, setMemberships] = useState(initialMemberships);
+  const [invitations, setInvitations] = useState(initialInvitations);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(
     currentOrganization?.id ?? organizations[0]?.id ?? ""
   );
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState("member");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("member");
+  const [inviteExpirationHours, setInviteExpirationHours] = useState("168");
   const [settings, setSettings] = useState<OrganizationSettings>({
     documentSharePolicy: {
       maxUsesDefault: currentOrganization?.settings?.documentSharePolicy.maxUsesDefault ?? 3,
@@ -135,6 +142,94 @@ export function OrganizationGovernancePanel({
         submitError instanceof Error
           ? submitError.message
           : "Falha ao atualizar membership."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleMembershipLifecycle(
+    membershipId: string,
+    input: {
+      status?: "active" | "suspended" | "removed";
+      isDefault?: boolean;
+    }
+  ) {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.updateOrganizationMembership(membershipId, input);
+
+      setMemberships((current) =>
+        current.map((membership) => (membership.id === membershipId ? updated : membership))
+      );
+      setMessage("Lifecycle da membership atualizado.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Falha ao atualizar lifecycle da membership."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCreateInvitation() {
+    if (!inviteEmail.trim()) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const api = createBrowserApiClient();
+      const expiresAt = new Date(
+        Date.now() + (Number(inviteExpirationHours) || 168) * 60 * 60 * 1000
+      ).toISOString();
+      const created = await api.createOrganizationInvitation({
+        email: inviteEmail.trim(),
+        membershipRole: inviteRole,
+        expiresAt
+      });
+
+      setInvitations((current) => [created, ...current]);
+      setInviteEmail("");
+      setMessage("Convite institucional criado.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Falha ao criar convite institucional."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRevokeInvitation(invitationId: string) {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const api = createBrowserApiClient();
+      const updated = await api.revokeOrganizationInvitation(invitationId);
+
+      setInvitations((current) =>
+        current.map((invitation) => (invitation.id === invitationId ? updated : invitation))
+      );
+      setMessage("Convite revogado.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Falha ao revogar convite."
       );
     } finally {
       setSaving(false);
@@ -278,25 +373,140 @@ export function OrganizationGovernancePanel({
                 <div>
                   <div style={{ fontWeight: 700 }}>{membership.professionalName}</div>
                   <div style={{ color: "var(--muted)" }}>
-                    {membership.professionalEmail} | papel {membership.membershipRole}
+                    {membership.professionalEmail} | papel {membership.membershipRole} | status{" "}
+                    {membership.status}
                     {membership.isDefault ? " | organizacao padrao" : ""}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handlePromoteMembership(membership.id, membership.membershipRole)
-                  }
-                  style={secondaryButtonStyle}
-                  disabled={saving || membership.membershipRole === "owner"}
-                >
-                  {membership.membershipRole === "member" ? "Promover para admin" : "Rebaixar para member"}
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handlePromoteMembership(membership.id, membership.membershipRole)
+                    }
+                    style={secondaryButtonStyle}
+                    disabled={saving || membership.membershipRole === "owner"}
+                  >
+                    {membership.membershipRole === "member"
+                      ? "Promover para admin"
+                      : "Rebaixar para member"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleMembershipLifecycle(membership.id, {
+                        status: membership.status === "active" ? "suspended" : "active"
+                      })
+                    }
+                    style={secondaryButtonStyle}
+                    disabled={saving || membership.membershipRole === "owner"}
+                  >
+                    {membership.status === "active" ? "Suspender" : "Reativar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleMembershipLifecycle(membership.id, {
+                        isDefault: true
+                      })
+                    }
+                    style={secondaryButtonStyle}
+                    disabled={saving || membership.status !== "active"}
+                  >
+                    Tornar padrao
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleMembershipLifecycle(membership.id, {
+                        status: "removed"
+                      })
+                    }
+                    style={dangerButtonStyle}
+                    disabled={saving || membership.membershipRole === "owner"}
+                  >
+                    Remover
+                  </button>
+                </div>
               </article>
             ))
           ) : (
             <div style={{ color: "var(--muted)" }}>
               Nenhuma membership carregada para a organizacao atual.
+            </div>
+          )}
+        </div>
+
+        {error ? <div style={{ color: "var(--danger)", fontWeight: 700 }}>{error}</div> : null}
+        {message ? <div style={{ color: "var(--primary)", fontWeight: 700 }}>{message}</div> : null}
+      </section>
+
+      <section style={panelStyle}>
+        <h2 style={{ margin: 0 }}>Convites institucionais</h2>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
+          <label style={fieldStyle}>
+            <span>E-mail convidado</span>
+            <input
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              style={inputStyle}
+              placeholder="novo@clinica.com"
+            />
+          </label>
+          <label style={fieldStyle}>
+            <span>Papel</span>
+            <select
+              value={inviteRole}
+              onChange={(event) => setInviteRole(event.target.value)}
+              style={inputStyle}
+            >
+              <option value="member">member</option>
+              <option value="admin">admin</option>
+              <option value="owner">owner</option>
+            </select>
+          </label>
+          <label style={fieldStyle}>
+            <span>Expira em horas</span>
+            <input
+              type="number"
+              min={1}
+              max={720}
+              value={inviteExpirationHours}
+              onChange={(event) => setInviteExpirationHours(event.target.value)}
+              style={inputStyle}
+            />
+          </label>
+          <button type="button" onClick={handleCreateInvitation} disabled={saving} style={buttonStyle}>
+            Criar convite
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
+          {invitations.length > 0 ? (
+            invitations.map((invitation) => (
+              <article key={invitation.id} style={membershipCardStyle}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{invitation.email}</div>
+                  <div style={{ color: "var(--muted)" }}>
+                    papel {invitation.membershipRole} | status {invitation.status}
+                    {invitation.expiresAt
+                      ? ` | expira em ${new Date(invitation.expiresAt).toLocaleString("pt-BR")}`
+                      : ""}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRevokeInvitation(invitation.id)}
+                  style={dangerButtonStyle}
+                  disabled={saving || invitation.status !== "pending"}
+                >
+                  Revogar convite
+                </button>
+              </article>
+            ))
+          ) : (
+            <div style={{ color: "var(--muted)" }}>
+              Nenhum convite institucional carregado para a organizacao atual.
             </div>
           )}
         </div>
@@ -519,6 +729,12 @@ const secondaryButtonStyle = {
   ...buttonStyle,
   background: "#dbeaf9",
   color: "#0d3b72"
+};
+
+const dangerButtonStyle = {
+  ...buttonStyle,
+  background: "#fbe3e0",
+  color: "#8c2f24"
 };
 
 const membershipCardStyle = {

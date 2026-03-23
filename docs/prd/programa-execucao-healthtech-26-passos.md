@@ -27,6 +27,7 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 4. endurecer autenticacao e autorizacao inicial
 - 5. blindar leitura por recurso e conter IDOR interno
 - 19. agenda clinica inicial
+- 24. multitenancy institucional basico
 
 ### Em progresso forte
 
@@ -47,15 +48,14 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 21. comunicacao
 - 22. integracao farmaceutica
 - 23. analytics
-- 24. multitenancy
 - 25. observabilidade
 - 26. filas, eventos e operacao segura
 
 ### Proximos da fila
 
-- 24. fechar politicas institucionais e lifecycle de memberships
 - 23. fechar analytics clinico-operacional por tenant e cohort
 - 10. fechar versionamento e contratos documentais mais rigidos
+- 12. aprofundar evolucao clinica longitudinal
 
 ## Checklist dos 26 passos
 
@@ -511,7 +511,7 @@ Falta para fechar:
 
 ### 24. Multitenancy
 
-Status: em progresso
+Status: concluido no baseline institucional atual
 
 Ja entregue:
 
@@ -529,11 +529,18 @@ Ja entregue:
   - politica padrao de compartilhamento externo
   - governanca de override clinico
   - travas basicas de branding/layout
+- convites institucionais pendentes com expiracao e revogacao
+- lifecycle de membership com:
+  - ativo
+  - suspenso
+  - removido
+- troca de tenant restrita a memberships ativas
 
 Falta para fechar:
 
-- governanca completa por tenant
-- lifecycle mais rico de memberships e convites
+- aceite automatico de convite no onboarding/login
+- expiracao automatica e limpeza de convites
+- auditoria institucional mais fina por acao de governanca
 
 ## Trilha 7: Escala e governanca
 
@@ -581,15 +588,15 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 24: fechar politicas institucionais e lifecycle de memberships
-2. passo 23: fechar analytics clinico-operacional por tenant e cohort
-3. passo 10: fechar versionamento e contratos documentais mais rigidos
+1. passo 23: fechar analytics clinico-operacional por tenant e cohort
+2. passo 10: fechar versionamento e contratos documentais mais rigidos
+3. passo 12: aprofundar evolucao clinica longitudinal
 
 ### Bloco seguinte
 
 4. aprofundar passo 18 com fonte clinica homologada e graduacao mais fina
-5. aprofundar passo 12 com evolucao clinica longitudinal
-6. ampliar analytics documentais e assistenciais por coorte e desfecho
+5. ampliar analytics documentais e assistenciais por coorte e desfecho
+6. endurecer o restante do lifecycle institucional com aceite e expiracao automatica
 
 ### Bloco posterior
 
