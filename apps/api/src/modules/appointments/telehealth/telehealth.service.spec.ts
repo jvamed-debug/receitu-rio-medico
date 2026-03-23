@@ -47,7 +47,17 @@ test("provisiona sala de teleconsulta e retorna url", async () => {
         })
       }
     } as never,
-    { log: async () => undefined } as never
+    { log: async () => undefined } as never,
+    {
+      provisionRoom: async () => ({
+        provider: "bluecare-meet",
+        roomId: "tele-apt-1",
+        joinUrl: "https://telemed.receituario.local/rooms/tele-apt-1",
+        metadata: {
+          providerMode: "mock"
+        }
+      })
+    } as never
   );
 
   const result = await service.ensureRoom("apt-1", {

@@ -10,6 +10,7 @@ import { PaymentProviderGateway } from "./billing/payment-provider.gateway";
 import { AppointmentRemindersService } from "./reminders/appointment-reminders.service";
 import { ReminderProviderGateway } from "./reminders/reminder-provider.gateway";
 import { AppointmentsService } from "./appointments.service";
+import { TelehealthProviderGateway } from "./telehealth/telehealth-provider.gateway";
 import { TelehealthService } from "./telehealth/telehealth.service";
 
 @Module({
@@ -21,6 +22,7 @@ import { TelehealthService } from "./telehealth/telehealth.service";
     ReminderProviderGateway,
     AppointmentBillingService,
     PaymentProviderGateway,
+    TelehealthProviderGateway,
     TelehealthService
   ],
   exports: [AppointmentsService]

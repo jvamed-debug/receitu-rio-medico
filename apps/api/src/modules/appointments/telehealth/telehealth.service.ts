@@ -1,15 +1,18 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import type { Appointment } from "@receituario/domain";
 
 import { PrismaService } from "../../../persistence/prisma.service";
 import { AuditService } from "../../audit/audit.service";
 import type { AccessPrincipal } from "../../auth/auth.types";
+import { TelehealthProviderGateway } from "./telehealth-provider.gateway";
 
 @Injectable()
 export class TelehealthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly telehealthProviderGateway: TelehealthProviderGateway
   ) {}
 
   async ensureRoom(appointmentId: string, principal: AccessPrincipal) {
@@ -29,16 +32,23 @@ export class TelehealthService {
       throw new NotFoundException("Consulta nao encontrada");
     }
 
-    const roomId = appointment.telehealthRoomId ?? `tele-${appointment.id}`;
+    const telehealthRoom = await this.telehealthProviderGateway.provisionRoom({
+      appointmentId: appointment.id,
+      professionalId: appointment.professionalId,
+      patientId: appointment.patientId,
+      title: appointment.title,
+      appointmentAt: appointment.appointmentAt.toISOString(),
+      durationMinutes: appointment.durationMinutes,
+      existingRoomId: appointment.telehealthRoomId
+    });
+
     const updated = await this.prisma.appointment.update({
       where: { id: appointmentId },
       data: {
         telehealth: true,
-        telehealthProvider: appointment.telehealthProvider ?? "bluecare-meet",
-        telehealthRoomId: roomId,
-        telehealthUrl:
-          appointment.telehealthUrl ??
-          `https://telemed.receituario.local/rooms/${roomId}`
+        telehealthProvider: telehealthRoom.provider,
+        telehealthRoomId: telehealthRoom.roomId,
+        telehealthUrl: telehealthRoom.joinUrl
       },
       include: {
         patient: {
@@ -57,15 +67,20 @@ export class TelehealthService {
       entityId: appointmentId,
       action: "telehealth_room_provisioned",
       origin: "api.telehealth",
-      metadata: {
+      metadata: normalizeJsonRecord({
         telehealthProvider: updated.telehealthProvider,
         telehealthRoomId: updated.telehealthRoomId,
-        telehealthUrl: updated.telehealthUrl
-      }
+        telehealthUrl: updated.telehealthUrl,
+        providerMetadata: normalizeJsonRecord(telehealthRoom.metadata)
+      })
     });
 
     return mapAppointmentRecord(updated);
   }
+}
+
+function normalizeJsonRecord(value: Record<string, unknown>): Prisma.InputJsonObject {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
 }
 
 function mapStatusFromPrisma(status: string): Appointment["status"] {
