@@ -3,17 +3,20 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import type { AppointmentBilling } from "@receituario/domain";
 
 import { PrismaService } from "../../../persistence/prisma.service";
 import { AuditService } from "../../audit/audit.service";
 import type { AccessPrincipal } from "../../auth/auth.types";
+import { PaymentProviderGateway } from "./payment-provider.gateway";
 
 @Injectable()
 export class AppointmentBillingService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly paymentProviderGateway: PaymentProviderGateway
   ) {}
 
   async listByAppointment(appointmentId: string) {
@@ -112,14 +115,11 @@ export class AppointmentBillingService {
 
     const updated = await this.prisma.appointmentBilling.update({
       where: { id: billingId },
-      data: {
-        status: nextStatus,
-        authorizedAt: nextStatus === "AUTHORIZED" ? new Date() : existing.authorizedAt,
-        paidAt: nextStatus === "PAID" ? new Date() : existing.paidAt,
-        externalReference:
-          existing.externalReference ??
-          `${(existing.paymentProvider ?? "manual").toLowerCase()}-${existing.id}`
-      }
+      data: await buildBillingTransitionUpdate(
+        existing,
+        nextStatus,
+        this.paymentProviderGateway
+      )
     });
 
     await this.auditService.log({
@@ -138,6 +138,73 @@ export class AppointmentBillingService {
 
     return mapBillingRecord(updated);
   }
+}
+
+async function buildBillingTransitionUpdate(
+  existing: {
+    id: string;
+    appointmentId: string;
+    amountCents: number;
+    currency: string;
+    description: string;
+    paymentProvider: string | null;
+    externalReference: string | null;
+    authorizedAt: Date | null;
+    metadata: unknown;
+  },
+  nextStatus: "AUTHORIZED" | "PAID",
+  paymentProviderGateway: PaymentProviderGateway
+) {
+  const paymentProvider = existing.paymentProvider ?? "manual";
+
+  if (nextStatus === "AUTHORIZED") {
+    const authorization = await paymentProviderGateway.authorize({
+      billingId: existing.id,
+      appointmentId: existing.appointmentId,
+      amountCents: existing.amountCents,
+      currency: existing.currency,
+      description: existing.description,
+      paymentProvider,
+      existingExternalReference: existing.externalReference
+    });
+
+    return {
+      status: nextStatus,
+      authorizedAt: new Date(authorization.authorizedAt),
+      paidAt: null,
+      externalReference: authorization.externalReference,
+      metadata: normalizeJsonRecord({
+        ...(typeof existing.metadata === "object" && existing.metadata ? existing.metadata : {}),
+        authorizationProvider: paymentProvider,
+        authorizationMetadata: normalizeJsonRecord(authorization.providerMetadata)
+      })
+    };
+  }
+
+  const capture = await paymentProviderGateway.capture({
+    billingId: existing.id,
+    appointmentId: existing.appointmentId,
+    externalReference: existing.externalReference,
+    amountCents: existing.amountCents,
+    currency: existing.currency,
+    paymentProvider
+  });
+
+  return {
+    status: nextStatus,
+    authorizedAt: existing.authorizedAt ?? new Date(),
+    paidAt: new Date(capture.paidAt),
+    externalReference: capture.externalReference,
+    metadata: normalizeJsonRecord({
+      ...(typeof existing.metadata === "object" && existing.metadata ? existing.metadata : {}),
+      captureProvider: paymentProvider,
+      captureMetadata: normalizeJsonRecord(capture.providerMetadata)
+    })
+  };
+}
+
+function normalizeJsonRecord(value: Record<string, unknown>): Prisma.InputJsonObject {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
 }
 
 function mapBillingRecord(entry: {

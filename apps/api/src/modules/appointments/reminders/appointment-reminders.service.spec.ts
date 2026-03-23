@@ -40,7 +40,8 @@ test("agenda lembrete por email usando contato do paciente", async () => {
         }
       }
     } as never,
-    { log: async () => undefined } as never
+    { log: async () => undefined } as never,
+    { dispatch: async () => undefined } as never
   );
 
   const result = await service.scheduleReminder(
@@ -73,6 +74,8 @@ test("dispara lembrete e marca como enviado", async () => {
           appointmentId: "apt-1",
           channel: "whatsapp",
           target: "+5511999999999",
+          scheduledFor: new Date("2026-03-25T13:00:00.000Z"),
+          message: "Lembrete",
           metadata: {}
         }),
         update: async ({ data }: { data: Record<string, unknown> }) => {
@@ -92,7 +95,16 @@ test("dispara lembrete e marca como enviado", async () => {
         }
       }
     } as never,
-    { log: async () => undefined } as never
+    { log: async () => undefined } as never,
+    {
+      dispatch: async () => ({
+        providerReference: "provider-rem-1",
+        deliveredAt: "2026-03-25T13:01:00.000Z",
+        providerMetadata: {
+          providerMode: "mock"
+        }
+      })
+    } as never
   );
 
   const result = await service.dispatchReminder("apt-1", "rem-1", {

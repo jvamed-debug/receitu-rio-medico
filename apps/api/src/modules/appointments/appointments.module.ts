@@ -6,7 +6,9 @@ import { AccessModule } from "../access/access.module";
 import { AuthModule } from "../auth/auth.module";
 import { AppointmentsController } from "./appointments.controller";
 import { AppointmentBillingService } from "./billing/appointment-billing.service";
+import { PaymentProviderGateway } from "./billing/payment-provider.gateway";
 import { AppointmentRemindersService } from "./reminders/appointment-reminders.service";
+import { ReminderProviderGateway } from "./reminders/reminder-provider.gateway";
 import { AppointmentsService } from "./appointments.service";
 import { TelehealthService } from "./telehealth/telehealth.service";
 
@@ -16,7 +18,9 @@ import { TelehealthService } from "./telehealth/telehealth.service";
   providers: [
     AppointmentsService,
     AppointmentRemindersService,
+    ReminderProviderGateway,
     AppointmentBillingService,
+    PaymentProviderGateway,
     TelehealthService
   ],
   exports: [AppointmentsService]

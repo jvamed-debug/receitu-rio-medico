@@ -3,17 +3,20 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import type { AppointmentReminder, Appointment } from "@receituario/domain";
 
 import { PrismaService } from "../../../persistence/prisma.service";
 import { AuditService } from "../../audit/audit.service";
 import type { AccessPrincipal } from "../../auth/auth.types";
+import { ReminderProviderGateway } from "./reminder-provider.gateway";
 
 @Injectable()
 export class AppointmentRemindersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly reminderProviderGateway: ReminderProviderGateway
   ) {}
 
   async listByAppointment(appointmentId: string) {
@@ -115,15 +118,11 @@ export class AppointmentRemindersService {
 
     const sentReminder = await this.prisma.appointmentReminder.update({
       where: { id: reminderId },
-      data: {
-        status: "SENT",
-        sentAt: new Date(),
-        metadata: {
-          ...(typeof reminder.metadata === "object" && reminder.metadata ? reminder.metadata : {}),
-          dispatchedByProfessionalId: principal.professionalId,
-          dispatchMode: "mock-transactional"
-        }
-      }
+      data: await buildReminderDispatchUpdate(
+        reminder,
+        principal,
+        this.reminderProviderGateway
+      )
     });
 
     await this.auditService.log({
@@ -142,6 +141,49 @@ export class AppointmentRemindersService {
 
     return mapReminderRecord(sentReminder);
   }
+}
+
+async function buildReminderDispatchUpdate(
+  reminder: {
+    id: string;
+    appointmentId: string;
+    channel: string;
+    target: string | null;
+    scheduledFor?: Date;
+    message?: string;
+    metadata?: unknown;
+  },
+  principal: AccessPrincipal,
+  reminderProviderGateway: ReminderProviderGateway
+) {
+  if (!reminder.target || !reminder.message || !reminder.scheduledFor) {
+    throw new BadRequestException("Lembrete sem dados suficientes para envio");
+  }
+
+  const dispatch = await reminderProviderGateway.dispatch({
+    reminderId: reminder.id,
+    appointmentId: reminder.appointmentId,
+    channel: reminder.channel as "email" | "sms" | "whatsapp",
+    target: reminder.target,
+    message: reminder.message,
+    scheduledFor: reminder.scheduledFor.toISOString()
+  });
+
+  return {
+    status: "SENT" as const,
+    sentAt: new Date(dispatch.deliveredAt),
+    metadata: normalizeJsonRecord({
+      ...(typeof reminder.metadata === "object" && reminder.metadata ? reminder.metadata : {}),
+      dispatchedByProfessionalId: principal.professionalId,
+      dispatchMode: "provider",
+      providerReference: dispatch.providerReference,
+      providerMetadata: normalizeJsonRecord(dispatch.providerMetadata)
+    })
+  };
+}
+
+function normalizeJsonRecord(value: Record<string, unknown>): Prisma.InputJsonObject {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
 }
 
 function resolveReminderTarget(

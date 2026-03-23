@@ -23,7 +23,11 @@ test("cria cobranca inicial para consulta", async () => {
         })
       }
     } as never,
-    { log: async () => undefined } as never
+    { log: async () => undefined } as never,
+    {
+      authorize: async () => undefined,
+      capture: async () => undefined
+    } as never
   );
 
   const result = await service.createEntry(
@@ -52,8 +56,12 @@ test("marca cobranca como paga e gera referencia externa", async () => {
           id: "bill-1",
           appointmentId: "apt-1",
           status: "AUTHORIZED",
+          amountCents: 18000,
+          currency: "BRL",
+          description: "Consulta particular",
           paymentProvider: "manual",
           externalReference: null,
+          metadata: {},
           authorizedAt: new Date("2026-03-22T18:00:00.000Z"),
           paidAt: null
         }),
@@ -73,7 +81,19 @@ test("marca cobranca como paga e gera referencia externa", async () => {
         })
       }
     } as never,
-    { log: async () => undefined } as never
+    { log: async () => undefined } as never,
+    {
+      authorize: async () => ({
+        externalReference: "manual-bill-1",
+        authorizedAt: "2026-03-22T18:00:00.000Z",
+        providerMetadata: { providerMode: "mock" }
+      }),
+      capture: async () => ({
+        externalReference: "manual-bill-1",
+        paidAt: "2026-03-22T18:15:00.000Z",
+        providerMetadata: { providerMode: "mock" }
+      })
+    } as never
   );
 
   const result = await service.payEntry(
