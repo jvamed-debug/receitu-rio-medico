@@ -25,9 +25,11 @@ export interface ClinicalDocumentBase {
   issuedAt?: string;
   derivedFromDocumentId?: string;
   layoutVersion: string;
+  payloadVersion: string;
   payloadHash?: string;
   pdfArtifactId?: string;
-  schemaVersion?: string;
+  schemaVersion: string;
+  contractVersion: string;
   context?: ClinicalDocumentContext;
   cdsSummary?: ClinicalDecisionSupportSummary;
   cdsOverride?: ClinicalDecisionSupportOverride;

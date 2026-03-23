@@ -351,6 +351,9 @@ export interface DocumentPdfPreview {
   documentType: string;
   documentStatus: string;
   layoutVersion: string;
+  payloadVersion: string;
+  schemaVersion: string;
+  contractVersion: string;
   payloadHash?: string | null;
   issuedAt?: string | null;
   previewMode: "artifact" | "draft";

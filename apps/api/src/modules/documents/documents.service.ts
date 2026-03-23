@@ -15,6 +15,7 @@ import { CdsService } from "../cds/cds.service";
 import { ComplianceService } from "../compliance/compliance.service";
 import {
   buildDocumentPayload,
+  getDocumentLayoutVersion,
   toDomainDocument,
   toPrismaDocumentStatus,
   toPrismaDocumentType
@@ -29,45 +30,25 @@ export class DocumentsService {
   ) {}
 
   async createPrescription(
-    input: CreateDocumentInput<
-      Omit<
-        PrescriptionDocument,
-        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
-      >
-    >
+    input: CreateDocumentInput<DocumentCreateShape<PrescriptionDocument>>
   ) {
     return this.createDocument("prescription", input);
   }
 
   async createExamRequest(
-    input: CreateDocumentInput<
-      Omit<
-        ExamRequestDocument,
-        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
-      >
-    >
+    input: CreateDocumentInput<DocumentCreateShape<ExamRequestDocument>>
   ) {
     return this.createDocument("exam-request", input);
   }
 
   async createMedicalCertificate(
-    input: CreateDocumentInput<
-      Omit<
-        MedicalCertificateDocument,
-        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
-      >
-    >
+    input: CreateDocumentInput<DocumentCreateShape<MedicalCertificateDocument>>
   ) {
     return this.createDocument("medical-certificate", input);
   }
 
   async createFreeDocument(
-    input: CreateDocumentInput<
-      Omit<
-        FreeDocument,
-        "id" | "type" | "status" | "createdAt" | "updatedAt" | "layoutVersion"
-      >
-    >
+    input: CreateDocumentInput<DocumentCreateShape<FreeDocument>>
   ) {
     return this.createDocument("free-document", input);
   }
@@ -95,6 +76,8 @@ export class DocumentsService {
     }
 
     const payload = (document.payload as Record<string, unknown> | null) ?? {};
+    const domainDocument = toDomainDocument(document);
+    const previewContent = readPreviewContent(payload);
 
     return {
       documentId: document.id,
@@ -102,6 +85,9 @@ export class DocumentsService {
       documentType: document.type,
       documentStatus: document.status,
       layoutVersion: document.layoutVersion,
+      payloadVersion: domainDocument.payloadVersion,
+      schemaVersion: domainDocument.schemaVersion,
+      contractVersion: domainDocument.contractVersion,
       payloadHash: document.payloadHash ?? null,
       issuedAt: document.issuedAt?.toISOString() ?? null,
       previewMode: document.pdfArtifact ? "artifact" : "draft",
@@ -117,7 +103,7 @@ export class DocumentsService {
       previewUrl: document.pdfArtifact
         ? `/artifacts/${document.pdfArtifact.storageKey}`
         : null,
-      sections: buildPreviewSections(document.type, payload)
+      sections: buildPreviewSections(document.type, previewContent)
     };
   }
 
@@ -397,7 +383,7 @@ export class DocumentsService {
         authorProfessionalId: String(enrichedInput.authorProfessionalId),
         title: String(enrichedInput.title),
         payload,
-        layoutVersion: "v1",
+        layoutVersion: getDocumentLayoutVersion(type),
         payloadHash: createHash("sha256").update(JSON.stringify(payload)).digest("hex")
       }
     });
@@ -792,7 +778,27 @@ function buildPreviewSections(type: DocumentType, payload: Record<string, unknow
   }
 }
 
+function readPreviewContent(payload: Record<string, unknown>) {
+  const nextContent = payload._content;
+  return nextContent && typeof nextContent === "object"
+    ? (nextContent as Record<string, unknown>)
+    : payload;
+}
+
 type CreateDocumentInput<T extends Record<string, unknown>> = T & {
   organizationId?: string;
   requesterRoles?: string[];
 };
+
+type DocumentCreateShape<T extends ClinicalDocument> = Omit<
+  T,
+  | "id"
+  | "type"
+  | "status"
+  | "createdAt"
+  | "updatedAt"
+  | "layoutVersion"
+  | "payloadVersion"
+  | "schemaVersion"
+  | "contractVersion"
+>;

@@ -188,10 +188,15 @@ test("reconhece override institucional quando autor tem papel privilegiado", asy
 });
 
 test("persiste contrato especifico de solicitacao de exames", async () => {
+  let persistedPayload: Record<string, unknown> | undefined;
+
   const service = new DocumentsService(
     {
       clinicalDocument: {
-        create: async ({ data }: { data: Record<string, unknown> }) => ({
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          persistedPayload = data.payload as Record<string, unknown>;
+
+          return {
           id: "doc-exam-1",
           type: DocumentType.EXAM_REQUEST,
           status: DocumentStatus.READY_FOR_REVIEW,
@@ -205,7 +210,8 @@ test("persiste contrato especifico de solicitacao de exames", async () => {
           derivedFromDocumentId: null,
           createdAt: new Date("2026-03-23T12:00:00.000Z"),
           updatedAt: new Date("2026-03-23T12:00:00.000Z")
-        })
+          };
+        }
       }
     } as never,
     {
@@ -235,6 +241,19 @@ test("persiste contrato especifico de solicitacao de exames", async () => {
   assert.equal(result.type, "exam-request");
   assert.equal(result.indication, "Seguimento de sindrome inflamatoria.");
   assert.equal(result.priority, "urgent");
+  assert.equal(
+    (persistedPayload?._meta as { payloadVersion?: string } | undefined)?.payloadVersion,
+    "exam-request.payload.v2"
+  );
+  assert.equal(
+    (persistedPayload?._meta as { layoutVersion?: string } | undefined)?.layoutVersion,
+    "exam-request.layout.v2"
+  );
+  assert.equal(
+    ((persistedPayload?._content as { requestedExams?: string[] } | undefined)?.requestedExams ?? [])
+      .length,
+    2
+  );
 });
 
 test("persiste contrato especifico de atestado e documento livre", async () => {
@@ -378,4 +397,56 @@ test("consolida analytics documentais por tipo e status", async () => {
   assert.equal(analytics.organizations[0]?.issued, 2);
   assert.equal(analytics.cohorts[0]?.cohort, "2026-03");
   assert.equal(analytics.cohorts[0]?.delivered, 1);
+});
+
+test("gera preview com versoes documentais e conteudo tipado", async () => {
+  const service = new DocumentsService(
+    {
+      clinicalDocument: {
+        findUnique: async () => ({
+          id: "doc-preview-1",
+          title: "Prescricao com metadata",
+          type: DocumentType.PRESCRIPTION,
+          status: DocumentStatus.ISSUED,
+          patientId: "patient-1",
+          authorProfessionalId: "prof-1",
+          layoutVersion: "prescription.layout.v2",
+          payloadHash: "hash-preview",
+          issuedAt: new Date("2026-03-23T14:00:00.000Z"),
+          derivedFromDocumentId: null,
+          createdAt: new Date("2026-03-23T13:55:00.000Z"),
+          updatedAt: new Date("2026-03-23T14:00:00.000Z"),
+          payload: {
+            _meta: {
+              schemaVersion: "2026.03",
+              contractVersion: "document-contract.2026-03",
+              payloadVersion: "prescription.payload.v2",
+              layoutVersion: "prescription.layout.v2"
+            },
+            _content: {
+              treatmentIntent: "continuous",
+              items: [
+                {
+                  medicationName: "Metformina",
+                  dosage: "500mg",
+                  frequency: "12/12h"
+                }
+              ]
+            }
+          },
+          pdfArtifact: null
+        })
+      }
+    } as never,
+    {} as never,
+    {} as never
+  );
+
+  const preview = await service.getPdfPreview("doc-preview-1");
+
+  assert.equal(preview.layoutVersion, "prescription.layout.v2");
+  assert.equal(preview.payloadVersion, "prescription.payload.v2");
+  assert.equal(preview.schemaVersion, "2026.03");
+  assert.equal(preview.contractVersion, "document-contract.2026-03");
+  assert.equal(preview.sections[1]?.lines[0], "Metformina | 500mg | frequencia: 12/12h");
 });

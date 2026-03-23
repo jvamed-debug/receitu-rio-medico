@@ -33,6 +33,9 @@ export default async function PdfPreviewPage({
             <div>Documento: {document?.title ?? "nenhum selecionado"}</div>
             <div>Status: {document?.status ?? "aguardando selecao"}</div>
             <div>Layout: {preview?.layoutVersion ?? "nao gerado"}</div>
+            <div>Payload: {preview?.payloadVersion ?? "nao gerado"}</div>
+            <div>Schema: {preview?.schemaVersion ?? "nao gerado"}</div>
+            <div>Contrato: {preview?.contractVersion ?? "nao gerado"}</div>
             <div>Modo do preview: {preview?.previewMode ?? "pendente"}</div>
             <div>Artefato: {preview?.artifact?.storageKey ?? "ainda nao emitido"}</div>
             <div>Hash: {preview?.payloadHash ?? "ainda nao calculado"}</div>

@@ -29,6 +29,7 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 19. agenda clinica inicial
 - 24. multitenancy institucional basico
 - 23. analytics clinico-operacional baseline
+- 10. contratos documentais tipados e versionados
 
 ### Em progresso forte
 
@@ -36,7 +37,6 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 7. fechar matriz regulatoria por tipo documental
 - 8. fortalecer LGPD operacional
 - 9. evoluir o modelo de dados
-- 10. tipar melhor os documentos
 - 11. criar engine de templates seria
 - 12. melhorar prontuario
 - 13. integrar provedor real ICP-Brasil
@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 10. fechar versionamento e contratos documentais mais rigidos
 - 12. aprofundar evolucao clinica longitudinal
 - 18. ampliar graduacao institucional do CDS
+- 11. endurecer lifecycle institucional de templates
 
 ## Checklist dos 26 passos
 
@@ -201,26 +201,34 @@ Falta para fechar:
 
 ### 10. Tipar melhor os documentos
 
-Status: em progresso
+Status: concluido no baseline atual
 
 Ja entregue:
 
 - `schemaVersion` no contrato de dominio
+- `payloadVersion` e `contractVersion` no contrato de dominio
 - `context` clinico opcional por documento
 - `cdsSummary` no contrato documental
 - schemas de criacao com `context`
 - payload versionado com metadados reservados
+- metadados formais em `_meta` com:
+  - `schemaVersion`
+  - `contractVersion`
+  - `payloadVersion`
+  - `layoutVersion`
+  - `type`
+- conteudo tipado em `_content` com leitura retrocompativel para payloads legados
 - campos especificos por tipo documental:
   - prescricao com `treatmentIntent` e `followUpInstructions`
   - exames com `indication` e `priority`
   - atestado com `certificateKind`, `workRestrictionNotes` e `fitToReturnDate`
   - documento livre com `documentKind`, `audience` e `closingStatement`
+- preview PDF expondo versoes de layout, payload, schema e contrato
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- evolucao de versionamento por layout/payload
-- menor dependencia de chaves genericas internas
-- reduzir variacao livre demais em payloads clinicos complexos
+- versionamento visual ainda mais fino por tenant/branding
+- schemas clinicos mais fechados para casos de alta complexidade
 
 ### 11. Criar engine de templates seria
 

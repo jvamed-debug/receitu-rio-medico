@@ -17,6 +17,23 @@ import {
   type ClinicalDocument as PrismaClinicalDocument
 } from "@prisma/client";
 
+const DOCUMENT_SCHEMA_VERSION = "2026.03";
+const DOCUMENT_CONTRACT_VERSION = "document-contract.2026-03";
+
+const payloadVersionByType: Record<ClinicalDocumentType, string> = {
+  prescription: "prescription.payload.v2",
+  "exam-request": "exam-request.payload.v2",
+  "medical-certificate": "medical-certificate.payload.v2",
+  "free-document": "free-document.payload.v2"
+};
+
+const layoutVersionByType: Record<ClinicalDocumentType, string> = {
+  prescription: "prescription.layout.v2",
+  "exam-request": "exam-request.layout.v2",
+  "medical-certificate": "medical-certificate.layout.v2",
+  "free-document": "free-document.layout.v2"
+};
+
 const typeFromDomain: Record<ClinicalDocumentType, DocumentType> = {
   prescription: DocumentType.PRESCRIPTION,
   "exam-request": DocumentType.EXAM_REQUEST,
@@ -60,6 +77,8 @@ export function toPrismaDocumentStatus(status: ClinicalDocumentStatus) {
 }
 
 export function toDomainDocument(document: PrismaClinicalDocument): ClinicalDocument {
+  const payload = document.payload as Record<string, unknown> | null;
+  const content = readDocumentContent(payload);
   const base = {
     id: document.id,
     type: typeToDomain[document.type],
@@ -68,60 +87,60 @@ export function toDomainDocument(document: PrismaClinicalDocument): ClinicalDocu
     authorProfessionalId: document.authorProfessionalId,
     title: document.title,
     layoutVersion: document.layoutVersion,
+    payloadVersion: readPayloadVersion(payload, typeToDomain[document.type]),
     payloadHash: document.payloadHash ?? undefined,
-    schemaVersion: readSchemaVersion(document.payload),
-    context: readClinicalContext(document.payload),
-    cdsSummary: readCdsSummary(document.payload),
-    cdsOverride: readCdsOverride(document.payload),
+    schemaVersion: readSchemaVersion(payload),
+    contractVersion: readContractVersion(payload),
+    context: readClinicalContext(payload),
+    cdsSummary: readCdsSummary(payload),
+    cdsOverride: readCdsOverride(payload),
     issuedAt: document.issuedAt?.toISOString(),
     derivedFromDocumentId: document.derivedFromDocumentId ?? undefined,
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString()
   };
 
-  const payload = document.payload as Record<string, unknown> | null;
-
   switch (document.type) {
     case DocumentType.PRESCRIPTION:
       return {
         ...base,
         type: "prescription",
-        items: ((payload?.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
+        items: ((content.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
           ...item
         })),
-        treatmentIntent: payload?.treatmentIntent as PrescriptionDocument["treatmentIntent"] | undefined,
-        followUpInstructions: payload?.followUpInstructions as string | undefined
+        treatmentIntent: content.treatmentIntent as PrescriptionDocument["treatmentIntent"] | undefined,
+        followUpInstructions: content.followUpInstructions as string | undefined
       };
     case DocumentType.EXAM_REQUEST:
       return {
         ...base,
         type: "exam-request",
-        requestedExams: (payload?.requestedExams as string[] | undefined) ?? [],
-        preparationNotes: payload?.preparationNotes as string | undefined,
-        indication: payload?.indication as string | undefined,
-        priority: payload?.priority as ExamRequestDocument["priority"] | undefined
+        requestedExams: (content.requestedExams as string[] | undefined) ?? [],
+        preparationNotes: content.preparationNotes as string | undefined,
+        indication: content.indication as string | undefined,
+        priority: content.priority as ExamRequestDocument["priority"] | undefined
       };
     case DocumentType.MEDICAL_CERTIFICATE:
       return {
         ...base,
         type: "medical-certificate",
-        purpose: String(payload?.purpose ?? ""),
-        restDays: payload?.restDays as number | undefined,
-        observations: payload?.observations as string | undefined,
+        purpose: String(content.purpose ?? ""),
+        restDays: content.restDays as number | undefined,
+        observations: content.observations as string | undefined,
         certificateKind:
-          payload?.certificateKind as MedicalCertificateDocument["certificateKind"] | undefined,
-        workRestrictionNotes: payload?.workRestrictionNotes as string | undefined,
-        fitToReturnDate: payload?.fitToReturnDate as string | undefined
+          content.certificateKind as MedicalCertificateDocument["certificateKind"] | undefined,
+        workRestrictionNotes: content.workRestrictionNotes as string | undefined,
+        fitToReturnDate: content.fitToReturnDate as string | undefined
       };
     case DocumentType.FREE_DOCUMENT:
     default:
       return {
         ...base,
         type: "free-document",
-        body: String(payload?.body ?? ""),
-        documentKind: payload?.documentKind as FreeDocument["documentKind"] | undefined,
-        audience: payload?.audience as FreeDocument["audience"] | undefined,
-        closingStatement: payload?.closingStatement as string | undefined
+        body: String(content.body ?? ""),
+        documentKind: content.documentKind as FreeDocument["documentKind"] | undefined,
+        audience: content.audience as FreeDocument["audience"] | undefined,
+        closingStatement: content.closingStatement as string | undefined
       };
   }
 }
@@ -131,7 +150,14 @@ export function buildDocumentPayload(
   input: Record<string, unknown>
 ): Prisma.InputJsonObject {
   const baseMetadata = {
-    _schemaVersion: "2026.03",
+    _meta: {
+      schemaVersion: DOCUMENT_SCHEMA_VERSION,
+      contractVersion: DOCUMENT_CONTRACT_VERSION,
+      payloadVersion: payloadVersionByType[type],
+      layoutVersion: layoutVersionByType[type],
+      type
+    },
+    _schemaVersion: DOCUMENT_SCHEMA_VERSION,
     _context: normalizeContext(input.context)
   };
 
@@ -141,58 +167,86 @@ export function buildDocumentPayload(
         ...baseMetadata,
         _cds: normalizeCdsSummary(input.cdsSummary),
         _cdsOverride: normalizeCdsOverride(input.cdsOverride),
-        treatmentIntent: (input.treatmentIntent as PrescriptionDocument["treatmentIntent"] | undefined) ?? null,
-        followUpInstructions: (input.followUpInstructions as string | undefined) ?? null,
-        items: ((input.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
-          id: item.id ?? null,
-          medicationName: item.medicationName,
-          activeIngredient: item.activeIngredient ?? null,
-          dosage: item.dosage,
-          route: item.route ?? null,
-          frequency: item.frequency ?? null,
-          duration: item.duration ?? null,
-          quantity: item.quantity ?? null,
-          notes: item.notes ?? null
-        }))
+        _content: {
+          treatmentIntent:
+            (input.treatmentIntent as PrescriptionDocument["treatmentIntent"] | undefined) ?? null,
+          followUpInstructions: (input.followUpInstructions as string | undefined) ?? null,
+          items: ((input.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
+            id: item.id ?? null,
+            medicationName: item.medicationName,
+            activeIngredient: item.activeIngredient ?? null,
+            dosage: item.dosage,
+            route: item.route ?? null,
+            frequency: item.frequency ?? null,
+            duration: item.duration ?? null,
+            quantity: item.quantity ?? null,
+            notes: item.notes ?? null
+          }))
+        }
       };
     case "exam-request":
       return {
         ...baseMetadata,
-        requestedExams: ((input.requestedExams as string[] | undefined) ?? []).map(String),
-        preparationNotes: (input.preparationNotes as string | undefined) ?? null,
-        indication: (input.indication as string | undefined) ?? null,
-        priority: (input.priority as ExamRequestDocument["priority"] | undefined) ?? null
+        _content: {
+          requestedExams: ((input.requestedExams as string[] | undefined) ?? []).map(String),
+          preparationNotes: (input.preparationNotes as string | undefined) ?? null,
+          indication: (input.indication as string | undefined) ?? null,
+          priority: (input.priority as ExamRequestDocument["priority"] | undefined) ?? null
+        }
       };
     case "medical-certificate":
       return {
         ...baseMetadata,
-        purpose: String(input.purpose ?? ""),
-        restDays: (input.restDays as number | undefined) ?? null,
-        observations: (input.observations as string | undefined) ?? null,
-        certificateKind:
-          (input.certificateKind as MedicalCertificateDocument["certificateKind"] | undefined) ??
-          null,
-        workRestrictionNotes: (input.workRestrictionNotes as string | undefined) ?? null,
-        fitToReturnDate: (input.fitToReturnDate as string | undefined) ?? null
+        _content: {
+          purpose: String(input.purpose ?? ""),
+          restDays: (input.restDays as number | undefined) ?? null,
+          observations: (input.observations as string | undefined) ?? null,
+          certificateKind:
+            (input.certificateKind as MedicalCertificateDocument["certificateKind"] | undefined) ??
+            null,
+          workRestrictionNotes: (input.workRestrictionNotes as string | undefined) ?? null,
+          fitToReturnDate: (input.fitToReturnDate as string | undefined) ?? null
+        }
       };
     case "free-document":
       return {
         ...baseMetadata,
-        body: String(input.body ?? ""),
-        documentKind: (input.documentKind as FreeDocument["documentKind"] | undefined) ?? null,
-        audience: (input.audience as FreeDocument["audience"] | undefined) ?? null,
-        closingStatement: (input.closingStatement as string | undefined) ?? null
+        _content: {
+          body: String(input.body ?? ""),
+          documentKind: (input.documentKind as FreeDocument["documentKind"] | undefined) ?? null,
+          audience: (input.audience as FreeDocument["audience"] | undefined) ?? null,
+          closingStatement: (input.closingStatement as string | undefined) ?? null
+        }
       };
   }
 }
 
 function readSchemaVersion(payload: unknown) {
+  const metadata = readPayloadMetadata(payload);
+  if (typeof metadata.schemaVersion === "string") {
+    return metadata.schemaVersion;
+  }
+
   if (!payload || typeof payload !== "object") {
-    return undefined;
+    return DOCUMENT_SCHEMA_VERSION;
   }
 
   const value = (payload as { _schemaVersion?: unknown })._schemaVersion;
-  return typeof value === "string" ? value : undefined;
+  return typeof value === "string" ? value : DOCUMENT_SCHEMA_VERSION;
+}
+
+function readContractVersion(payload: unknown) {
+  const metadata = readPayloadMetadata(payload);
+  return typeof metadata.contractVersion === "string"
+    ? metadata.contractVersion
+    : DOCUMENT_CONTRACT_VERSION;
+}
+
+function readPayloadVersion(payload: unknown, type: ClinicalDocumentType) {
+  const metadata = readPayloadMetadata(payload);
+  return typeof metadata.payloadVersion === "string"
+    ? metadata.payloadVersion
+    : payloadVersionByType[type];
 }
 
 function readClinicalContext(payload: unknown): ClinicalDocumentContext | undefined {
@@ -232,6 +286,34 @@ function readCdsOverride(payload: unknown): ClinicalDecisionSupportOverride | un
   }
 
   return summary as ClinicalDecisionSupportOverride;
+}
+
+function readPayloadMetadata(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+
+  const metadata = (payload as { _meta?: unknown })._meta;
+  return metadata && typeof metadata === "object"
+    ? (metadata as Record<string, unknown>)
+    : {};
+}
+
+function readDocumentContent(payload: Record<string, unknown> | null) {
+  if (!payload) {
+    return {};
+  }
+
+  const nextContent = payload._content;
+  if (nextContent && typeof nextContent === "object") {
+    return nextContent as Record<string, unknown>;
+  }
+
+  return payload;
+}
+
+export function getDocumentLayoutVersion(type: ClinicalDocumentType) {
+  return layoutVersionByType[type];
 }
 
 function normalizeContext(input: unknown) {
