@@ -15,6 +15,9 @@ export class CdsService {
   async analyzePrescription(input: {
     patientId: string;
     items: PrescriptionItem[];
+    context?: {
+      specialty?: string;
+    };
   }): Promise<ClinicalDecisionSupportSummary> {
     const patient = await this.prisma.patient.findUnique({
       where: { id: input.patientId },
@@ -27,7 +30,9 @@ export class CdsService {
     const alerts = [
       ...buildAllergyAlerts(profile, input.items),
       ...buildDuplicateTherapyAlerts(profile, input.items),
-      ...buildConditionAlerts(profile, input.items)
+      ...buildConditionAlerts(profile, input.items),
+      ...buildMedicationInteractionAlerts(input.items),
+      ...buildSpecialtyAlerts(input.items, input.context?.specialty)
     ];
 
     return {
@@ -197,6 +202,161 @@ function buildConditionAlerts(
       ];
     });
   });
+}
+
+function buildMedicationInteractionAlerts(
+  items: PrescriptionItem[]
+): ClinicalDecisionSupportAlert[] {
+  const itemPairs = buildItemPairs(items);
+  const interactionRules = [
+    {
+      code: "interaction_warfarin_nsaid",
+      medications: ["warfarina", "ibuprofeno", "diclofenaco", "cetoprofeno", "naproxeno"],
+      required: ["warfarina", "ibuprofeno|diclofenaco|cetoprofeno|naproxeno"],
+      severity: "high" as const,
+      message:
+        "Associacao entre anticoagulante oral e AINE pode elevar risco importante de sangramento.",
+      requiresOverrideJustification: true
+    },
+    {
+      code: "interaction_serotonergic_tramadol",
+      medications: ["sertralina", "fluoxetina", "escitalopram", "tramadol"],
+      required: ["sertralina|fluoxetina|escitalopram", "tramadol"],
+      severity: "high" as const,
+      message:
+        "Associacao serotonergica com tramadol demanda revisao devido a risco de eventos adversos graves.",
+      requiresOverrideJustification: true
+    },
+    {
+      code: "interaction_nitrate_sildenafil",
+      medications: ["sildenafil", "tadalafila", "nitrato", "isosorbida", "nitroglicerina"],
+      required: ["sildenafil|tadalafila", "nitrato|isosorbida|nitroglicerina"],
+      severity: "high" as const,
+      message:
+        "Associacao entre nitratos e inibidor de PDE5 pode causar hipotensao importante.",
+      requiresOverrideJustification: true
+    }
+  ];
+
+  return interactionRules.flatMap((rule) => {
+    const matchedPair = itemPairs.find((pair) =>
+      rule.required.every((group) =>
+        group.split("|").some((term) => pair.normalizedNames.some((name) => name.includes(term)))
+      )
+    );
+
+    if (!matchedPair) {
+      return [];
+    }
+
+    return [
+      {
+        code: rule.code,
+        severity: rule.severity,
+        category: "interaction",
+        message: `${rule.message} Itens envolvidos: ${matchedPair.displayNames.join(" + ")}.`,
+        requiresOverrideJustification: rule.requiresOverrideJustification
+      }
+    ];
+  });
+}
+
+function buildSpecialtyAlerts(
+  items: PrescriptionItem[],
+  specialty?: string
+): ClinicalDecisionSupportAlert[] {
+  const normalizedSpecialty = specialty?.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+  if (!normalizedSpecialty) {
+    return [];
+  }
+
+  const rules = [
+    {
+      matches: ["pediatria", "pediatrica"],
+      itemMatches: ["ciprofloxacino", "levofloxacino", "tetraciclina", "doxiciclina"],
+      code: "specialty_pediatrics_restricted_antibiotic",
+      severity: "high" as const,
+      requiresOverrideJustification: true,
+      message: (medicationName: string) =>
+        `${medicationName} exige cautela reforcada em contexto pediatrico e validacao da indicacao.`
+    },
+    {
+      matches: ["geriatria", "clinica medica"],
+      itemMatches: ["clonazepam", "diazepam", "alprazolam"],
+      code: "specialty_geriatric_sedative",
+      severity: "moderate" as const,
+      requiresOverrideJustification: true,
+      message: (medicationName: string) =>
+        `${medicationName} demanda avaliacao de risco de sedacao e quedas em pacientes fragilizados.`
+    },
+    {
+      matches: ["cardiologia"],
+      itemMatches: ["diclofenaco", "cetoprofeno", "ibuprofeno"],
+      code: "specialty_cardiology_nsaid_caution",
+      severity: "moderate" as const,
+      requiresOverrideJustification: false,
+      message: (medicationName: string) =>
+        `${medicationName} merece cautela adicional em seguimento cardiovascular.`
+    }
+  ];
+
+  return items.flatMap((item) => {
+    const medicationName = item.medicationName.toLowerCase();
+    const activeIngredient = item.activeIngredient?.toLowerCase() ?? "";
+
+    return rules.flatMap((rule) => {
+      if (!rule.matches.some((match) => normalizedSpecialty.includes(match))) {
+        return [];
+      }
+
+      const medicationMatched = rule.itemMatches.some(
+        (term) => medicationName.includes(term) || activeIngredient.includes(term)
+      );
+
+      if (!medicationMatched) {
+        return [];
+      }
+
+      return [
+        {
+          code: rule.code,
+          severity: rule.severity,
+          category: "interaction",
+          message: rule.message(item.medicationName),
+          requiresOverrideJustification: rule.requiresOverrideJustification
+        }
+      ];
+    });
+  });
+}
+
+function buildItemPairs(items: PrescriptionItem[]) {
+  const normalizedItems = items.map((item) => ({
+    displayName: item.medicationName,
+    normalizedName: `${item.medicationName} ${item.activeIngredient ?? ""}`.toLowerCase()
+  }));
+  const pairs: Array<{
+    displayNames: [string, string];
+    normalizedNames: [string, string];
+  }> = [];
+
+  for (let index = 0; index < normalizedItems.length; index += 1) {
+    for (let inner = index + 1; inner < normalizedItems.length; inner += 1) {
+      pairs.push({
+        displayNames: [
+          normalizedItems[index]!.displayName,
+          normalizedItems[inner]!.displayName
+        ],
+        normalizedNames: [
+          normalizedItems[index]!.normalizedName,
+          normalizedItems[inner]!.normalizedName
+        ]
+      });
+    }
+  }
+
+  return pairs;
 }
 
 function resolveSeverity(alerts: ClinicalDecisionSupportAlert[]): ClinicalDecisionSupportSummary["severity"] {

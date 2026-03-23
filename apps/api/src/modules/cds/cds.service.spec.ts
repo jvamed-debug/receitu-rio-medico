@@ -41,3 +41,50 @@ test("detecta alergia e duplicidade terapeutica na prescricao", async () => {
   assert.equal(result.alerts[2]?.category, "condition");
   assert.equal(result.alerts[2]?.requiresOverrideJustification, true);
 });
+
+test("detecta interacao grave e regra por especialidade", async () => {
+  const service = new CdsService({
+    patient: {
+      findUnique: async () => ({
+        clinicalProfile: {
+          allergies: [],
+          chronicMedications: [],
+          conditions: []
+        }
+      })
+    }
+  } as never);
+
+  const result = await service.analyzePrescription({
+    patientId: "patient-2",
+    context: {
+      specialty: "Pediatria"
+    },
+    items: [
+      {
+        medicationName: "Warfarina",
+        dosage: "5mg"
+      },
+      {
+        medicationName: "Ibuprofeno",
+        dosage: "400mg"
+      },
+      {
+        medicationName: "Ciprofloxacino",
+        dosage: "500mg"
+      }
+    ]
+  });
+
+  assert.equal(result.severity, "high");
+  assert.equal(
+    result.alerts.some((alert) => alert.code === "interaction_warfarin_nsaid"),
+    true
+  );
+  assert.equal(
+    result.alerts.some(
+      (alert) => alert.code === "specialty_pediatrics_restricted_antibiotic"
+    ),
+    true
+  );
+});

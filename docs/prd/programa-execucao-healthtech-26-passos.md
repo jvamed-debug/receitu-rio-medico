@@ -358,15 +358,18 @@ Ja entregue:
 - alerta de duplicidade com medicacao cronica
 - alerta por condicao clinica em contexto gestacional, renal e hepatica
 - suporte a override justificado no contrato documental
+- suporte a override wildcard para aceitar todos os alertas obrigatorios do caso
 - severidade resumida no documento
 - abertura automatica de revisao institucional para override critico
 - listagem e resolucao de revisoes de override
+- interacoes graves entre medicamentos
+- regras adicionais por especialidade
 
 Falta para fechar:
 
-- interacoes graves
 - graduacao mais fina de override
 - workflow institucional com regras por tenant e papel
+- interacoes mais amplas baseadas em fonte clinica homologada
 
 ## Trilha 5: Operacao da clinica
 

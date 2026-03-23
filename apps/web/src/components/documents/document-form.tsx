@@ -564,13 +564,7 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
           cdsOverride: state.cdsOverrideJustification.trim()
             ? {
                 justification: state.cdsOverrideJustification.trim(),
-                acceptedAlertCodes: [
-                  "condition_pregnancy_risk",
-                  "condition_renal_risk",
-                  "condition_hepatic_risk",
-                  "allergy_match",
-                  "duplicate_therapy"
-                ]
+                acceptedAlertCodes: ["all-required"]
               }
             : undefined
         };

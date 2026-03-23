@@ -108,11 +108,11 @@ test("persiste prescricao com override justificado", async () => {
     items: [{ medicationName: "Isotretinoina", dosage: "1 comp" }],
     cdsOverride: {
       justification: "Beneficio clinico supera risco com monitorizacao rigorosa.",
-      acceptedAlertCodes: ["condition_pregnancy_risk"]
+      acceptedAlertCodes: ["all-required"]
     }
   } as never);
 
   assert.equal(result.type, "prescription");
-  assert.equal(result.cdsOverride?.acceptedAlertCodes[0], "condition_pregnancy_risk");
+  assert.equal(result.cdsOverride?.acceptedAlertCodes[0], "all-required");
   assert.equal(createdReviewPayload?.documentId, "doc-1");
 });

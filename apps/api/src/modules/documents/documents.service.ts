@@ -224,6 +224,10 @@ export class DocumentsService {
 
     const cdsSummary = await this.cdsService.analyzePrescription({
       patientId: String(input.patientId),
+      context:
+        input.context && typeof input.context === "object"
+          ? { specialty: String((input.context as Record<string, unknown>).specialty ?? "") }
+          : undefined,
       items: Array.isArray(input.items)
         ? (input.items as PrescriptionDocument["items"])
         : []
@@ -380,9 +384,12 @@ function ensureCdsOverrideCompliance(
         (item): item is string => typeof item === "string" && item.trim().length > 0
       )
     : [];
+  const acceptsAllRequired = acceptedAlertCodes.some(
+    (code) => code === "*" || code === "all-required"
+  );
   const missingCodes = requiredAlerts
     .map((alert) => alert.code)
-    .filter((code) => !acceptedAlertCodes.includes(code));
+    .filter((code) => !acceptsAllRequired && !acceptedAlertCodes.includes(code));
 
   if (!justification || missingCodes.length > 0) {
     throw new BadRequestException({
