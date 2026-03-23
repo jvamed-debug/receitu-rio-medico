@@ -6,11 +6,12 @@ import { ComplianceModule } from "../compliance/compliance.module";
 import { PersistenceModule } from "../../persistence/persistence.module";
 import { SignatureProviderGateway } from "./signature-provider.gateway";
 import { SignatureController } from "./signature.controller";
+import { SignatureProviderCallbackController } from "./signature-provider-callback.controller";
 import { SignatureService } from "./signature.service";
 
 @Module({
   imports: [AuthModule, AuditModule, ComplianceModule, PersistenceModule],
-  controllers: [SignatureController],
+  controllers: [SignatureController, SignatureProviderCallbackController],
   providers: [SignatureService, SignatureProviderGateway],
   exports: [SignatureService, SignatureProviderGateway]
 })

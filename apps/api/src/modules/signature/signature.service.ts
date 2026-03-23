@@ -206,66 +206,85 @@ export class SignatureService {
       throw error;
     }
 
-    await this.prisma.signatureSession.update({
-      where: { id: session.id },
-      data: {
-        status: SignatureSessionStatus.SIGNED,
-        signedAt: new Date(providerResult.signedAt),
-        providerReference: providerResult.externalReference,
-        evidence: {
-          ...complianceRecord,
-          requestContext: {
-            ip: input.requestContext?.ip ?? undefined,
-            userAgent: input.requestContext?.userAgent ?? undefined,
-            origin: input.requestContext?.origin ?? undefined
-          },
-          temporaryWindowUsed: activeWindow != null,
-          providerEvidence: providerResult.evidence
-        } as unknown as Prisma.InputJsonValue
-      }
-    });
-
-    const updatedDocument = await this.prisma.clinicalDocument.update({
-      where: { id: input.documentId },
-      data: {
-        status: DocumentStatus.ISSUED,
-        issuedAt: new Date()
-      }
-    });
-
-    const pdfArtifact = await this.ensurePdfArtifact(updatedDocument.id);
-
-    await this.auditService.log({
-      actorProfessionalId: input.professionalId,
-      entityType: "clinical_document",
-      entityId: updatedDocument.id,
-      action: "document_signed",
-      origin: "api.signature",
-      metadata: {
-        provider,
-        sessionId: session.id,
-        providerReference: providerResult.externalReference,
-        usedWindow: activeWindow != null,
-        pdfArtifactId: pdfArtifact.id,
-        signatureLevel: compliance.policy.signatureLevel,
-        policyVersion: compliance.policy.policyVersion,
-        retentionCategory: compliance.policy.retentionCategory,
-        requestContext: {
-          ip: input.requestContext?.ip ?? undefined,
-          userAgent: input.requestContext?.userAgent ?? undefined,
-          origin: input.requestContext?.origin ?? undefined
-        }
-      }
-    });
-
-    return {
+    return this.finalizeSignedSession({
       sessionId: session.id,
-      documentId: updatedDocument.id,
-      status: updatedDocument.status,
-      issuedAt: updatedDocument.issuedAt?.toISOString() ?? null,
+      documentId: input.documentId,
+      professionalId: input.professionalId,
+      provider,
+      signedAt: providerResult.signedAt,
+      providerReference: providerResult.externalReference,
+      policyVersion: compliance.policy.policyVersion,
+      signatureLevel: compliance.policy.signatureLevel,
+      retentionCategory: compliance.policy.retentionCategory,
+      evidence: providerResult.evidence,
+      requestContext: input.requestContext,
       usedWindow: activeWindow != null,
-      pdfArtifact
-    };
+      complianceRecord
+    });
+  }
+
+  async handleProviderCallback(input: {
+    sessionId: string;
+    status: "signed" | "failed";
+    externalReference?: string;
+    signedAt?: string;
+    evidence?: Record<string, unknown>;
+  }) {
+    const session = await this.prisma.signatureSession.findUnique({
+      where: { id: input.sessionId }
+    });
+
+    if (!session) {
+      throw new NotFoundException("Sessao de assinatura nao encontrada");
+    }
+
+    if (input.status === "failed") {
+      await this.prisma.signatureSession.update({
+        where: { id: session.id },
+        data: {
+          status: SignatureSessionStatus.FAILED,
+          providerReference: input.externalReference ?? session.providerReference,
+          evidence: {
+            ...(typeof session.evidence === "object" && session.evidence ? session.evidence : {}),
+            providerEvidence: input.evidence ?? {},
+            callbackStatus: "failed"
+          } as unknown as Prisma.InputJsonValue
+        }
+      });
+
+      await this.auditService.log({
+        actorProfessionalId: session.professionalId,
+        entityType: "signature_session",
+        entityId: session.id,
+        action: "signature_callback_failed",
+        origin: "api.signature.callback",
+        metadata: {
+          provider: session.provider,
+          externalReference: input.externalReference ?? null
+        }
+      });
+
+      return {
+        sessionId: session.id,
+        status: "failed"
+      };
+    }
+
+    return this.finalizeSignedSession({
+      sessionId: session.id,
+      documentId: session.documentId,
+      professionalId: session.professionalId,
+      provider: session.provider,
+      signedAt: input.signedAt ?? new Date().toISOString(),
+      providerReference: input.externalReference ?? session.providerReference ?? undefined,
+      policyVersion: session.policyVersion ?? undefined,
+      signatureLevel: session.signatureLevel ?? undefined,
+      retentionCategory: "clinical_record",
+      evidence: input.evidence ?? {},
+      usedWindow: false,
+      complianceRecord:
+        typeof session.evidence === "object" && session.evidence ? (session.evidence as Record<string, unknown>) : {}
+    });
   }
 
   async ensurePdfArtifact(documentId: string) {
@@ -318,5 +337,86 @@ export class SignatureService {
       evidence: session.evidence ?? null,
       createdAt: session.createdAt.toISOString()
     }));
+  }
+
+  private async finalizeSignedSession(input: {
+    sessionId: string;
+    documentId: string;
+    professionalId: string;
+    provider: SignatureProvider;
+    signedAt: string;
+    providerReference?: string;
+    policyVersion?: string;
+    signatureLevel?: string;
+    retentionCategory: string;
+    evidence: Record<string, unknown>;
+    requestContext?: {
+      ip?: string;
+      userAgent?: string;
+      origin?: string;
+    };
+    usedWindow: boolean;
+    complianceRecord: Record<string, unknown>;
+  }) {
+    await this.prisma.signatureSession.update({
+      where: { id: input.sessionId },
+      data: {
+        status: SignatureSessionStatus.SIGNED,
+        signedAt: new Date(input.signedAt),
+        providerReference: input.providerReference,
+        evidence: {
+          ...input.complianceRecord,
+          requestContext: {
+            ip: input.requestContext?.ip ?? undefined,
+            userAgent: input.requestContext?.userAgent ?? undefined,
+            origin: input.requestContext?.origin ?? undefined
+          },
+          temporaryWindowUsed: input.usedWindow,
+          providerEvidence: input.evidence
+        } as unknown as Prisma.InputJsonValue
+      }
+    });
+
+    const updatedDocument = await this.prisma.clinicalDocument.update({
+      where: { id: input.documentId },
+      data: {
+        status: DocumentStatus.ISSUED,
+        issuedAt: new Date(input.signedAt)
+      }
+    });
+
+    const pdfArtifact = await this.ensurePdfArtifact(updatedDocument.id);
+
+    await this.auditService.log({
+      actorProfessionalId: input.professionalId,
+      entityType: "clinical_document",
+      entityId: updatedDocument.id,
+      action: "document_signed",
+      origin: "api.signature",
+      metadata: {
+        provider: input.provider,
+        sessionId: input.sessionId,
+        providerReference: input.providerReference,
+        usedWindow: input.usedWindow,
+        pdfArtifactId: pdfArtifact.id,
+        signatureLevel: input.signatureLevel,
+        policyVersion: input.policyVersion,
+        retentionCategory: input.retentionCategory,
+        requestContext: {
+          ip: input.requestContext?.ip ?? undefined,
+          userAgent: input.requestContext?.userAgent ?? undefined,
+          origin: input.requestContext?.origin ?? undefined
+        }
+      }
+    });
+
+    return {
+      sessionId: input.sessionId,
+      documentId: updatedDocument.id,
+      status: updatedDocument.status,
+      issuedAt: updatedDocument.issuedAt?.toISOString() ?? null,
+      usedWindow: input.usedWindow,
+      pdfArtifact
+    };
   }
 }

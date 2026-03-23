@@ -80,6 +80,10 @@ export class SignatureProviderGateway {
     const timeoutMs = Number(
       this.configService.get<string>("SIGNATURE_PROVIDER_TIMEOUT_MS") ?? "10000"
     );
+    const callbackSecret =
+      this.configService.get<string>("SIGNATURE_PROVIDER_CALLBACK_SECRET") ??
+      "receituario-signature-callback";
+    const callbackBaseUrl = this.configService.get<string>("API_PUBLIC_URL");
 
     if (!baseUrl || !apiKey) {
       throw new ServiceUnavailableException(
@@ -106,7 +110,13 @@ export class SignatureProviderGateway {
           signatureLevel: input.signatureLevel,
           policyVersion: input.policyVersion,
           expiresAt: input.expiresAt,
-          requestContext: input.requestContext
+          requestContext: input.requestContext,
+          callbackUrl:
+            input.callbackUrl ??
+            (callbackBaseUrl
+              ? `${callbackBaseUrl.replace(/\/$/, "")}/api/signature/providers/callback`
+              : undefined),
+          callbackSecret: input.callbackSecret ?? callbackSecret
         }),
         signal: controller.signal
       });

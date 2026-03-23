@@ -11,27 +11,53 @@ Consolidar a transformacao do `receitu-rio-medico` em uma healthtech regulada, s
 - ecossistema
 - escala
 
-Este documento organiza os 26 passos em execucao progressiva, com status e foco pratico.
+Este documento funciona como checklist executiva do programa, marcando:
+
+- o que ja foi entregue no codigo
+- o que esta em progresso real
+- o que vem na fila imediata
 
 ## Status geral
 
 ### Concluidos
 
-1. congelar escopo do core
-2. revisar a arquitetura atual
-3. criar trilhas formais
-4. endurecer autenticacao e autorizacao inicial
-5. blindar leitura por recurso e conter IDOR interno
+- 1. congelar escopo do core
+- 2. revisar a arquitetura atual
+- 3. criar trilhas formais
+- 4. endurecer autenticacao e autorizacao inicial
+- 5. blindar leitura por recurso e conter IDOR interno
+- 19. agenda clinica inicial
 
-### Em progresso
+### Em progresso forte
 
-6. blindar documentos e links compartilhados
-7. fechar matriz regulatoria por tipo documental
-8. fortalecer LGPD operacional
+- 6. blindar documentos e links compartilhados
+- 7. fechar matriz regulatoria por tipo documental
+- 8. fortalecer LGPD operacional
+- 9. evoluir o modelo de dados
+- 10. tipar melhor os documentos
+- 11. criar engine de templates seria
+- 12. melhorar prontuario
+- 13. integrar provedor real ICP-Brasil
+- 14. criar trilha probatoria
+- 15. separar autenticacao e assinatura
+- 16. refinar UX clinica
+- 17. criar biblioteca clinica forte
+- 18. incluir CDS basico
+- 20. financeiro
+- 21. comunicacao
+- 22. integracao farmaceutica
+- 23. analytics
+- 24. multitenancy
+- 25. observabilidade
+- 26. filas, eventos e operacao segura
 
-### Pendentes
+### Proximos da fila
 
-9 a 26
+- 23. analytics por periodo
+- 25. observabilidade com paineis e alertas
+- 26. jobs assincronos leves para retries e processamento
+
+## Checklist dos 26 passos
 
 ## Trilha 1: Fundacao e seguranca
 
@@ -39,7 +65,7 @@ Este documento organiza os 26 passos em execucao progressiva, com status e foco 
 
 Status: concluido
 
-Core atual definido:
+Core atual estabilizado:
 
 - auth
 - professionals
@@ -50,8 +76,9 @@ Core atual definido:
 - delivery
 - audit
 - compliance
+- appointments
 
-### 2. Revisar arquitetura atual
+### 2. Revisar a arquitetura atual
 
 Status: concluido
 
@@ -63,7 +90,7 @@ Artefatos:
 
 Status: concluido
 
-Trilhas ativas:
+Trilhas em uso:
 
 - seguranca e compliance
 - core clinico
@@ -72,281 +99,431 @@ Trilhas ativas:
 
 ### 4. Endurecer autenticacao e autorizacao
 
-Status: concluido na Fase A
+Status: concluido
 
-Entregue:
+Ja entregue:
 
 - principal tipado
 - `ResourceAccessService`
-- policy por recurso para `documents`, `patients`, `history` e `delivery`
+- policy por recurso em `documents`, `patients`, `history` e `delivery`
+- ownership minimo por paciente
 - auditoria de acesso negado
 
 ### 5. Blindar documentos e leituras por `id`
 
-Status: concluido na Fase A
+Status: concluido
 
-Entregue:
+Ja entregue:
 
 - leitura de documento exige policy
 - preview PDF exige policy
 - duplicate exige policy
 - delivery events exige policy
+- share links com token opaco
 
 ### 6. Blindar links compartilhados
 
-Status: em progresso com primeira entrega
+Status: em progresso avancado
 
-Entregue:
+Ja entregue:
 
 - token opaco
 - hash persistido
-- expiração
+- expiracao
 - limite de uso
 - revogacao
 - endpoint publico controlado para resolucao do link
 
-Falta:
+Falta para fechar:
 
-- uso unico por politica documental
-- renderizacao publica segura do artefato final
 - trilha de IP/user-agent na resolucao do token
+- politica diferenciada por risco do documento
+- renderizacao publica ainda mais restrita do artefato final
 
 ### 7. Fechar matriz regulatoria
 
-Status: em progresso
+Status: em progresso avancado
 
-Base atual:
+Ja entregue:
 
-- [compliance.service.ts](/c:/Users/jvame/.antigravity/receitu-rio-medico/apps/api/src/modules/compliance/compliance.service.ts)
+- politica por tipo documental em `compliance`
+- bloqueios de assinatura por provider inadequado
+- readiness profissional para assinatura
+- politica de compartilhamento externo por tipo documental
 
-Proximos incrementos:
+Falta para fechar:
 
-- assinatura minima por tipo documental
-- politica de compartilhamento por tipo documental
-- bloqueios por papel
-- justificativa de override
+- justificativa formal de override
+- regras mais finas por papel e tenant
+- matriz mais rica para documentos de maior risco
 
 ### 8. Fortalecer LGPD
 
-Status: em progresso
+Status: em progresso inicial
 
-Proximos incrementos:
+Ja entregue:
 
-- campos de consentimento quando aplicavel
+- segregacao inicial de acesso
+- auditoria de acesso e acao
+- reducao de exposicao por recurso e link
+
+Falta para fechar:
+
 - retention/disposal plan
-- log enriquecido
+- logs com base legal e finalidade onde fizer sentido
 - anonimização para analytics
+- governanca mais forte para consentimento
 
 ## Trilha 2: Dominio clinico
 
 ### 9. Evoluir o modelo de dados
 
-Status: pendente
+Status: em progresso
 
-Prioridades:
+Ja entregue:
 
+- `PatientClinicalProfile`
 - alergias
-- problemas/diagnosticos
-- medicamentos em uso
+- condicoes
+- medicacoes cronicas
+- plano de cuidado
+- resumo clinico
+- agenda, cobranca, lembretes e teleconsulta
+
+Falta para fechar:
+
 - encounters
-- timeline clinica
+- timeline clinica mais formal
+- problemas e eventos com estrutura longitudinal
 
 ### 10. Tipar melhor os documentos
 
-Status: pendente
+Status: em progresso
 
-Prioridades:
+Ja entregue:
 
-- contratos mais fortes por tipo documental
-- versionamento formal
-- payloads menos genericos
+- `schemaVersion` no contrato de dominio
+- `context` clinico opcional por documento
+- `cdsSummary` no contrato documental
+- schemas de criacao com `context`
+- payload versionado com metadados reservados
+
+Falta para fechar:
+
+- contratos ainda mais especificos por tipo
+- evolucao de versionamento por layout/payload
+- menor dependencia de chaves genericas internas
 
 ### 11. Criar engine de templates seria
 
-Status: parcialmente concluido
+Status: em progresso avancado
 
-Ja existe:
+Ja entregue:
 
 - favoritos por usuario
-- templates institucionais/pessoais
+- templates institucionais e pessoais
 - versionamento inicial
+- importacao institucional
+- presets por especialidade
 
-Falta:
+Falta para fechar:
 
 - governanca por clinica
 - aprovacao/publicacao institucional
+- lifecycle mais forte para templates oficiais
 
 ### 12. Melhorar prontuario
 
-Status: pendente
+Status: em progresso
 
-Prioridades:
+Ja entregue:
 
-- timeline real
+- perfil clinico estruturado
+- historico por paciente
+- vinculo entre paciente, documentos e agenda
+
+Falta para fechar:
+
+- timeline real do atendimento
 - evolucao clinica
-- problemas e alergias
-- documentos e eventos consolidados
+- encounters e consolidacao longitudinal
 
 ## Trilha 3: Assinatura e validade juridica
 
 ### 13. Integrar provedor real ICP-Brasil
 
-Status: pendente
+Status: em progresso
 
-Hoje:
+Ja entregue:
 
-- fluxo e simulacao operacional existem
+- gateway de provider configuravel
+- modos `mock` e `remote`
+- referencia e evidencia persistidas
+- `callbackUrl` e `callbackSecret` no fluxo remoto
+- endpoint publico de callback para provider
 
-Falta:
+Falta para fechar:
 
 - provider real
-- callback real
-- evidencias tecnicas
+- credenciais e contratos de homologacao
+- homologacao ponta a ponta com retorno assinado do provider
 
 ### 14. Criar trilha probatoria
 
-Status: pendente
+Status: em progresso
 
-Necessario:
+Ja entregue:
 
-- hash documental
-- carimbo temporal
-- evidencias da sessao
-- cadeia de auditoria forte
+- `signatureLevel`
+- `policyVersion`
+- `providerReference`
+- `signedAt`
+- `evidence`
+- snapshot regulatorio persistido
+
+Falta para fechar:
+
+- carimbo temporal forte
+- cadeia probatoria mais completa
+- consolidacao juridica do artefato final
 
 ### 15. Separar autenticacao e assinatura
 
-Status: parcialmente concluido
+Status: em progresso avancado
 
-Falta:
+Ja entregue:
 
 - step-up auth
-- approval window com enforcement forte
+- janela elevada
+- enforcement em acoes sensiveis
+
+Falta para fechar:
+
+- binding ainda mais forte entre janela e ato de assinatura real
+- regras de expiracao mais finas por provider
 
 ## Trilha 4: Produto clinico de uso diario
 
 ### 16. Refinar UX clinica
 
-Status: em progresso
+Status: em progresso avancado
 
-Ja existe:
+Ja entregue:
 
 - dashboard
 - onboarding
+- assinatura
 - templates
 - presets
+- agenda operacional
 
-Falta:
+Falta para fechar:
 
-- fluxo mais curto por especialidade
-- atalhos por contexto assistencial
+- fluxo ainda mais curto por contexto assistencial
+- atalhos por especialidade e perfil
 
 ### 17. Criar biblioteca clinica forte
 
 Status: em progresso avancado
 
-Ja existe:
+Ja entregue:
 
-- presets
 - grupos laboratoriais
+- paineis rapidos
 - modelos padronizados
+- modelos por especialidade
+- biblioteca juridico-clinica
 
-Falta:
+Falta para fechar:
 
-- validacao clinica mais forte
 - curadoria institucional
+- validacao clinica mais forte
 
 ### 18. Incluir CDS basico
 
-Status: pendente
+Status: em progresso
 
-Comecar por:
+Ja entregue:
 
-- alergias
+- CDS basico para prescricoes
+- alerta de alergia por correspondencia simples
+- alerta de duplicidade com medicacao cronica
+- severidade resumida no documento
+
+Falta para fechar:
+
 - interacoes graves
-- duplicidade terapeutica
+- alertas por condicao clinica
+- graduacao e governanca de override
 
 ## Trilha 5: Operacao da clinica
 
 ### 19. Agenda
 
-Status: pendente
+Status: concluido no baseline e em evolucao continua
+
+Ja entregue:
+
+- agenda clinica inicial
+- status da consulta
+- teleconsulta
+- lembretes
+- filtros operacionais
 
 ### 20. Financeiro
 
-Status: pendente
+Status: em progresso
+
+Ja entregue:
+
+- cobranca por consulta
+- authorize/pay
+- checkout
+- conciliacao manual
+- webhook de cobranca
+- resumo financeiro da agenda
+
+Falta para fechar:
+
+- conciliacao automatica mais rica
+- painel financeiro expandido
+- provider real
 
 ### 21. Comunicacao
 
-Status: pendente
+Status: em progresso
 
-Foco:
+Ja entregue:
 
-- WhatsApp
-- SMS
-- e-mail transacional
+- lembretes por email/sms/whatsapp
+- provider gateway configuravel
+- retry de lembretes falhos
+- visibilidade operacional de falhas
+
+Falta para fechar:
+
+- provider real
+- politicas de cadencia
+- templates transacionais centralizados
 
 ## Trilha 6: Ecossistema e monetizacao
 
 ### 22. Integracao farmaceutica
 
-Status: pendente
+Status: em progresso inicial
+
+Ja entregue:
+
+- gateway de farmacia configuravel
+- cotacao mock por prescricao
+- endpoint de quote no backend
+- contrato compartilhado de cotacao
+
+Falta para fechar:
+
+- provider real
+- roteamento para rede/farmacia
+- disponibilidade e status de pedido
+- camada anti-corruption para parceiros
 
 ### 23. Analytics
 
-Status: pendente
+Status: em progresso inicial
+
+Ja entregue:
+
+- metricas da API
+- resumo financeiro da agenda
+- snapshot operacional
+
+Falta para fechar:
+
+- analytics por periodo
+- funil operacional e clinico
+- visao por profissional e tenant
 
 ### 24. Multitenancy
 
-Status: em progresso inicial
-
-Prioridade:
-
-- organizacao
-- membership
-- governanca por tenant
+Status: em progresso
 
 Ja entregue:
 
 - `Organization`
 - `OrganizationMembership`
-- `primaryOrganizationId` no perfil profissional
-- `organizationId` em pacientes e documentos
-- emissao e listagem respeitando organizacao quando presente
+- `primaryOrganizationId`
+- `organizationId` em pacientes, documentos e appointments
+- scoping por organizacao na agenda e no core
+
+Falta para fechar:
+
+- governanca completa por tenant
+- politicas institucionais mais fortes
+- administracao de memberships pela UI
 
 ## Trilha 7: Escala e governanca
 
 ### 25. Observabilidade
 
-Status: pendente
+Status: em progresso inicial
+
+Ja entregue:
+
+- `requestId`
+- `correlationId`
+- metricas in-memory
+- contexto operacional
+- auditoria herdando correlacao
+
+Falta para fechar:
+
+- dashboards mais fortes
+- alertas reais
+- tracing distribuido
 
 ### 26. Filas, eventos e operacao segura
 
-Status: pendente
+Status: em progresso inicial
 
-Escopo:
+Ja entregue:
+
+- inbox de webhook de cobranca
+- idempotencia por `eventKey`
+- retries de lembrete
+- visibilidade operacional de falhas
+
+Falta para fechar:
 
 - jobs assincronos
-- retries
+- workers
+- retries automaticos centralizados
 - circuit breaker
-- incident response
-- backups e restore
+- playbooks de incidente
 
-## Sequencia pratica recomendada a partir de agora
+## Proximos passos recomendados
 
-1. terminar endurecimento de share links
-2. enriquecer compliance por tipo documental
-3. começar modelagem de prontuario clinico
-4. preparar step-up auth e assinatura real
-5. introduzir estrutura de organizacao e membership
-6. entrar em agenda, comunicacao e financeiro
-7. só depois abrir farmacias, analytics e multitenancy completo
+### Bloco imediato
+
+1. passo 23: analytics por periodo e profissional
+2. passo 25: observabilidade com paines/alertas
+3. passo 26: jobs assincronos leves para retries e processamento
+
+### Bloco seguinte
+
+4. aprofundar passo 10 com contratos documentais mais estritos
+5. aprofundar passo 13 com provider real de assinatura
+6. aprofundar passo 18 com novas regras de CDS
+
+### Bloco posterior
+
+7. aprofundar passo 22 com provider farmaceutico real
+8. aprofundar LGPD operacional
+9. aprofundar governanca institucional
 
 ## Regra de execucao
 
-Nao abrir novas frentes de ecossistema antes de concluir:
+Nao abrir novas frentes pesadas de ecossistema antes de concluir:
 
-- autorizacao por recurso
-- links seguros
-- compliance minimo forte
-- ownership institucional basico
+- contratos mais fortes por tipo documental
+- provider real de assinatura
+- CDS basico
+- operacao segura mais madura

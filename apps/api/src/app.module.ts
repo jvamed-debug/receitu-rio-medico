@@ -11,6 +11,7 @@ import { DocumentsModule } from "./modules/documents/documents.module";
 import { HealthModule } from "./modules/health/health.module";
 import { HistoryModule } from "./modules/history/history.module";
 import { PatientsModule } from "./modules/patients/patients.module";
+import { PharmacyModule } from "./modules/pharmacy/pharmacy.module";
 import { ProfessionalsModule } from "./modules/professionals/professionals.module";
 import { ObservabilityModule } from "./modules/observability/observability.module";
 import { RequestContextMiddleware } from "./modules/observability/request-context.middleware";
@@ -30,6 +31,7 @@ import { PersistenceModule } from "./persistence/persistence.module";
     AppointmentsModule,
     ProfessionalsModule,
     PatientsModule,
+    PharmacyModule,
     ComplianceModule,
     DocumentsModule,
     TemplatesModule,

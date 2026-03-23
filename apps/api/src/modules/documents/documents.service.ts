@@ -11,6 +11,7 @@ import type {
 } from "@receituario/domain";
 
 import { PrismaService } from "../../persistence/prisma.service";
+import { CdsService } from "../cds/cds.service";
 import { ComplianceService } from "../compliance/compliance.service";
 import {
   buildDocumentPayload,
@@ -23,7 +24,8 @@ import {
 export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly complianceService: ComplianceService
+    private readonly complianceService: ComplianceService,
+    private readonly cdsService: CdsService
   ) {}
 
   async createPrescription(
@@ -185,19 +187,20 @@ export class DocumentsService {
     type: ClinicalDocumentType,
     input: Record<string, unknown>
   ) {
-    const compliance = this.complianceService.validateDraft(type, input);
-    const payload = buildDocumentPayload(type, input);
+    const enrichedInput = await this.enrichDocumentInput(type, input);
+    const compliance = this.complianceService.validateDraft(type, enrichedInput);
+    const payload = buildDocumentPayload(type, enrichedInput);
     const document = await this.prisma.clinicalDocument.create({
       data: {
         type: toPrismaDocumentType(type),
         status: toPrismaDocumentStatus(compliance.status),
         organizationId:
-          typeof input.organizationId === "string" && input.organizationId.length > 0
-            ? input.organizationId
+          typeof enrichedInput.organizationId === "string" && enrichedInput.organizationId.length > 0
+            ? enrichedInput.organizationId
             : null,
-        patientId: String(input.patientId),
-        authorProfessionalId: String(input.authorProfessionalId),
-        title: String(input.title),
+        patientId: String(enrichedInput.patientId),
+        authorProfessionalId: String(enrichedInput.authorProfessionalId),
+        title: String(enrichedInput.title),
         payload,
         layoutVersion: "v1",
         payloadHash: createHash("sha256").update(JSON.stringify(payload)).digest("hex")
@@ -205,6 +208,29 @@ export class DocumentsService {
     });
 
     return toDomainDocument(document);
+  }
+
+  private async enrichDocumentInput(
+    type: ClinicalDocumentType,
+    input: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    if (type !== "prescription") {
+      return {
+        ...input
+      };
+    }
+
+    const cdsSummary = await this.cdsService.analyzePrescription({
+      patientId: String(input.patientId),
+      items: Array.isArray(input.items)
+        ? (input.items as PrescriptionDocument["items"])
+        : []
+    });
+
+    return {
+      ...input,
+      cdsSummary
+    };
   }
 }
 

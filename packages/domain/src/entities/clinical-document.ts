@@ -27,6 +27,29 @@ export interface ClinicalDocumentBase {
   layoutVersion: string;
   payloadHash?: string;
   pdfArtifactId?: string;
+  schemaVersion?: string;
+  context?: ClinicalDocumentContext;
+  cdsSummary?: ClinicalDecisionSupportSummary;
+}
+
+export interface ClinicalDocumentContext {
+  encounterType?: "ambulatory" | "telehealth" | "emergency" | "inpatient";
+  specialty?: string;
+  clinicalReason?: string;
+  diagnosisCode?: string;
+}
+
+export interface ClinicalDecisionSupportAlert {
+  code: string;
+  severity: "low" | "moderate" | "high";
+  category: "allergy" | "interaction" | "duplicate_therapy" | "condition";
+  message: string;
+}
+
+export interface ClinicalDecisionSupportSummary {
+  severity: "none" | "low" | "moderate" | "high";
+  alerts: ClinicalDecisionSupportAlert[];
+  reviewedAt: string;
 }
 
 export interface PrescriptionItem {

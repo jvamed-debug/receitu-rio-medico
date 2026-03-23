@@ -1,5 +1,7 @@
 import type {
   ClinicalDocument,
+  ClinicalDocumentContext,
+  ClinicalDecisionSupportSummary,
   ClinicalDocumentStatus,
   ClinicalDocumentType,
   PrescriptionDocument
@@ -63,6 +65,9 @@ export function toDomainDocument(document: PrismaClinicalDocument): ClinicalDocu
     title: document.title,
     layoutVersion: document.layoutVersion,
     payloadHash: document.payloadHash ?? undefined,
+    schemaVersion: readSchemaVersion(document.payload),
+    context: readClinicalContext(document.payload),
+    cdsSummary: readCdsSummary(document.payload),
     issuedAt: document.issuedAt?.toISOString(),
     derivedFromDocumentId: document.derivedFromDocumentId ?? undefined,
     createdAt: document.createdAt.toISOString(),
@@ -109,9 +114,16 @@ export function buildDocumentPayload(
   type: ClinicalDocumentType,
   input: Record<string, unknown>
 ): Prisma.InputJsonObject {
+  const baseMetadata = {
+    _schemaVersion: "2026.03",
+    _context: normalizeContext(input.context)
+  };
+
   switch (type) {
     case "prescription":
       return {
+        ...baseMetadata,
+        _cds: normalizeCdsSummary(input.cdsSummary),
         items: ((input.items as PrescriptionDocument["items"] | undefined) ?? []).map((item) => ({
           id: item.id ?? null,
           medicationName: item.medicationName,
@@ -126,18 +138,72 @@ export function buildDocumentPayload(
       };
     case "exam-request":
       return {
+        ...baseMetadata,
         requestedExams: ((input.requestedExams as string[] | undefined) ?? []).map(String),
         preparationNotes: (input.preparationNotes as string | undefined) ?? null
       };
     case "medical-certificate":
       return {
+        ...baseMetadata,
         purpose: String(input.purpose ?? ""),
         restDays: (input.restDays as number | undefined) ?? null,
         observations: (input.observations as string | undefined) ?? null
       };
     case "free-document":
       return {
+        ...baseMetadata,
         body: String(input.body ?? "")
       };
   }
+}
+
+function readSchemaVersion(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const value = (payload as { _schemaVersion?: unknown })._schemaVersion;
+  return typeof value === "string" ? value : undefined;
+}
+
+function readClinicalContext(payload: unknown): ClinicalDocumentContext | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const context = (payload as { _context?: unknown })._context;
+  if (!context || typeof context !== "object") {
+    return undefined;
+  }
+
+  return context as ClinicalDocumentContext;
+}
+
+function readCdsSummary(payload: unknown): ClinicalDecisionSupportSummary | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const summary = (payload as { _cds?: unknown })._cds;
+  if (!summary || typeof summary !== "object") {
+    return undefined;
+  }
+
+  return summary as ClinicalDecisionSupportSummary;
+}
+
+function normalizeContext(input: unknown) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  return JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;
+}
+
+function normalizeCdsSummary(input: unknown) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  return JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;
 }

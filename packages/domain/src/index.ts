@@ -4,3 +4,4 @@ export * from "./entities/patient";
 export * from "./entities/professional-profile";
 export * from "./entities/audit-log";
 export * from "./entities/signature";
+export * from "./entities/pharmacy";

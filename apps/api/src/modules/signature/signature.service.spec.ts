@@ -98,11 +98,67 @@ test("signDocument persiste evidencia e referencia de provider", async () => {
   );
 });
 
+test("handleProviderCallback finaliza sessao assinada", async () => {
+  let updatedSessionPayload: Record<string, unknown> | undefined;
+
+  const service = createService(
+    {
+      signatureSession: {
+        findUnique: async () => ({
+          id: "sig-2",
+          documentId: "doc-2",
+          professionalId: "prof-1",
+          provider: SignatureProvider.ICP_BRASIL_VENDOR,
+          policyVersion: "2026.03",
+          signatureLevel: "qualified",
+          providerReference: null,
+          evidence: { policyVersion: "2026.03" }
+        }),
+        update: async ({ data }) => {
+          updatedSessionPayload = data;
+        },
+        findMany: async () => []
+      },
+      clinicalDocument: {
+        update: async () => ({
+          id: "doc-2",
+          status: DocumentStatus.ISSUED,
+          issuedAt: new Date("2026-03-22T17:01:00.000Z")
+        })
+      },
+      pdfArtifact: {
+        findUnique: async () => null,
+        create: async () => ({
+          id: "pdf-2",
+          storageKey: "documents/doc-2/final.pdf",
+          sha256: "sha256-doc-2"
+        })
+      }
+    }
+  );
+
+  const result = await service.handleProviderCallback({
+    sessionId: "sig-2",
+    status: "signed",
+    externalReference: "provider-sig-2",
+    signedAt: "2026-03-22T17:01:00.000Z",
+    evidence: {
+      providerMode: "remote"
+    }
+  });
+
+  assert.equal(result.sessionId, "sig-2");
+  assert.equal(result.status, DocumentStatus.ISSUED);
+  assert.equal(updatedSessionPayload?.status, SignatureSessionStatus.SIGNED);
+  assert.equal(updatedSessionPayload?.providerReference, "provider-sig-2");
+});
+
 function createService(
   prismaOverrides?: Partial<{
     signatureSession: {
       create?: (...args: any[]) => Promise<any>;
       update?: (...args: any[]) => Promise<any>;
+      findUnique?: (...args: any[]) => Promise<any>;
       findMany?: (...args: any[]) => Promise<any>;
     };
     clinicalDocument: {
@@ -134,6 +190,7 @@ function createService(
         createdAt: new Date("2026-03-22T16:00:00.000Z")
       }),
       update: async () => undefined,
+      findUnique: async () => null,
       findMany: async () => [],
       ...prismaOverrides?.signatureSession
     },

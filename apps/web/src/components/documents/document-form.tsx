@@ -554,9 +554,18 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
               quantity: state.quantity || undefined,
               notes: state.notes || undefined
             }
-          ]
+          ],
+          context: {
+            encounterType: "ambulatory",
+            specialty: specialtyTrack ?? undefined
+          }
         };
-        await api.createPrescription(payload);
+        const created = await api.createPrescription(payload);
+        if (created.type === "prescription" && created.cdsSummary?.alerts.length) {
+          setMessage(
+            `Rascunho criado com ${created.cdsSummary.alerts.length} alerta(s) clinico(s) para revisao.`
+          );
+        }
       }
 
       if (kind === "exam-request") {
@@ -565,7 +574,11 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
           patientId: state.patientId,
           title: state.title,
           requestedExams,
-          preparationNotes: state.preparationNotes || undefined
+          preparationNotes: state.preparationNotes || undefined,
+          context: {
+            encounterType: "ambulatory",
+            specialty: specialtyTrack ?? undefined
+          }
         };
         await api.createExamRequest(payload);
       }
@@ -576,7 +589,11 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
           title: state.title,
           purpose: state.purpose,
           restDays: state.restDays ? Number(state.restDays) : undefined,
-          observations: state.observations || undefined
+          observations: state.observations || undefined,
+          context: {
+            encounterType: "ambulatory",
+            specialty: specialtyTrack ?? undefined
+          }
         };
         await api.createMedicalCertificate(payload);
       }
@@ -585,12 +602,16 @@ export function DocumentForm({ kind, title, description }: DocumentFormProps) {
         const payload: CreateFreeDocumentInput = {
           patientId: state.patientId,
           title: state.title,
-          body: state.body
+          body: state.body,
+          context: {
+            encounterType: "ambulatory",
+            specialty: specialtyTrack ?? undefined
+          }
         };
         await api.createFreeDocument(payload);
       }
 
-      setMessage("Rascunho criado com sucesso na API.");
+      setMessage((current) => current ?? "Rascunho criado com sucesso na API.");
       setState((current) => ({
         ...buildInitialState(kind),
         patientId: current.patientId

@@ -4,14 +4,16 @@ import type {
   AppointmentOperationsSnapshot,
   AppointmentSummary,
   AppointmentReminder,
-  ClinicalDocument
+  ClinicalDocument,
+  PharmacyQuote
 } from "@receituario/domain";
 export type {
   Appointment,
   AppointmentBilling,
   AppointmentOperationsSnapshot,
   AppointmentSummary,
-  AppointmentReminder
+  AppointmentReminder,
+  PharmacyQuote
 } from "@receituario/domain";
 import type {
   AuthTokens,
@@ -108,6 +110,12 @@ export interface CreatePrescriptionInput {
   patientId: string;
   title: string;
   items: PrescriptionItemInput[];
+  context?: {
+    encounterType?: "ambulatory" | "telehealth" | "emergency" | "inpatient";
+    specialty?: string;
+    clinicalReason?: string;
+    diagnosisCode?: string;
+  };
 }
 
 export interface CreateExamRequestInput {
@@ -115,6 +123,7 @@ export interface CreateExamRequestInput {
   title: string;
   requestedExams: string[];
   preparationNotes?: string;
+  context?: CreatePrescriptionInput["context"];
 }
 
 export interface CreateMedicalCertificateInput {
@@ -123,12 +132,14 @@ export interface CreateMedicalCertificateInput {
   purpose: string;
   restDays?: number;
   observations?: string;
+  context?: CreatePrescriptionInput["context"];
 }
 
 export interface CreateFreeDocumentInput {
   patientId: string;
   title: string;
   body: string;
+  context?: CreatePrescriptionInput["context"];
 }
 
 export interface CreateTemplateInput {
@@ -530,19 +541,23 @@ export class ApiClient {
   }
 
   createPrescription(input: CreatePrescriptionInput) {
-    return this.post("/documents/prescriptions", input);
+    return this.post<ClinicalDocument>("/documents/prescriptions", input);
   }
 
   createExamRequest(input: CreateExamRequestInput) {
-    return this.post("/documents/exam-requests", input);
+    return this.post<ClinicalDocument>("/documents/exam-requests", input);
   }
 
   createMedicalCertificate(input: CreateMedicalCertificateInput) {
-    return this.post("/documents/certificates", input);
+    return this.post<ClinicalDocument>("/documents/certificates", input);
   }
 
   createFreeDocument(input: CreateFreeDocumentInput) {
-    return this.post("/documents/free", input);
+    return this.post<ClinicalDocument>("/documents/free", input);
+  }
+
+  createPrescriptionQuote(documentId: string) {
+    return this.post<PharmacyQuote>(`/pharmacy/prescriptions/${documentId}/quote`, {});
   }
 
   listTemplates() {

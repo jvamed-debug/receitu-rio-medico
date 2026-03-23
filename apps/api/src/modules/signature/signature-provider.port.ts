@@ -13,6 +13,8 @@ export type SignatureProviderExecutionInput = {
     userAgent?: string;
     origin?: string;
   };
+  callbackUrl?: string;
+  callbackSecret?: string;
 };
 
 export type SignatureProviderExecutionResult = {
