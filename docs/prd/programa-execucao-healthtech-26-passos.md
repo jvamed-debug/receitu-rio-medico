@@ -33,13 +33,13 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 12. prontuario longitudinal baseline
 - 18. CDS baseline institucional concluido
 - 11. engine institucional de templates baseline
+- 9. modelo clinico longitudinal estruturado baseline
 
 ### Em progresso forte
 
 - 6. blindar documentos e links compartilhados
 - 7. fechar matriz regulatoria por tipo documental
 - 8. fortalecer LGPD operacional
-- 9. evoluir o modelo de dados
 - 13. integrar provedor real ICP-Brasil
 - 14. criar trilha probatoria
 - 15. separar autenticacao e assinatura
@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 9. aprofundar problemas e eventos clinicos estruturados
 - 7. fechar matriz regulatoria por tipo documental no nivel institucional
 - 8. fortalecer LGPD no ciclo de descarte e governanca
+- 25. aprofundar observabilidade e exportacao analitica
 
 ## Checklist dos 26 passos
 
@@ -180,7 +180,7 @@ Falta para fechar:
 
 ### 9. Evoluir o modelo de dados
 
-Status: em progresso
+Status: concluido no baseline longitudinal atual
 
 Ja entregue:
 
@@ -192,12 +192,32 @@ Ja entregue:
 - resumo clinico
 - agenda, cobranca, lembretes e teleconsulta
 - `PatientEncounter` estruturado
-- timeline consolidada com encounters, documentos e consultas
+- `PatientEvolution` estruturada
+- `PatientProblem` com:
+  - status longitudinal
+  - severidade
+  - notas
+  - tags
+  - data de inicio
+  - data de resolucao
+- `PatientClinicalEvent` com:
+  - tipo de evento
+  - payload estruturado
+  - vinculo opcional com encounter e evolucao
+- timeline consolidada com:
+  - problemas
+  - eventos clinicos
+  - evolucoes
+  - encounters
+  - documentos
+  - consultas
+- editores web para problemas e eventos estruturados no perfil do paciente
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- timeline clinica mais formal
-- problemas e eventos com estrutura longitudinal
+- taxonomia clinica mais fina para eventos e problemas
+- reconciliacao automatica entre eventos, documentos e desfechos
+- metricas longitudinais derivadas por linha de cuidado
 
 ### 10. Tipar melhor os documentos
 
@@ -619,15 +639,15 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 9: aprofundar problemas e eventos clinicos estruturados
-2. passo 7: fechar matriz regulatoria institucional por tipo documental
-3. passo 8: fortalecer LGPD no ciclo de descarte e governanca
+1. passo 7: fechar matriz regulatoria institucional por tipo documental
+2. passo 8: fortalecer LGPD no ciclo de descarte e governanca
+3. passo 25: aprofundar observabilidade e exportacao analitica
 
 ### Bloco seguinte
 
-4. aprofundar observabilidade e exportacao analitica
-5. endurecer descarte e retencao automatizados com workflow
-6. evoluir a governanca de templates oficiais por tenant
+4. endurecer descarte e retencao automatizados com workflow
+5. evoluir a governanca de templates oficiais por tenant
+6. aprofundar lifecycle probatorio da assinatura
 
 ### Bloco posterior
 
@@ -642,4 +662,4 @@ Nao abrir novas frentes pesadas de ecossistema antes de concluir:
 - lifecycle institucional de templates
 - matriz regulatoria institucional
 - operacao segura mais madura
-- prontuario longitudinal com eventos mais estruturados
+- governanca clinica longitudinal mais madura

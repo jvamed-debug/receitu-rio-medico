@@ -1,10 +1,12 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { ClinicalEventType, Prisma, ProblemStatus } from "@prisma/client";
 import type {
   Patient,
+  PatientClinicalEvent,
   PatientClinicalProfile,
   PatientEncounter,
   PatientEvolution,
+  PatientProblem,
   PatientTimelineEntry
 } from "@receituario/domain";
 
@@ -128,6 +130,30 @@ export class PatientsService {
     return evolutions.map(mapEvolution);
   }
 
+  async listProblems(patientId: string) {
+    const problems = await this.prisma.patientProblem.findMany({
+      where: {
+        patientId
+      },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }]
+    });
+
+    return problems.map(mapProblem);
+  }
+
+  async listClinicalEvents(patientId: string) {
+    const events = await this.prisma.patientClinicalEvent.findMany({
+      where: {
+        patientId
+      },
+      orderBy: {
+        occurredAt: "desc"
+      }
+    });
+
+    return events.map(mapClinicalEvent);
+  }
+
   async createEncounter(
     patientId: string,
     input: {
@@ -196,8 +222,81 @@ export class PatientsService {
     return mapEvolution(evolution);
   }
 
+  async createProblem(
+    patientId: string,
+    input: {
+      title: string;
+      status?: PatientProblem["status"];
+      severity?: string;
+      notes?: string;
+      tags?: string[];
+      onsetDate?: string;
+      resolvedAt?: string;
+    },
+    principal: AccessPrincipal
+  ) {
+    if (!principal.professionalId) {
+      throw new ForbiddenException("Problema longitudinal exige profissional autenticado");
+    }
+
+    const problem = await this.prisma.patientProblem.create({
+      data: {
+        patientId,
+        organizationId: principal.organizationId,
+        professionalId: principal.professionalId,
+        title: input.title,
+        status: toProblemStatus(input.status),
+        severity: input.severity ?? null,
+        notes: input.notes ?? null,
+        tags: (input.tags ?? []) as Prisma.InputJsonValue,
+        onsetDate: input.onsetDate ? new Date(input.onsetDate) : null,
+        resolvedAt: input.resolvedAt ? new Date(input.resolvedAt) : null
+      }
+    });
+
+    return mapProblem(problem);
+  }
+
+  async createClinicalEvent(
+    patientId: string,
+    input: {
+      eventType?: PatientClinicalEvent["eventType"];
+      title: string;
+      summary?: string;
+      payload?: Record<string, unknown>;
+      encounterId?: string;
+      evolutionId?: string;
+      occurredAt?: string;
+    },
+    principal: AccessPrincipal
+  ) {
+    if (!principal.professionalId) {
+      throw new ForbiddenException("Evento clinico exige profissional autenticado");
+    }
+
+    const event = await this.prisma.patientClinicalEvent.create({
+      data: {
+        patientId,
+        organizationId: principal.organizationId,
+        professionalId: principal.professionalId,
+        encounterId: input.encounterId ?? null,
+        evolutionId: input.evolutionId ?? null,
+        eventType: toClinicalEventType(input.eventType),
+        title: input.title,
+        summary: input.summary ?? null,
+        payload: input.payload
+          ? (input.payload as Prisma.InputJsonValue)
+          : undefined,
+        occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date()
+      }
+    });
+
+    return mapClinicalEvent(event);
+  }
+
   async getTimeline(patientId: string) {
-    const [encounters, evolutions, documents, appointments] = await Promise.all([
+    const [encounters, evolutions, problems, clinicalEvents, documents, appointments] =
+      await Promise.all([
       this.prisma.patientEncounter.findMany({
         where: {
           patientId
@@ -207,6 +306,20 @@ export class PatientsService {
         }
       }),
       this.prisma.patientEvolution.findMany({
+        where: {
+          patientId
+        },
+        orderBy: {
+          occurredAt: "desc"
+        }
+      }),
+      this.prisma.patientProblem.findMany({
+        where: {
+          patientId
+        },
+        orderBy: [{ createdAt: "desc" }]
+      }),
+      this.prisma.patientClinicalEvent.findMany({
         where: {
           patientId
         },
@@ -263,6 +376,42 @@ export class PatientsService {
           tags: Array.isArray(evolution.tags)
             ? evolution.tags.filter((item): item is string => typeof item === "string")
             : []
+        }
+      })),
+      ...problems.map<PatientTimelineEntry>((problem) => ({
+        id: `problem:${problem.id}`,
+        sourceType: "problem",
+        sourceId: problem.id,
+        patientId: problem.patientId,
+        title: problem.title,
+        subtitle: problem.status.toLowerCase(),
+        occurredAt: (problem.onsetDate ?? problem.createdAt).toISOString(),
+        status: problem.status.toLowerCase(),
+        summary: problem.notes ?? undefined,
+        metadata: {
+          severity: problem.severity ?? undefined,
+          tags: Array.isArray(problem.tags)
+            ? problem.tags.filter((item): item is string => typeof item === "string")
+            : [],
+          resolvedAt: problem.resolvedAt?.toISOString() ?? undefined
+        }
+      })),
+      ...clinicalEvents.map<PatientTimelineEntry>((event) => ({
+        id: `clinical-event:${event.id}`,
+        sourceType: "clinical-event",
+        sourceId: event.id,
+        patientId: event.patientId,
+        title: event.title,
+        subtitle: event.eventType.toLowerCase(),
+        occurredAt: event.occurredAt.toISOString(),
+        summary: event.summary ?? undefined,
+        metadata: {
+          encounterId: event.encounterId ?? undefined,
+          evolutionId: event.evolutionId ?? undefined,
+          payload:
+            event.payload && typeof event.payload === "object"
+              ? (event.payload as Record<string, unknown>)
+              : undefined
         }
       })),
       ...documents.map<PatientTimelineEntry>((document) => ({
@@ -425,6 +574,75 @@ function mapEvolution(evolution: {
   };
 }
 
+function mapProblem(problem: {
+  id: string;
+  patientId: string;
+  organizationId: string | null;
+  professionalId: string;
+  title: string;
+  status: string;
+  severity: string | null;
+  notes: string | null;
+  tags: Prisma.JsonValue | null;
+  onsetDate: Date | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): PatientProblem {
+  return {
+    id: problem.id,
+    patientId: problem.patientId,
+    organizationId: problem.organizationId ?? undefined,
+    professionalId: problem.professionalId,
+    title: problem.title,
+    status: problem.status.toLowerCase() as PatientProblem["status"],
+    severity: problem.severity ?? undefined,
+    notes: problem.notes ?? undefined,
+    tags: Array.isArray(problem.tags)
+      ? problem.tags.filter((item): item is string => typeof item === "string")
+      : undefined,
+    onsetDate: problem.onsetDate?.toISOString(),
+    resolvedAt: problem.resolvedAt?.toISOString(),
+    createdAt: problem.createdAt.toISOString(),
+    updatedAt: problem.updatedAt.toISOString()
+  };
+}
+
+function mapClinicalEvent(event: {
+  id: string;
+  patientId: string;
+  organizationId: string | null;
+  professionalId: string;
+  encounterId: string | null;
+  evolutionId: string | null;
+  eventType: string;
+  title: string;
+  summary: string | null;
+  payload: Prisma.JsonValue | null;
+  occurredAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}): PatientClinicalEvent {
+  return {
+    id: event.id,
+    patientId: event.patientId,
+    organizationId: event.organizationId ?? undefined,
+    professionalId: event.professionalId,
+    encounterId: event.encounterId ?? undefined,
+    evolutionId: event.evolutionId ?? undefined,
+    eventType: event.eventType.toLowerCase() as PatientClinicalEvent["eventType"],
+    title: event.title,
+    summary: event.summary ?? undefined,
+    payload:
+      event.payload && typeof event.payload === "object"
+        ? (event.payload as Record<string, unknown>)
+        : undefined,
+    occurredAt: event.occurredAt.toISOString(),
+    createdAt: event.createdAt.toISOString(),
+    updatedAt: event.updatedAt.toISOString()
+  };
+}
+
 function toEncounterType(type?: PatientEncounter["type"]) {
   switch (type) {
     case "consultation":
@@ -439,6 +657,38 @@ function toEncounterType(type?: PatientEncounter["type"]) {
       return "PROCEDURE" as const;
     default:
       return "CLINICAL_NOTE" as const;
+  }
+}
+
+function toProblemStatus(status?: PatientProblem["status"]) {
+  switch (status) {
+    case "controlled":
+      return ProblemStatus.CONTROLLED;
+    case "resolved":
+      return ProblemStatus.RESOLVED;
+    case "inactive":
+      return ProblemStatus.INACTIVE;
+    default:
+      return ProblemStatus.ACTIVE;
+  }
+}
+
+function toClinicalEventType(type?: PatientClinicalEvent["eventType"]) {
+  switch (type) {
+    case "lab_result":
+      return ClinicalEventType.LAB_RESULT;
+    case "vital_sign":
+      return ClinicalEventType.VITAL_SIGN;
+    case "procedure":
+      return ClinicalEventType.PROCEDURE;
+    case "incident":
+      return ClinicalEventType.INCIDENT;
+    case "communication":
+      return ClinicalEventType.COMMUNICATION;
+    case "administrative":
+      return ClinicalEventType.ADMINISTRATIVE;
+    default:
+      return ClinicalEventType.OBSERVATION;
   }
 }
 

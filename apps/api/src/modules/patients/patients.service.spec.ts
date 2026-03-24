@@ -91,7 +91,98 @@ test("cria evolucao clinica estruturada vinculada ao paciente", async () => {
   assert.equal(result.assessment, "Boa resposta terapeutica.");
 });
 
-test("consolida timeline com encounters, documentos e appointments", async () => {
+test("cria problema longitudinal estruturado", async () => {
+  const service = new PatientsService(
+    {
+      patientProblem: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({
+          id: "prob-1",
+          patientId: data.patientId,
+          organizationId: data.organizationId,
+          professionalId: data.professionalId,
+          title: data.title,
+          status: data.status,
+          severity: data.severity,
+          notes: data.notes,
+          tags: data.tags,
+          onsetDate: new Date("2026-03-20T00:00:00.000Z"),
+          resolvedAt: null,
+          createdAt: new Date("2026-03-23T09:00:00.000Z"),
+          updatedAt: new Date("2026-03-23T09:00:00.000Z")
+        })
+      }
+    } as never
+  );
+
+  const result = await service.createProblem(
+    "patient-1",
+    {
+      title: "Hipertensao arterial sistemica",
+      status: "active",
+      severity: "moderada",
+      notes: "Segue em monitorizacao ambulatorial.",
+      tags: ["cronico", "cardiovascular"]
+    },
+    {
+      professionalId: "prof-1",
+      organizationId: "org-1"
+    } as never
+  );
+
+  assert.equal(result.patientId, "patient-1");
+  assert.equal(result.professionalId, "prof-1");
+  assert.equal(result.status, "active");
+  assert.equal(result.tags?.length, 2);
+});
+
+test("cria evento clinico estruturado", async () => {
+  const service = new PatientsService(
+    {
+      patientClinicalEvent: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({
+          id: "evt-1",
+          patientId: data.patientId,
+          organizationId: data.organizationId,
+          professionalId: data.professionalId,
+          encounterId: data.encounterId,
+          evolutionId: data.evolutionId,
+          eventType: data.eventType,
+          title: data.title,
+          summary: data.summary,
+          payload: data.payload,
+          occurredAt: new Date("2026-03-23T17:00:00.000Z"),
+          createdAt: new Date("2026-03-23T17:00:00.000Z"),
+          updatedAt: new Date("2026-03-23T17:00:00.000Z")
+        })
+      }
+    } as never
+  );
+
+  const result = await service.createClinicalEvent(
+    "patient-1",
+    {
+      eventType: "lab_result",
+      title: "Creatinina elevada",
+      summary: "Ajustar seguimento renal.",
+      payload: {
+        test: "creatinina",
+        value: 1.8,
+        unit: "mg/dL"
+      },
+      encounterId: "enc-1"
+    },
+    {
+      professionalId: "prof-1",
+      organizationId: "org-1"
+    } as never
+  );
+
+  assert.equal(result.patientId, "patient-1");
+  assert.equal(result.eventType, "lab_result");
+  assert.equal(result.encounterId, "enc-1");
+});
+
+test("consolida timeline com problemas, eventos, encounters, documentos e appointments", async () => {
   const service = new PatientsService(
     {
       patientEncounter: {
@@ -132,6 +223,47 @@ test("consolida timeline com encounters, documentos e appointments", async () =>
           }
         ]
       },
+      patientProblem: {
+        findMany: async () => [
+          {
+            id: "prob-1",
+            patientId: "patient-1",
+            organizationId: "org-1",
+            professionalId: "prof-1",
+            title: "Diabetes tipo 2",
+            status: "ACTIVE",
+            severity: "moderada",
+            notes: "Em ajuste terapeutico.",
+            tags: ["cronico", "metabolico"],
+            onsetDate: new Date("2026-03-23T17:30:00.000Z"),
+            resolvedAt: null,
+            createdAt: new Date("2026-03-23T17:30:00.000Z"),
+            updatedAt: new Date("2026-03-23T17:30:00.000Z")
+          }
+        ]
+      },
+      patientClinicalEvent: {
+        findMany: async () => [
+          {
+            id: "evt-1",
+            patientId: "patient-1",
+            organizationId: "org-1",
+            professionalId: "prof-1",
+            encounterId: "enc-1",
+            evolutionId: null,
+            eventType: "LAB_RESULT",
+            title: "HbA1c 8,2%",
+            summary: "Controle glicemico insuficiente.",
+            payload: {
+              test: "hba1c",
+              value: "8.2%"
+            },
+            occurredAt: new Date("2026-03-23T18:00:00.000Z"),
+            createdAt: new Date("2026-03-23T18:00:00.000Z"),
+            updatedAt: new Date("2026-03-23T18:00:00.000Z")
+          }
+        ]
+      },
       clinicalDocument: {
         findMany: async () => [
           {
@@ -169,9 +301,11 @@ test("consolida timeline com encounters, documentos e appointments", async () =>
   const result = await service.getTimeline("patient-1");
 
   assert.equal(result.patientId, "patient-1");
-  assert.equal(result.items.length, 4);
-  assert.equal(result.items[0]?.sourceType, "evolution");
-  assert.equal(result.items[1]?.sourceType, "encounter");
-  assert.equal(result.items[2]?.sourceType, "document");
-  assert.equal(result.items[3]?.sourceType, "appointment");
+  assert.equal(result.items.length, 6);
+  assert.equal(result.items[0]?.sourceType, "clinical-event");
+  assert.equal(result.items[1]?.sourceType, "problem");
+  assert.equal(result.items[2]?.sourceType, "evolution");
+  assert.equal(result.items[3]?.sourceType, "encounter");
+  assert.equal(result.items[4]?.sourceType, "document");
+  assert.equal(result.items[5]?.sourceType, "appointment");
 });

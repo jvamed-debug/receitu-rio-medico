@@ -11,8 +11,10 @@ import type {
   PharmacyOperationsSnapshot,
   PharmacyProviderReadinessResponse,
   PharmacyQuote,
+  PatientClinicalEvent,
   PatientEncounter,
   PatientEvolution,
+  PatientProblem,
   PatientTimelineEntry
 } from "@receituario/domain";
 export type {
@@ -27,8 +29,10 @@ export type {
   PharmacyOperationsSnapshot,
   PharmacyProviderReadinessResponse,
   PharmacyQuote,
+  PatientClinicalEvent,
   PatientEncounter,
   PatientEvolution,
+  PatientProblem,
   PatientTimelineEntry
 } from "@receituario/domain";
 import type {
@@ -702,6 +706,14 @@ export class ApiClient {
     return this.get<PatientEvolution[]>(`/patients/${id}/evolutions`);
   }
 
+  listPatientProblems(id: string) {
+    return this.get<PatientProblem[]>(`/patients/${id}/problems`);
+  }
+
+  listPatientClinicalEvents(id: string) {
+    return this.get<PatientClinicalEvent[]>(`/patients/${id}/clinical-events`);
+  }
+
   createPatientEncounter(
     id: string,
     input: {
@@ -735,6 +747,43 @@ export class ApiClient {
     }
   ) {
     return this.post<PatientEvolution>(`/patients/${id}/evolutions`, input);
+  }
+
+  createPatientProblem(
+    id: string,
+    input: {
+      title: string;
+      status?: "active" | "controlled" | "resolved" | "inactive";
+      severity?: string;
+      notes?: string;
+      tags?: string[];
+      onsetDate?: string;
+      resolvedAt?: string;
+    }
+  ) {
+    return this.post<PatientProblem>(`/patients/${id}/problems`, input);
+  }
+
+  createPatientClinicalEvent(
+    id: string,
+    input: {
+      eventType?:
+        | "observation"
+        | "lab_result"
+        | "vital_sign"
+        | "procedure"
+        | "incident"
+        | "communication"
+        | "administrative";
+      title: string;
+      summary?: string;
+      payload?: Record<string, unknown>;
+      encounterId?: string;
+      evolutionId?: string;
+      occurredAt?: string;
+    }
+  ) {
+    return this.post<PatientClinicalEvent>(`/patients/${id}/clinical-events`, input);
   }
 
   getPatientTimeline(id: string) {

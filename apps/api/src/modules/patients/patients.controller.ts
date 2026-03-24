@@ -92,6 +92,77 @@ export class PatientsController {
     return this.patientsService.listEvolutions(id);
   }
 
+  @Get(":id/problems")
+  async listProblems(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertPatientAccess(principal, id, "patient_timeline_read");
+    return this.patientsService.listProblems(id);
+  }
+
+  @Post(":id/problems")
+  async createProblem(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Body()
+    input: {
+      title: string;
+      status?: "active" | "controlled" | "resolved" | "inactive";
+      severity?: string;
+      notes?: string;
+      tags?: string[];
+      onsetDate?: string;
+      resolvedAt?: string;
+    }
+  ) {
+    await this.resourceAccessService.assertPatientAccess(
+      principal,
+      id,
+      "patient_encounter_create"
+    );
+    return this.patientsService.createProblem(id, input, principal);
+  }
+
+  @Get(":id/clinical-events")
+  async listClinicalEvents(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertPatientAccess(principal, id, "patient_timeline_read");
+    return this.patientsService.listClinicalEvents(id);
+  }
+
+  @Post(":id/clinical-events")
+  async createClinicalEvent(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string,
+    @Body()
+    input: {
+      eventType?:
+        | "observation"
+        | "lab_result"
+        | "vital_sign"
+        | "procedure"
+        | "incident"
+        | "communication"
+        | "administrative";
+      title: string;
+      summary?: string;
+      payload?: Record<string, unknown>;
+      encounterId?: string;
+      evolutionId?: string;
+      occurredAt?: string;
+    }
+  ) {
+    await this.resourceAccessService.assertPatientAccess(
+      principal,
+      id,
+      "patient_encounter_create"
+    );
+    return this.patientsService.createClinicalEvent(id, input, principal);
+  }
+
   @Post(":id/evolutions")
   async createEvolution(
     @CurrentPrincipal() principal: AccessPrincipal,

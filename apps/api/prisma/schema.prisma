@@ -100,6 +100,23 @@ enum EncounterType {
   CLINICAL_NOTE
 }
 
+enum ProblemStatus {
+  ACTIVE
+  CONTROLLED
+  RESOLVED
+  INACTIVE
+}
+
+enum ClinicalEventType {
+  OBSERVATION
+  LAB_RESULT
+  VITAL_SIGN
+  PROCEDURE
+  INCIDENT
+  COMMUNICATION
+  ADMINISTRATIVE
+}
+
 enum MembershipStatus {
   ACTIVE
   SUSPENDED
@@ -162,6 +179,8 @@ model ProfessionalProfile {
   reviewedClinicalProfiles PatientClinicalProfile[]
   encounters           PatientEncounter[]
   evolutions           PatientEvolution[]
+  problems             PatientProblem[]
+  clinicalEvents       PatientClinicalEvent[]
   signatureSessions    SignatureSession[]
   requestedCdsOverrideReviews CdsOverrideReview[] @relation("RequestedCdsOverrideReviews")
   reviewedCdsOverrideReviews CdsOverrideReview[]  @relation("ReviewedCdsOverrideReviews")
@@ -183,6 +202,8 @@ model Organization {
   appointments       Appointment[]
   encounters         PatientEncounter[]
   evolutions         PatientEvolution[]
+  problems           PatientProblem[]
+  clinicalEvents     PatientClinicalEvent[]
   templates          Template[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
@@ -239,6 +260,8 @@ model Patient {
   appointments Appointment[]
   encounters   PatientEncounter[]
   evolutions   PatientEvolution[]
+  problems     PatientProblem[]
+  clinicalEvents PatientClinicalEvent[]
   organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
   createdAt  DateTime           @default(now())
@@ -393,6 +416,52 @@ model PatientEvolution {
   patient          Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
   organization     Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   professional     ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, occurredAt])
+  @@index([organizationId, occurredAt])
+  @@index([professionalId, occurredAt])
+}
+
+model PatientProblem {
+  id             String              @id @default(cuid())
+  patientId      String
+  organizationId String?
+  professionalId String
+  title          String
+  status         ProblemStatus       @default(ACTIVE)
+  severity       String?
+  notes          String?
+  tags           Json?
+  onsetDate      DateTime?
+  resolvedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  patient        Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization   Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status, createdAt])
+  @@index([organizationId, status, createdAt])
+  @@index([professionalId, createdAt])
+}
+
+model PatientClinicalEvent {
+  id             String              @id @default(cuid())
+  patientId      String
+  organizationId String?
+  professionalId String
+  encounterId    String?
+  evolutionId    String?
+  eventType      ClinicalEventType   @default(OBSERVATION)
+  title          String
+  summary        String?
+  payload        Json?
+  occurredAt     DateTime
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  patient        Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization   Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
   @@index([patientId, occurredAt])
   @@index([organizationId, occurredAt])

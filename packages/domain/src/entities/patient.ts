@@ -52,9 +52,58 @@ export interface PatientEvolution {
   updatedAt: string;
 }
 
+export type PatientProblemStatus = "active" | "controlled" | "resolved" | "inactive";
+
+export interface PatientProblem {
+  id: string;
+  patientId: string;
+  organizationId?: string;
+  professionalId: string;
+  title: string;
+  status: PatientProblemStatus;
+  severity?: string;
+  notes?: string;
+  tags?: string[];
+  onsetDate?: string;
+  resolvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PatientClinicalEventType =
+  | "observation"
+  | "lab_result"
+  | "vital_sign"
+  | "procedure"
+  | "incident"
+  | "communication"
+  | "administrative";
+
+export interface PatientClinicalEvent {
+  id: string;
+  patientId: string;
+  organizationId?: string;
+  professionalId: string;
+  encounterId?: string;
+  evolutionId?: string;
+  eventType: PatientClinicalEventType;
+  title: string;
+  summary?: string;
+  payload?: Record<string, unknown>;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PatientTimelineEntry {
   id: string;
-  sourceType: "encounter" | "evolution" | "document" | "appointment";
+  sourceType:
+    | "encounter"
+    | "evolution"
+    | "problem"
+    | "clinical-event"
+    | "document"
+    | "appointment";
   sourceId: string;
   patientId: string;
   title: string;

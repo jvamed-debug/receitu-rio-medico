@@ -1,6 +1,8 @@
 import { ClinicalProfileEditor } from "../../../../components/patients/clinical-profile-editor";
+import { PatientClinicalEventEditor } from "../../../../components/patients/patient-clinical-event-editor";
 import { PatientEncounterEditor } from "../../../../components/patients/patient-encounter-editor";
 import { PatientEvolutionEditor } from "../../../../components/patients/patient-evolution-editor";
+import { PatientProblemEditor } from "../../../../components/patients/patient-problem-editor";
 import { DocumentList } from "../../../../components/documents/document-list";
 import { PageSection } from "../../../../components/page-section";
 import { Shell } from "../../../../components/shell";
@@ -15,13 +17,16 @@ export default async function PatientProfilePage({
 }) {
   const { id } = await params;
   const api = await createServerApiClient();
-  const [patient, history, encounters, evolutions, timeline] = await Promise.all([
+  const [patient, history, encounters, evolutions, problems, clinicalEvents, timeline] =
+    await Promise.all([
     api.getPatient(id).catch(() => null),
     api.getPatientHistory(id).catch(() => ({ patientId: id, items: [] })),
     api.listPatientEncounters(id).catch(() => []),
     api.listPatientEvolutions(id).catch(() => []),
+    api.listPatientProblems(id).catch(() => []),
+    api.listPatientClinicalEvents(id).catch(() => []),
     api.getPatientTimeline(id).catch(() => ({ patientId: id, items: [] }))
-  ]);
+    ]);
 
   return (
     <Shell
@@ -88,9 +93,22 @@ export default async function PatientProfilePage({
             title: encounter.title
           }))}
         />
+        <PatientProblemEditor patientId={id} initialProblems={problems} />
+        <PatientClinicalEventEditor
+          patientId={id}
+          initialEvents={clinicalEvents}
+          encounterOptions={encounters.map((encounter) => ({
+            id: encounter.id,
+            title: encounter.title
+          }))}
+          evolutionOptions={evolutions.map((evolution) => ({
+            id: evolution.id,
+            title: evolution.title
+          }))}
+        />
         <PageSection
           title="Timeline assistencial"
-          description="Consolidacao longitudinal de evolucoes, encounters, consultas e documentos do paciente."
+          description="Consolidacao longitudinal de problemas, eventos clinicos, evolucoes, encounters, consultas e documentos do paciente."
         >
           <div style={{ display: "grid", gap: 12 }}>
             {timeline.items.length > 0 ? (
