@@ -113,6 +113,18 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum TemplateScope {
+  PERSONAL
+  INSTITUTIONAL
+}
+
+enum TemplateLifecycleStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
 model User {
   id                 String               @id @default(cuid())
   email              String               @unique
@@ -121,6 +133,8 @@ model User {
   role               UserRole             @default(PROFESSIONAL)
   professionalProfile ProfessionalProfile?
   templateFavorites  UserTemplateFavorite[]
+  createdTemplates   Template[]           @relation("CreatedTemplates")
+  reviewedTemplates  Template[]           @relation("ReviewedTemplates")
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 }
@@ -169,6 +183,7 @@ model Organization {
   appointments       Appointment[]
   encounters         PatientEncounter[]
   evolutions         PatientEvolution[]
+  templates          Template[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 }
@@ -459,14 +474,30 @@ model PharmacyOrder {
 }
 
 model Template {
-  id          String       @id @default(cuid())
-  name        String
-  type        DocumentType
-  version     Int          @default(1)
-  structure   Json
-  favoritedBy UserTemplateFavorite[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id               String                  @id @default(cuid())
+  name             String
+  type             DocumentType
+  version          Int                     @default(1)
+  scope            TemplateScope           @default(PERSONAL)
+  lifecycleStatus  TemplateLifecycleStatus @default(DRAFT)
+  structure        Json
+  organizationId   String?
+  createdByUserId  String?
+  reviewedByUserId String?
+  sourceTemplateId String?
+  publishedAt      DateTime?
+  archivedAt       DateTime?
+  favoritedBy      UserTemplateFavorite[]
+  organization     Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdByUser    User?                   @relation("CreatedTemplates", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  reviewedByUser   User?                   @relation("ReviewedTemplates", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  sourceTemplate   Template?               @relation("TemplateLineage", fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  derivedTemplates Template[]              @relation("TemplateLineage")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([organizationId, lifecycleStatus, updatedAt])
+  @@index([createdByUserId, scope, updatedAt])
 }
 
 model UserTemplateFavorite {

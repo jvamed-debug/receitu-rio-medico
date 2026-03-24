@@ -12,8 +12,15 @@ export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 
   @Get()
-  list() {
-    return this.templatesService.list();
+  list(
+    @CurrentPrincipal()
+    principal: {
+      userId: string;
+      organizationId?: string;
+      roles: string[];
+    }
+  ) {
+    return this.templatesService.list(principal);
   }
 
   @Get("favorites")
@@ -28,16 +35,56 @@ export class TemplatesController {
 
   @RequireRoles("professional", "admin")
   @Post()
-  create(@Body() input: Record<string, unknown>) {
-    return this.templatesService.create({
+  create(
+    @CurrentPrincipal()
+    principal: {
+      userId: string;
+      organizationId?: string;
+      roles: string[];
+    },
+    @Body() input: Record<string, unknown>
+  ) {
+    return this.templatesService.create(principal, {
       name: String(input.name),
       type: input.type as
         | "prescription"
         | "exam-request"
         | "medical-certificate"
         | "free-document",
+      scope:
+        input.scope === "institutional" || input.scope === "personal"
+          ? input.scope
+          : undefined,
       structure: (input.structure as Record<string, unknown> | undefined) ?? {}
     });
+  }
+
+  @RequireRoles("professional", "admin")
+  @Post(":id/publish")
+  publish(
+    @CurrentPrincipal()
+    principal: {
+      userId: string;
+      organizationId?: string;
+      roles: string[];
+    },
+    @Param("id") id: string
+  ) {
+    return this.templatesService.publish(principal, id);
+  }
+
+  @RequireRoles("professional", "admin")
+  @Post(":id/archive")
+  archive(
+    @CurrentPrincipal()
+    principal: {
+      userId: string;
+      organizationId?: string;
+      roles: string[];
+    },
+    @Param("id") id: string
+  ) {
+    return this.templatesService.archive(principal, id);
   }
 
   @RequireRoles("professional", "admin")

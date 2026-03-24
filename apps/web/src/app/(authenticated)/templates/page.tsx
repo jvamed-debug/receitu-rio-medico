@@ -255,6 +255,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [favoritePresetIds, setFavoritePresetIds] = useState<string[]>([]);
   const [specialtyTrack, setSpecialtyTrack] = useState<SpecialtyTrack | null>(null);
+  const [currentRoles, setCurrentRoles] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [type, setType] = useState<TemplateType>("prescription");
   const [editorName, setEditorName] = useState("");
@@ -315,6 +316,7 @@ export default function TemplatesPage() {
         setTemplates(templateItems);
         setFavoritePresetIds(favorites.map((favorite) => favorite.presetKey));
         setSpecialtyTrack(inferSpecialtyTrack(me.professionalProfile?.specialty));
+        setCurrentRoles(Array.isArray(me.roles) ? me.roles : []);
       })
       .catch((loadError) => {
         if (active) {
@@ -344,7 +346,8 @@ export default function TemplatesPage() {
             scope: "personal",
             createdFrom: "web-ui"
           }
-        }
+        },
+        scope: "personal"
       });
       setTemplates((current) => [created, ...current]);
       setName("");
@@ -375,7 +378,8 @@ export default function TemplatesPage() {
             sourcePresetId: preset.id,
             source: "preset-library"
           }
-        }
+        },
+        scope: "personal"
       });
       setTemplates((current) => [created, ...current]);
       setMessage(`Template ${created.name} criado com versao ${created.version}.`);
@@ -409,7 +413,8 @@ export default function TemplatesPage() {
                 collectionName: collection.name,
                 source: "institutional-import"
               }
-            }
+            },
+            scope: "institutional"
           })
         )
       );
@@ -474,7 +479,8 @@ export default function TemplatesPage() {
       const created = await api.createTemplate({
         name: editorName,
         type: editorType,
-        structure
+        structure,
+        scope: editorScope
       });
 
       setTemplates((current) => [created, ...current]);
@@ -734,7 +740,7 @@ export default function TemplatesPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <div style={{ fontWeight: 700 }}>{template.name}</div>
                       <div style={{ color: "var(--muted)" }}>
-                        {readString(meta.scope) ?? "personal"} | versao {template.version}
+                        {template.scope} | {template.lifecycleStatus} | versao {template.version}
                       </div>
                     </div>
                     <div>Tipo: {template.type}</div>
@@ -745,6 +751,69 @@ export default function TemplatesPage() {
                     <div style={{ color: "var(--muted)", fontSize: 14 }}>
                       Estrutura base: {JSON.stringify(template.structure)}
                     </div>
+                    {template.scope === "institutional" &&
+                    currentRoles.some((role) => role === "admin" || role === "compliance") ? (
+                      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                        {template.lifecycleStatus !== "published" ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!api) {
+                                return;
+                              }
+
+                              try {
+                                const updated = await api.publishTemplate(template.id);
+                                setTemplates((current) =>
+                                  current.map((item) => (item.id === template.id ? updated : item))
+                                );
+                                setMessage(`Template ${updated.name} publicado.`);
+                                setError(null);
+                              } catch (publishError) {
+                                setError(
+                                  publishError instanceof Error
+                                    ? publishError.message
+                                    : "Falha ao publicar template."
+                                );
+                                setMessage(null);
+                              }
+                            }}
+                            style={secondaryButtonStyle}
+                          >
+                            Publicar
+                          </button>
+                        ) : null}
+                        {template.lifecycleStatus !== "archived" ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!api) {
+                                return;
+                              }
+
+                              try {
+                                const updated = await api.archiveTemplate(template.id);
+                                setTemplates((current) =>
+                                  current.map((item) => (item.id === template.id ? updated : item))
+                                );
+                                setMessage(`Template ${updated.name} arquivado.`);
+                                setError(null);
+                              } catch (archiveError) {
+                                setError(
+                                  archiveError instanceof Error
+                                    ? archiveError.message
+                                    : "Falha ao arquivar template."
+                                );
+                                setMessage(null);
+                              }
+                            }}
+                            style={secondaryButtonStyle}
+                          >
+                            Arquivar
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })

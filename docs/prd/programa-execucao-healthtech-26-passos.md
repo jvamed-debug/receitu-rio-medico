@@ -32,6 +32,7 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 10. contratos documentais tipados e versionados
 - 12. prontuario longitudinal baseline
 - 18. CDS baseline institucional concluido
+- 11. engine institucional de templates baseline
 
 ### Em progresso forte
 
@@ -39,7 +40,6 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 7. fechar matriz regulatoria por tipo documental
 - 8. fortalecer LGPD operacional
 - 9. evoluir o modelo de dados
-- 11. criar engine de templates seria
 - 13. integrar provedor real ICP-Brasil
 - 14. criar trilha probatoria
 - 15. separar autenticacao e assinatura
@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 11. endurecer lifecycle institucional de templates
 - 9. aprofundar problemas e eventos clinicos estruturados
 - 7. fechar matriz regulatoria por tipo documental no nivel institucional
+- 8. fortalecer LGPD no ciclo de descarte e governanca
 
 ## Checklist dos 26 passos
 
@@ -232,7 +232,7 @@ Fica para evolucao posterior:
 
 ### 11. Criar engine de templates seria
 
-Status: em progresso avancado
+Status: concluido no baseline institucional atual
 
 Ja entregue:
 
@@ -241,12 +241,19 @@ Ja entregue:
 - versionamento inicial
 - importacao institucional
 - presets por especialidade
+- escopo formal `personal` e `institutional`
+- lifecycle institucional com:
+  - `pending_review`
+  - `published`
+  - `archived`
+- publicacao e arquivamento institucional com governanca por tenant
+- visibilidade de status no catalogo web
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- governanca por clinica
-- aprovacao/publicacao institucional
-- lifecycle mais forte para templates oficiais
+- aprovacao em duas etapas para templates oficiais de maior risco
+- workflow de revisao com comentario e trilha mais rica
+- curadoria clinica centralizada por linha de cuidado
 
 ### 12. Melhorar prontuario
 
@@ -612,9 +619,9 @@ Falta para fechar:
 
 ### Bloco imediato
 
-1. passo 11: endurecer lifecycle institucional de templates
-2. passo 9: aprofundar problemas e eventos clinicos estruturados
-3. passo 7: fechar matriz regulatoria institucional por tipo documental
+1. passo 9: aprofundar problemas e eventos clinicos estruturados
+2. passo 7: fechar matriz regulatoria institucional por tipo documental
+3. passo 8: fortalecer LGPD no ciclo de descarte e governanca
 
 ### Bloco seguinte
 

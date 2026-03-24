@@ -76,6 +76,13 @@ export interface TemplateSummary {
   name: string;
   type: string;
   version: number;
+  scope: "personal" | "institutional";
+  lifecycleStatus: "draft" | "pending_review" | "published" | "archived";
+  organizationId?: string | null;
+  createdByUserId?: string | null;
+  reviewedByUserId?: string | null;
+  publishedAt?: string | null;
+  archivedAt?: string | null;
   structure: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -283,6 +290,7 @@ export interface CreateFreeDocumentInput {
 export interface CreateTemplateInput {
   name: string;
   type: "prescription" | "exam-request" | "medical-certificate" | "free-document";
+  scope?: "personal" | "institutional";
   structure?: Record<string, unknown>;
 }
 
@@ -931,6 +939,14 @@ export class ApiClient {
 
   createTemplate(input: CreateTemplateInput) {
     return this.post<TemplateSummary>("/templates", input);
+  }
+
+  publishTemplate(id: string) {
+    return this.post<TemplateSummary>(`/templates/${id}/publish`, {});
+  }
+
+  archiveTemplate(id: string) {
+    return this.post<TemplateSummary>(`/templates/${id}/archive`, {});
   }
 
   listTemplateFavorites() {
