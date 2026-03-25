@@ -36,7 +36,12 @@ test("gera link seguro com expiracao e limite de uso", async () => {
 
   const result = await service.createShareLink({
     documentId: "doc-1",
-    professionalId: "prof-1"
+    principal: {
+      userId: "user-1",
+      professionalId: "prof-1",
+      organizationId: "org-1",
+      roles: ["professional"]
+    }
   });
 
   assert.equal(result.documentId, "doc-1");
@@ -158,7 +163,11 @@ function createService(
       },
       policy: {
         shareLinkTtlHours: 24,
-        shareLinkMaxUses: 3
+        shareLinkMaxUses: 3,
+        minimumShareRole: "professional",
+        legalBasis: "execucao assistencial",
+        processingPurpose: "compartilhamento externo",
+        riskLevel: "standard"
       }
     }),
     ...complianceOverrides

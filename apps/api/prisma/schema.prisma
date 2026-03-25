@@ -130,6 +130,31 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum PatientConsentType {
+  EXTERNAL_DOCUMENT_SHARE
+  COMMUNICATION
+  ANALYTICS
+  OPTIONAL_SERVICES
+}
+
+enum ConsentStatus {
+  GRANTED
+  REVOKED
+  EXPIRED
+}
+
+enum RetentionReviewType {
+  ARCHIVE
+  DISPOSAL
+}
+
+enum RetentionReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+}
+
 enum TemplateScope {
   PERSONAL
   INSTITUTIONAL
@@ -181,6 +206,7 @@ model ProfessionalProfile {
   evolutions           PatientEvolution[]
   problems             PatientProblem[]
   clinicalEvents       PatientClinicalEvent[]
+  consentRecords       PatientConsentRecord[]
   signatureSessions    SignatureSession[]
   requestedCdsOverrideReviews CdsOverrideReview[] @relation("RequestedCdsOverrideReviews")
   reviewedCdsOverrideReviews CdsOverrideReview[]  @relation("ReviewedCdsOverrideReviews")
@@ -204,6 +230,8 @@ model Organization {
   evolutions         PatientEvolution[]
   problems           PatientProblem[]
   clinicalEvents     PatientClinicalEvent[]
+  consentRecords     PatientConsentRecord[]
+  retentionReviews   ComplianceRetentionReview[]
   templates          Template[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
@@ -262,6 +290,7 @@ model Patient {
   evolutions   PatientEvolution[]
   problems     PatientProblem[]
   clinicalEvents PatientClinicalEvent[]
+  consentRecords PatientConsentRecord[]
   organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   primaryProfessional ProfessionalProfile? @relation("PrimaryProfessionalPatients", fields: [primaryProfessionalId], references: [id], onDelete: SetNull)
   createdAt  DateTime           @default(now())
@@ -468,6 +497,29 @@ model PatientClinicalEvent {
   @@index([professionalId, occurredAt])
 }
 
+model PatientConsentRecord {
+  id             String              @id @default(cuid())
+  patientId      String
+  organizationId String?
+  professionalId String
+  consentType    PatientConsentType
+  status         ConsentStatus       @default(GRANTED)
+  purpose        String
+  legalBasis     String
+  grantedAt      DateTime            @default(now())
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  patient        Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization   Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, consentType, status, grantedAt])
+  @@index([organizationId, consentType, status, grantedAt])
+}
+
 model ClinicalDocument {
   id                    String               @id @default(cuid())
   type                  DocumentType
@@ -489,6 +541,7 @@ model ClinicalDocument {
   shareTokens           DocumentShareToken[]
   cdsOverrideReviews    CdsOverrideReview[]
   pharmacyOrders        PharmacyOrder[]
+  retentionReviews      ComplianceRetentionReview[]
   pdfArtifact           PdfArtifact?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
@@ -638,6 +691,29 @@ model DocumentShareToken {
   document        ClinicalDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId, expiresAt])
+}
+
+model ComplianceRetentionReview {
+  id                String                @id @default(cuid())
+  documentId        String
+  organizationId    String?
+  documentType      DocumentType
+  retentionCategory String
+  reviewType        RetentionReviewType
+  status            RetentionReviewStatus @default(PENDING)
+  dueAt             DateTime
+  rationale         String?
+  requestedByUserId String?
+  resolvedByUserId  String?
+  resolutionNotes   String?
+  resolvedAt        DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  document          ClinicalDocument      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  organization      Organization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, reviewType, createdAt])
+  @@index([documentId, status, reviewType])
 }
 
 model AuditLog {

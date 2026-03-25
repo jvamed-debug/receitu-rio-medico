@@ -6,6 +6,7 @@ import {
 import { createHash, randomBytes } from "node:crypto";
 
 import { PrismaService } from "../../persistence/prisma.service";
+import type { AccessPrincipal } from "../auth/auth.types";
 import { ComplianceService } from "../compliance/compliance.service";
 
 @Injectable()
@@ -54,10 +55,10 @@ export class DeliveryService {
     };
   }
 
-  async createShareLink(input: { documentId: string; professionalId: string }) {
+  async createShareLink(input: { documentId: string; principal: AccessPrincipal }) {
     const { document, policy } = await this.complianceService.validateBeforeExternalShare({
       documentId: input.documentId,
-      professionalId: input.professionalId
+      principal: input.principal
     });
 
     const plainToken = randomBytes(24).toString("base64url");
@@ -76,7 +77,11 @@ export class DeliveryService {
           documentType: document.type,
           policy: {
             ttlHours: policy.shareLinkTtlHours,
-            maxUses: policy.shareLinkMaxUses
+            maxUses: policy.shareLinkMaxUses,
+            minimumShareRole: policy.minimumShareRole,
+            legalBasis: policy.legalBasis,
+            processingPurpose: policy.processingPurpose,
+            riskLevel: policy.riskLevel
           }
         }
       }

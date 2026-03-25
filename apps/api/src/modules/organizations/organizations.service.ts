@@ -335,11 +335,29 @@ export class OrganizationsService {
         expirationHoursDefault?: number;
         allowHighRiskExternalShare?: boolean;
       };
+      documentPolicyMatrix?: Partial<
+        Record<
+          "prescription" | "exam-request" | "medical-certificate" | "free-document",
+          {
+            allowExternalShare?: boolean;
+            requireRqe?: boolean;
+            minimumShareRole?: "professional" | "admin" | "compliance";
+            requirePatientConsentForExternalShare?: boolean;
+            shareLinkTtlHours?: number;
+            shareLinkMaxUses?: number;
+          }
+        >
+      >;
       overridePolicy?: {
         minimumReviewerRole?: "professional" | "admin" | "compliance";
         requireInstitutionalReviewForHighSeverity?: boolean;
         requireInstitutionalReviewForModerateInteraction?: boolean;
         autoAcknowledgePrivilegedOverride?: boolean;
+      };
+      lgpdPolicy?: {
+        requireConsentForExternalShare?: boolean;
+        requireDisposalApproval?: boolean;
+        retentionReviewWindowDays?: number;
       };
       brandingPolicy?: {
         allowCustomLogo?: boolean;
@@ -563,7 +581,9 @@ function mapMembershipStatus(status?: "active" | "suspended" | "removed") {
 function normalizeOrganizationSettings(input: unknown) {
   const value = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
   const share = readObject(value.documentSharePolicy);
+  const matrix = readObject(value.documentPolicyMatrix);
   const override = readObject(value.overridePolicy);
+  const lgpd = readObject(value.lgpdPolicy);
   const branding = readObject(value.brandingPolicy);
 
   return {
@@ -576,6 +596,43 @@ function normalizeOrganizationSettings(input: unknown) {
         typeof share.allowHighRiskExternalShare === "boolean"
           ? share.allowHighRiskExternalShare
           : false
+    },
+    documentPolicyMatrix: {
+      prescription: normalizeDocumentPolicyEntry(readObject(matrix.prescription), {
+        allowExternalShare: true,
+        requireRqe: false,
+        minimumShareRole: "professional",
+        requirePatientConsentForExternalShare: false,
+        shareLinkTtlHours: 24,
+        shareLinkMaxUses: 3
+      }),
+      "exam-request": normalizeDocumentPolicyEntry(readObject(matrix["exam-request"]), {
+        allowExternalShare: true,
+        requireRqe: false,
+        minimumShareRole: "professional",
+        requirePatientConsentForExternalShare: false,
+        shareLinkTtlHours: 72,
+        shareLinkMaxUses: 5
+      }),
+      "medical-certificate": normalizeDocumentPolicyEntry(
+        readObject(matrix["medical-certificate"]),
+        {
+          allowExternalShare: true,
+          requireRqe: false,
+          minimumShareRole: "professional",
+          requirePatientConsentForExternalShare: true,
+          shareLinkTtlHours: 48,
+          shareLinkMaxUses: 3
+        }
+      ),
+      "free-document": normalizeDocumentPolicyEntry(readObject(matrix["free-document"]), {
+        allowExternalShare: false,
+        requireRqe: false,
+        minimumShareRole: "admin",
+        requirePatientConsentForExternalShare: true,
+        shareLinkTtlHours: 12,
+        shareLinkMaxUses: 1
+      })
     },
     overridePolicy: {
       minimumReviewerRole:
@@ -597,6 +654,20 @@ function normalizeOrganizationSettings(input: unknown) {
           ? override.autoAcknowledgePrivilegedOverride
           : true
     },
+    lgpdPolicy: {
+      requireConsentForExternalShare:
+        typeof lgpd.requireConsentForExternalShare === "boolean"
+          ? lgpd.requireConsentForExternalShare
+          : false,
+      requireDisposalApproval:
+        typeof lgpd.requireDisposalApproval === "boolean"
+          ? lgpd.requireDisposalApproval
+          : true,
+      retentionReviewWindowDays:
+        typeof lgpd.retentionReviewWindowDays === "number"
+          ? lgpd.retentionReviewWindowDays
+          : 30
+    },
     brandingPolicy: {
       allowCustomLogo:
         typeof branding.allowCustomLogo === "boolean" ? branding.allowCustomLogo : false,
@@ -612,7 +683,9 @@ function mergeOrganizationSettings(current: unknown, patch: unknown) {
   const base = normalizeOrganizationSettings(current);
   const next = patch && typeof patch === "object" ? (patch as Record<string, unknown>) : {};
   const share = readObject(next.documentSharePolicy);
+  const matrix = readObject(next.documentPolicyMatrix);
   const override = readObject(next.overridePolicy);
+  const lgpd = readObject(next.lgpdPolicy);
   const branding = readObject(next.brandingPolicy);
 
   return {
@@ -629,6 +702,24 @@ function mergeOrganizationSettings(current: unknown, patch: unknown) {
         typeof share.allowHighRiskExternalShare === "boolean"
           ? share.allowHighRiskExternalShare
           : base.documentSharePolicy.allowHighRiskExternalShare
+    },
+    documentPolicyMatrix: {
+      prescription: mergeDocumentPolicyEntry(
+        base.documentPolicyMatrix.prescription,
+        readObject(matrix.prescription)
+      ),
+      "exam-request": mergeDocumentPolicyEntry(
+        base.documentPolicyMatrix["exam-request"],
+        readObject(matrix["exam-request"])
+      ),
+      "medical-certificate": mergeDocumentPolicyEntry(
+        base.documentPolicyMatrix["medical-certificate"],
+        readObject(matrix["medical-certificate"])
+      ),
+      "free-document": mergeDocumentPolicyEntry(
+        base.documentPolicyMatrix["free-document"],
+        readObject(matrix["free-document"])
+      )
     },
     overridePolicy: {
       minimumReviewerRole:
@@ -650,6 +741,20 @@ function mergeOrganizationSettings(current: unknown, patch: unknown) {
           ? override.autoAcknowledgePrivilegedOverride
           : base.overridePolicy.autoAcknowledgePrivilegedOverride
     },
+    lgpdPolicy: {
+      requireConsentForExternalShare:
+        typeof lgpd.requireConsentForExternalShare === "boolean"
+          ? lgpd.requireConsentForExternalShare
+          : base.lgpdPolicy.requireConsentForExternalShare,
+      requireDisposalApproval:
+        typeof lgpd.requireDisposalApproval === "boolean"
+          ? lgpd.requireDisposalApproval
+          : base.lgpdPolicy.requireDisposalApproval,
+      retentionReviewWindowDays:
+        typeof lgpd.retentionReviewWindowDays === "number"
+          ? lgpd.retentionReviewWindowDays
+          : base.lgpdPolicy.retentionReviewWindowDays
+    },
     brandingPolicy: {
       allowCustomLogo:
         typeof branding.allowCustomLogo === "boolean"
@@ -665,4 +770,57 @@ function mergeOrganizationSettings(current: unknown, patch: unknown) {
 
 function readObject(value: unknown) {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function normalizeDocumentPolicyEntry(
+  value: Record<string, unknown>,
+  fallback: {
+    allowExternalShare: boolean;
+    requireRqe: boolean;
+    minimumShareRole: "professional" | "admin" | "compliance";
+    requirePatientConsentForExternalShare: boolean;
+    shareLinkTtlHours: number;
+    shareLinkMaxUses: number;
+  }
+) {
+  return {
+    allowExternalShare:
+      typeof value.allowExternalShare === "boolean"
+        ? value.allowExternalShare
+        : fallback.allowExternalShare,
+    requireRqe:
+      typeof value.requireRqe === "boolean" ? value.requireRqe : fallback.requireRqe,
+    minimumShareRole:
+      value.minimumShareRole === "professional" ||
+      value.minimumShareRole === "admin" ||
+      value.minimumShareRole === "compliance"
+        ? value.minimumShareRole
+        : fallback.minimumShareRole,
+    requirePatientConsentForExternalShare:
+      typeof value.requirePatientConsentForExternalShare === "boolean"
+        ? value.requirePatientConsentForExternalShare
+        : fallback.requirePatientConsentForExternalShare,
+    shareLinkTtlHours:
+      typeof value.shareLinkTtlHours === "number"
+        ? value.shareLinkTtlHours
+        : fallback.shareLinkTtlHours,
+    shareLinkMaxUses:
+      typeof value.shareLinkMaxUses === "number"
+        ? value.shareLinkMaxUses
+        : fallback.shareLinkMaxUses
+  };
+}
+
+function mergeDocumentPolicyEntry(
+  base: {
+    allowExternalShare: boolean;
+    requireRqe: boolean;
+    minimumShareRole: "professional" | "admin" | "compliance";
+    requirePatientConsentForExternalShare: boolean;
+    shareLinkTtlHours: number;
+    shareLinkMaxUses: number;
+  },
+  patch: Record<string, unknown>
+) {
+  return normalizeDocumentPolicyEntry(patch, base);
 }

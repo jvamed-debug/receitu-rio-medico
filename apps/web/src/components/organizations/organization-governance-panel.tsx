@@ -13,6 +13,84 @@ import { useState } from "react";
 
 import { getBrowserApiBaseUrl } from "../../lib/browser-api";
 
+const documentPolicyLabels: Record<
+  "prescription" | "exam-request" | "medical-certificate" | "free-document",
+  string
+> = {
+  prescription: "Prescricao",
+  "exam-request": "Solicitacao de exames",
+  "medical-certificate": "Atestado medico",
+  "free-document": "Documento livre"
+};
+
+function buildDefaultDocumentPolicyMatrix(
+  settings?: OrganizationSettings
+): NonNullable<OrganizationSettings["documentPolicyMatrix"]> {
+  return {
+    prescription: {
+      allowExternalShare: settings?.documentPolicyMatrix?.prescription?.allowExternalShare ?? true,
+      requireRqe: settings?.documentPolicyMatrix?.prescription?.requireRqe ?? false,
+      minimumShareRole:
+        settings?.documentPolicyMatrix?.prescription?.minimumShareRole ?? "professional",
+      requirePatientConsentForExternalShare:
+        settings?.documentPolicyMatrix?.prescription?.requirePatientConsentForExternalShare ?? false,
+      shareLinkTtlHours: settings?.documentPolicyMatrix?.prescription?.shareLinkTtlHours ?? 24,
+      shareLinkMaxUses: settings?.documentPolicyMatrix?.prescription?.shareLinkMaxUses ?? 3
+    },
+    "exam-request": {
+      allowExternalShare:
+        settings?.documentPolicyMatrix?.["exam-request"]?.allowExternalShare ?? true,
+      requireRqe: settings?.documentPolicyMatrix?.["exam-request"]?.requireRqe ?? false,
+      minimumShareRole:
+        settings?.documentPolicyMatrix?.["exam-request"]?.minimumShareRole ?? "professional",
+      requirePatientConsentForExternalShare:
+        settings?.documentPolicyMatrix?.["exam-request"]?.requirePatientConsentForExternalShare ??
+        false,
+      shareLinkTtlHours:
+        settings?.documentPolicyMatrix?.["exam-request"]?.shareLinkTtlHours ?? 72,
+      shareLinkMaxUses: settings?.documentPolicyMatrix?.["exam-request"]?.shareLinkMaxUses ?? 5
+    },
+    "medical-certificate": {
+      allowExternalShare:
+        settings?.documentPolicyMatrix?.["medical-certificate"]?.allowExternalShare ?? true,
+      requireRqe:
+        settings?.documentPolicyMatrix?.["medical-certificate"]?.requireRqe ?? false,
+      minimumShareRole:
+        settings?.documentPolicyMatrix?.["medical-certificate"]?.minimumShareRole ??
+        "professional",
+      requirePatientConsentForExternalShare:
+        settings?.documentPolicyMatrix?.["medical-certificate"]?.requirePatientConsentForExternalShare ??
+        true,
+      shareLinkTtlHours:
+        settings?.documentPolicyMatrix?.["medical-certificate"]?.shareLinkTtlHours ?? 48,
+      shareLinkMaxUses:
+        settings?.documentPolicyMatrix?.["medical-certificate"]?.shareLinkMaxUses ?? 3
+    },
+    "free-document": {
+      allowExternalShare:
+        settings?.documentPolicyMatrix?.["free-document"]?.allowExternalShare ?? false,
+      requireRqe: settings?.documentPolicyMatrix?.["free-document"]?.requireRqe ?? false,
+      minimumShareRole:
+        settings?.documentPolicyMatrix?.["free-document"]?.minimumShareRole ?? "admin",
+      requirePatientConsentForExternalShare:
+        settings?.documentPolicyMatrix?.["free-document"]?.requirePatientConsentForExternalShare ??
+        true,
+      shareLinkTtlHours:
+        settings?.documentPolicyMatrix?.["free-document"]?.shareLinkTtlHours ?? 12,
+      shareLinkMaxUses: settings?.documentPolicyMatrix?.["free-document"]?.shareLinkMaxUses ?? 1
+    }
+  };
+}
+
+function buildDefaultLgpdPolicy(settings?: OrganizationSettings) {
+  return {
+    requireConsentForExternalShare:
+      settings?.lgpdPolicy?.requireConsentForExternalShare ?? false,
+    requireDisposalApproval: settings?.lgpdPolicy?.requireDisposalApproval ?? true,
+    retentionReviewWindowDays: settings?.lgpdPolicy?.retentionReviewWindowDays ?? 30
+  };
+}
+
 export function OrganizationGovernancePanel({
   currentOrganization,
   organizations,
@@ -59,7 +137,9 @@ export function OrganizationGovernancePanel({
       allowCustomLogo: currentOrganization?.settings?.brandingPolicy.allowCustomLogo ?? false,
       lockedLayoutVersion:
         currentOrganization?.settings?.brandingPolicy.lockedLayoutVersion ?? ""
-    }
+    },
+    documentPolicyMatrix: buildDefaultDocumentPolicyMatrix(currentOrganization?.settings),
+    lgpdPolicy: buildDefaultLgpdPolicy(currentOrganization?.settings)
   });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -266,7 +346,9 @@ export function OrganizationGovernancePanel({
         brandingPolicy: {
           allowCustomLogo: settings.brandingPolicy.allowCustomLogo,
           lockedLayoutVersion: settings.brandingPolicy.lockedLayoutVersion || undefined
-        }
+        },
+        documentPolicyMatrix: settings.documentPolicyMatrix,
+        lgpdPolicy: settings.lgpdPolicy
       });
 
       setSettings({
@@ -291,7 +373,9 @@ export function OrganizationGovernancePanel({
         brandingPolicy: {
           allowCustomLogo: updated.settings?.brandingPolicy.allowCustomLogo ?? false,
           lockedLayoutVersion: updated.settings?.brandingPolicy.lockedLayoutVersion ?? ""
-        }
+        },
+        documentPolicyMatrix: buildDefaultDocumentPolicyMatrix(updated.settings),
+        lgpdPolicy: buildDefaultLgpdPolicy(updated.settings)
       });
 
       setMessage("Politicas institucionais atualizadas.");
@@ -706,6 +790,224 @@ export function OrganizationGovernancePanel({
                 style={inputStyle}
               />
             </label>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          <h3 style={{ margin: 0 }}>Matriz regulatoria por documento</h3>
+          <div
+            style={{
+              display: "grid",
+              gap: 12,
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))"
+            }}
+          >
+            {(Object.entries(documentPolicyLabels) as Array<
+              [
+                "prescription" | "exam-request" | "medical-certificate" | "free-document",
+                string
+              ]
+            >).map(([documentType, label]) => {
+              const policy = settings.documentPolicyMatrix?.[documentType];
+              if (!policy) {
+                return null;
+              }
+
+              return (
+                <div key={documentType} style={policySectionStyle}>
+                  <h3 style={{ margin: 0 }}>{label}</h3>
+                  <label style={fieldStyle}>
+                    <span>Papel minimo para compartilhamento</span>
+                    <select
+                      value={policy.minimumShareRole}
+                      onChange={(event) =>
+                        setSettings((current) => ({
+                          ...current,
+                          documentPolicyMatrix: {
+                            ...current.documentPolicyMatrix,
+                            [documentType]: {
+                              ...current.documentPolicyMatrix?.[documentType],
+                              minimumShareRole: event.target.value as
+                                | "professional"
+                                | "admin"
+                                | "compliance"
+                            }
+                          }
+                        }))
+                      }
+                      style={inputStyle}
+                    >
+                      <option value="professional">professional</option>
+                      <option value="admin">admin</option>
+                      <option value="compliance">compliance</option>
+                    </select>
+                  </label>
+                  <label style={fieldStyle}>
+                    <span>TTL do link (horas)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={policy.shareLinkTtlHours}
+                      onChange={(event) =>
+                        setSettings((current) => ({
+                          ...current,
+                          documentPolicyMatrix: {
+                            ...current.documentPolicyMatrix,
+                            [documentType]: {
+                              ...current.documentPolicyMatrix?.[documentType],
+                              shareLinkTtlHours: Number(event.target.value) || 1
+                            }
+                          }
+                        }))
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={fieldStyle}>
+                    <span>Usos maximos do link</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={policy.shareLinkMaxUses}
+                      onChange={(event) =>
+                        setSettings((current) => ({
+                          ...current,
+                          documentPolicyMatrix: {
+                            ...current.documentPolicyMatrix,
+                            [documentType]: {
+                              ...current.documentPolicyMatrix?.[documentType],
+                              shareLinkMaxUses: Number(event.target.value) || 1
+                            }
+                          }
+                        }))
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={checkboxLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={policy.allowExternalShare}
+                      onChange={(event) =>
+                        setSettings((current) => ({
+                          ...current,
+                          documentPolicyMatrix: {
+                            ...current.documentPolicyMatrix,
+                            [documentType]: {
+                              ...current.documentPolicyMatrix?.[documentType],
+                              allowExternalShare: event.target.checked
+                            }
+                          }
+                        }))
+                      }
+                    />
+                    <span>Permitir compartilhamento externo</span>
+                  </label>
+                  <label style={checkboxLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={policy.requireRqe}
+                      onChange={(event) =>
+                        setSettings((current) => ({
+                          ...current,
+                          documentPolicyMatrix: {
+                            ...current.documentPolicyMatrix,
+                            [documentType]: {
+                              ...current.documentPolicyMatrix?.[documentType],
+                              requireRqe: event.target.checked
+                            }
+                          }
+                        }))
+                      }
+                    />
+                    <span>Exigir RQE</span>
+                  </label>
+                  <label style={checkboxLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={policy.requirePatientConsentForExternalShare}
+                      onChange={(event) =>
+                        setSettings((current) => ({
+                          ...current,
+                          documentPolicyMatrix: {
+                            ...current.documentPolicyMatrix,
+                            [documentType]: {
+                              ...current.documentPolicyMatrix?.[documentType],
+                              requirePatientConsentForExternalShare: event.target.checked
+                            }
+                          }
+                        }))
+                      }
+                    />
+                    <span>Exigir consentimento do paciente</span>
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          <h3 style={{ margin: 0 }}>LGPD operacional</h3>
+          <div
+            style={{
+              display: "grid",
+              gap: 12,
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))"
+            }}
+          >
+            <div style={policySectionStyle}>
+              <label style={checkboxLabelStyle}>
+                <input
+                  type="checkbox"
+                  checked={settings.lgpdPolicy?.requireConsentForExternalShare ?? false}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+                      lgpdPolicy: {
+                        ...current.lgpdPolicy,
+                        requireConsentForExternalShare: event.target.checked
+                      }
+                    }))
+                  }
+                />
+                <span>Exigir consentimento para compartilhamento externo</span>
+              </label>
+              <label style={checkboxLabelStyle}>
+                <input
+                  type="checkbox"
+                  checked={settings.lgpdPolicy?.requireDisposalApproval ?? true}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+                      lgpdPolicy: {
+                        ...current.lgpdPolicy,
+                        requireDisposalApproval: event.target.checked
+                      }
+                    }))
+                  }
+                />
+                <span>Exigir aprovacao para descarte documental</span>
+              </label>
+              <label style={fieldStyle}>
+                <span>Janela de review de retencao (dias)</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={settings.lgpdPolicy?.retentionReviewWindowDays ?? 30}
+                  onChange={(event) =>
+                    setSettings((current) => ({
+                      ...current,
+                      lgpdPolicy: {
+                        ...current.lgpdPolicy,
+                        retentionReviewWindowDays: Number(event.target.value) || 1
+                      }
+                    }))
+                  }
+                  style={inputStyle}
+                />
+              </label>
+            </div>
           </div>
         </div>
 

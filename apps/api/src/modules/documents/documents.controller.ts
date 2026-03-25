@@ -254,7 +254,7 @@ export class DocumentsController {
     ensureRecentStepUp(principal, "create_document_share_link");
     const shareLink = await this.deliveryService.createShareLink({
       documentId: id,
-      professionalId: principal.professionalId ?? ""
+      principal
     });
     await this.auditService.log({
       actorUserId: principal.userId,

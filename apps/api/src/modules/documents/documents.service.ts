@@ -369,7 +369,7 @@ export class DocumentsService {
     input: Record<string, unknown>
   ) {
     const enrichedInput = await this.enrichDocumentInput(type, input);
-    const compliance = this.complianceService.validateDraft(type, enrichedInput);
+    const compliance = await this.complianceService.validateDraft(type, enrichedInput);
     const payload = buildDocumentPayload(type, enrichedInput);
     const document = await this.prisma.clinicalDocument.create({
       data: {

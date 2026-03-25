@@ -170,16 +170,66 @@ export interface OrganizationSettings {
     expirationHoursDefault: number;
     allowHighRiskExternalShare: boolean;
   };
+  documentPolicyMatrix: Record<
+    "prescription" | "exam-request" | "medical-certificate" | "free-document",
+    {
+      allowExternalShare: boolean;
+      requireRqe: boolean;
+      minimumShareRole: "professional" | "admin" | "compliance";
+      requirePatientConsentForExternalShare: boolean;
+      shareLinkTtlHours: number;
+      shareLinkMaxUses: number;
+    }
+  >;
   overridePolicy: {
     minimumReviewerRole: "professional" | "admin" | "compliance";
     requireInstitutionalReviewForHighSeverity: boolean;
     requireInstitutionalReviewForModerateInteraction: boolean;
     autoAcknowledgePrivilegedOverride: boolean;
   };
+  lgpdPolicy: {
+    requireConsentForExternalShare: boolean;
+    requireDisposalApproval: boolean;
+    retentionReviewWindowDays: number;
+  };
   brandingPolicy: {
     allowCustomLogo: boolean;
     lockedLayoutVersion?: string;
   };
+}
+
+export interface PatientConsentRecordSummary {
+  id: string;
+  patientId: string;
+  organizationId?: string | null;
+  professionalId: string;
+  consentType: "external_document_share" | "communication" | "analytics" | "optional_services";
+  status: "granted" | "revoked" | "expired";
+  purpose: string;
+  legalBasis: string;
+  grantedAt: string;
+  expiresAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplianceRetentionReviewSummary {
+  id: string;
+  documentId: string;
+  organizationId?: string | null;
+  documentType: string;
+  retentionCategory: string;
+  reviewType: "archive" | "disposal";
+  status: "pending" | "approved" | "rejected" | "executed";
+  dueAt: string;
+  rationale?: string | null;
+  requestedByUserId?: string | null;
+  resolvedByUserId?: string | null;
+  resolutionNotes?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ClinicalDocumentAnalyticsSnapshot {
@@ -1064,6 +1114,56 @@ export class ApiClient {
 
   updateCurrentOrganizationSettings(input: OrganizationSettings) {
     return this.patch<OrganizationDetail>("/organizations/current/settings", input);
+  }
+
+  listPatientConsents(patientId: string) {
+    return this.get<PatientConsentRecordSummary[]>(`/compliance/patients/${patientId}/consents`);
+  }
+
+  createPatientConsent(
+    patientId: string,
+    input: {
+      consentType: "external_document_share" | "communication" | "analytics" | "optional_services";
+      purpose: string;
+      legalBasis: string;
+      expiresAt?: string;
+      metadata?: Record<string, unknown>;
+    }
+  ) {
+    return this.post<PatientConsentRecordSummary>(`/compliance/patients/${patientId}/consents`, input);
+  }
+
+  revokePatientConsent(patientId: string, consentId: string, input?: { reason?: string }) {
+    return this.post<PatientConsentRecordSummary>(
+      `/compliance/patients/${patientId}/consents/${consentId}/revoke`,
+      input ?? {}
+    );
+  }
+
+  listRetentionReviews(query?: { status?: "pending" | "approved" | "rejected" | "executed" }) {
+    return this.get<ComplianceRetentionReviewSummary[]>(
+      `/compliance/retention/reviews${buildQueryString(query)}`
+    );
+  }
+
+  runRetentionReviewSweep(input?: { limit?: number }) {
+    return this.post<{ created: number; reviews: ComplianceRetentionReviewSummary[] }>(
+      "/compliance/retention/reviews/run",
+      input ?? {}
+    );
+  }
+
+  resolveRetentionReview(
+    reviewId: string,
+    input: {
+      decision: "approved" | "rejected" | "executed";
+      resolutionNotes?: string;
+    }
+  ) {
+    return this.post<ComplianceRetentionReviewSummary>(
+      `/compliance/retention/reviews/${reviewId}/resolve`,
+      input
+    );
   }
 
   saveTemplateFavorite(input: {

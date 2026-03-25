@@ -34,12 +34,12 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 18. CDS baseline institucional concluido
 - 11. engine institucional de templates baseline
 - 9. modelo clinico longitudinal estruturado baseline
+- 7. matriz regulatoria institucional por tipo documental
+- 8. LGPD operacional baseline
 
 ### Em progresso forte
 
 - 6. blindar documentos e links compartilhados
-- 7. fechar matriz regulatoria por tipo documental
-- 8. fortalecer LGPD operacional
 - 13. integrar provedor real ICP-Brasil
 - 14. criar trilha probatoria
 - 15. separar autenticacao e assinatura
@@ -53,9 +53,9 @@ Este documento funciona como checklist executiva do programa, marcando:
 
 ### Proximos da fila
 
-- 7. fechar matriz regulatoria por tipo documental no nivel institucional
-- 8. fortalecer LGPD no ciclo de descarte e governanca
 - 25. aprofundar observabilidade e exportacao analitica
+- 6. endurecer resolucao publica e trilha contextual de links seguros
+- 14. aprofundar trilha probatoria e cadeia de evidencia
 
 ## Checklist dos 26 passos
 
@@ -142,24 +142,32 @@ Falta para fechar:
 
 ### 7. Fechar matriz regulatoria
 
-Status: em progresso avancado
+Status: concluido no baseline institucional atual
 
 Ja entregue:
 
-- politica por tipo documental em `compliance`
+- politica efetiva por tipo documental em `compliance`
 - bloqueios de assinatura por provider inadequado
 - readiness profissional para assinatura
-- politica de compartilhamento externo por tipo documental
+- matriz institucional por tenant com:
+  - `allowExternalShare`
+  - `requireRqe`
+  - `minimumShareRole`
+  - `requirePatientConsentForExternalShare`
+  - `shareLinkTtlHours`
+  - `shareLinkMaxUses`
+- politica efetiva aplicada na listagem e leitura de `policies`
+- base legal, finalidade de tratamento e nivel de risco expostos por tipo documental
+- governanca web para configuracao da matriz por organizacao
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- justificativa formal de override
-- regras mais finas por papel e tenant
-- matriz mais rica para documentos de maior risco
+- regras juridicas ainda mais finas por subtipo documental e linha de cuidado
+- acoplamento com homologacoes externas e normativas especificas adicionais
 
 ### 8. Fortalecer LGPD
 
-Status: em progresso avancado
+Status: concluido no baseline operacional atual
 
 Ja entregue:
 
@@ -169,12 +177,26 @@ Ja entregue:
 - snapshot de retencao e descarte
 - analytics anonimizados por periodo
 - parametrizacao de retention por categoria documental
+- politica LGPD institucional com:
+  - exigencia de consentimento para compartilhamento externo
+  - exigencia de aprovacao para descarte
+  - janela institucional de review
+- registro de consentimento do paciente:
+  - concessao
+  - listagem
+  - revogacao
+- workflow de review de retencao:
+  - listagem
+  - varredura
+  - resolucao
+- base legal e finalidade presentes na camada de compliance e no snapshot regulatorio
+- painel institucional para ajuste de politica LGPD
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- logs com base legal e finalidade onde fizer sentido
-- governanca mais forte para consentimento
-- descarte automatizado com workflow de aprovacao
+- automacao de descarte com executor operacional segregado
+- trilha contextual mais rica de finalidade/base legal por evento tecnico
+- governanca avancada de consentimento por canal e por servico opcional
 
 ## Trilha 2: Dominio clinico
 

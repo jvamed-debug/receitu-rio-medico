@@ -40,9 +40,29 @@ export class OrganizationsController {
         expirationHoursDefault?: number;
         allowHighRiskExternalShare?: boolean;
       };
+      documentPolicyMatrix?: Partial<
+        Record<
+          "prescription" | "exam-request" | "medical-certificate" | "free-document",
+          {
+            allowExternalShare?: boolean;
+            requireRqe?: boolean;
+            minimumShareRole?: "professional" | "admin" | "compliance";
+            requirePatientConsentForExternalShare?: boolean;
+            shareLinkTtlHours?: number;
+            shareLinkMaxUses?: number;
+          }
+        >
+      >;
       overridePolicy?: {
         minimumReviewerRole?: "professional" | "admin" | "compliance";
         requireInstitutionalReviewForHighSeverity?: boolean;
+        requireInstitutionalReviewForModerateInteraction?: boolean;
+        autoAcknowledgePrivilegedOverride?: boolean;
+      };
+      lgpdPolicy?: {
+        requireConsentForExternalShare?: boolean;
+        requireDisposalApproval?: boolean;
+        retentionReviewWindowDays?: number;
       };
       brandingPolicy?: {
         allowCustomLogo?: boolean;
