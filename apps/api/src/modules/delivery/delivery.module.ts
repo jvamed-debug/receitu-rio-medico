@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AuditModule } from "../audit/audit.module";
 import { PersistenceModule } from "../../persistence/persistence.module";
 import { AccessModule } from "../access/access.module";
 import { AuthModule } from "../auth/auth.module";
@@ -8,7 +9,7 @@ import { DeliveryController, PublicDeliveryController } from "./delivery.control
 import { DeliveryService } from "./delivery.service";
 
 @Module({
-  imports: [AccessModule, AuthModule, ComplianceModule, PersistenceModule],
+  imports: [AccessModule, AuditModule, AuthModule, ComplianceModule, PersistenceModule],
   controllers: [DeliveryController, PublicDeliveryController],
   providers: [DeliveryService],
   exports: [DeliveryService]

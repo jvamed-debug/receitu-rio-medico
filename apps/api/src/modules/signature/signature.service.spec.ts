@@ -11,7 +11,7 @@ import { SignatureService } from "./signature.service";
 
 test("signDocument persiste evidencia e referencia de provider", async () => {
   let createdSessionPayload: Record<string, unknown> | undefined;
-  let updatedSessionPayload: Record<string, unknown> | undefined;
+  const updatedSessionPayloads: Record<string, unknown>[] = [];
 
   const service = createService(
     {
@@ -28,7 +28,7 @@ test("signDocument persiste evidencia e referencia de provider", async () => {
           createdAt: new Date("2026-03-22T16:00:00.000Z")
         }),
         update: async ({ data }) => {
-          updatedSessionPayload = data;
+          updatedSessionPayloads.push(data);
         },
         findMany: async () => []
       },
@@ -90,8 +90,17 @@ test("signDocument persiste evidencia e referencia de provider", async () => {
 
   assert.equal(result.sessionId, "sig-1");
   assert.equal(result.status, DocumentStatus.ISSUED);
-  assert.equal(updatedSessionPayload?.status, SignatureSessionStatus.SIGNED);
-  assert.equal(updatedSessionPayload?.providerReference, "icpbr-sig-1");
+  assert.equal(updatedSessionPayloads[0]?.status, SignatureSessionStatus.SIGNED);
+  assert.equal(updatedSessionPayloads[0]?.providerReference, "icpbr-sig-1");
+  assert.equal(
+    Boolean(
+      ((updatedSessionPayloads[1]?.evidence as Record<string, unknown>)?.evidenceBundle as Record<
+        string,
+        unknown
+      >)?.evidenceChainHash
+    ),
+    true
+  );
   assert.equal(
     ((createdSessionPayload?.evidence as Record<string, unknown>) ?? {}).policyVersion,
     "2026.03"
@@ -99,7 +108,7 @@ test("signDocument persiste evidencia e referencia de provider", async () => {
 });
 
 test("handleProviderCallback finaliza sessao assinada", async () => {
-  let updatedSessionPayload: Record<string, unknown> | undefined;
+  const updatedSessionPayloads: Record<string, unknown>[] = [];
 
   const service = createService(
     {
@@ -115,7 +124,7 @@ test("handleProviderCallback finaliza sessao assinada", async () => {
           evidence: { policyVersion: "2026.03" }
         }),
         update: async ({ data }) => {
-          updatedSessionPayload = data;
+          updatedSessionPayloads.push(data);
         },
         findMany: async () => []
       },
@@ -149,8 +158,8 @@ test("handleProviderCallback finaliza sessao assinada", async () => {
 
   assert.equal(result.sessionId, "sig-2");
   assert.equal(result.status, DocumentStatus.ISSUED);
-  assert.equal(updatedSessionPayload?.status, SignatureSessionStatus.SIGNED);
-  assert.equal(updatedSessionPayload?.providerReference, "provider-sig-2");
+  assert.equal(updatedSessionPayloads[0]?.status, SignatureSessionStatus.SIGNED);
+  assert.equal(updatedSessionPayloads[0]?.providerReference, "provider-sig-2");
 });
 
 function createService(
@@ -163,7 +172,11 @@ function createService(
       count?: (...args: any[]) => Promise<any>;
     };
     clinicalDocument: {
+      findUnique?: (...args: any[]) => Promise<any>;
       update?: (...args: any[]) => Promise<any>;
+    };
+    auditLog: {
+      findMany?: (...args: any[]) => Promise<any>;
     };
     pdfArtifact: {
       findUnique?: (...args: any[]) => Promise<any>;
@@ -199,12 +212,17 @@ function createService(
       ...prismaOverrides?.signatureSession
     },
     clinicalDocument: {
+      findUnique: async () => null,
       update: async () => ({
         id: "doc-1",
         status: DocumentStatus.ISSUED,
         issuedAt: new Date("2026-03-22T16:01:00.000Z")
       }),
       ...prismaOverrides?.clinicalDocument
+    },
+    auditLog: {
+      findMany: async () => [],
+      ...prismaOverrides?.auditLog
     },
     pdfArtifact: {
       findUnique: async () => null,
@@ -455,4 +473,59 @@ test("getOperationsSnapshot consolida readiness e fila", async () => {
   assert.equal(result.queue.failed, 1);
   assert.equal(result.queue.signedToday, 4);
   assert.equal(result.recentSessions[0]?.id, "sig-ops-1");
+});
+
+test("getEvidenceBundle consolida documento, artefato e trilha", async () => {
+  const service = createService({
+    clinicalDocument: {
+      findUnique: async () => ({
+        id: "doc-evidence-1",
+        type: "PRESCRIPTION",
+        status: DocumentStatus.ISSUED,
+        payloadHash: "payload-hash",
+        issuedAt: new Date("2026-03-24T10:00:00.000Z"),
+        layoutVersion: "prescription-v2",
+        pdfArtifact: {
+          id: "pdf-evidence-1",
+          storageKey: "documents/doc-evidence-1/final.pdf",
+          sha256: "pdf-sha",
+          createdAt: new Date("2026-03-24T10:00:00.000Z")
+        },
+        signatures: [
+          {
+            id: "sig-evidence-1",
+            provider: SignatureProvider.ICP_BRASIL_VENDOR,
+            status: SignatureSessionStatus.SIGNED,
+            policyVersion: "2026.03",
+            signatureLevel: "qualified",
+            providerReference: "provider-ref-1",
+            signedAt: new Date("2026-03-24T10:00:00.000Z"),
+            evidence: { providerMode: "remote" }
+          }
+        ]
+      })
+    },
+    auditLog: {
+      findMany: async () => [
+        {
+          id: "audit-1",
+          entityType: "clinical_document",
+          entityId: "doc-evidence-1",
+          action: "document_signed",
+          correlationId: "corr-1",
+          origin: "api.signature",
+          metadata: {},
+          occurredAt: new Date("2026-03-24T10:00:00.000Z")
+        }
+      ]
+    }
+  });
+
+  const result = await service.getEvidenceBundle("doc-evidence-1");
+
+  assert.equal(result.document.id, "doc-evidence-1");
+  assert.equal(result.artifact?.sha256, "pdf-sha");
+  assert.equal(result.latestSignedSession?.id, "sig-evidence-1");
+  assert.equal(Boolean(result.evidenceChainHash), true);
+  assert.equal(result.auditTrail.length, 1);
 });

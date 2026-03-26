@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import {
   DocumentStatus,
   Prisma,
@@ -580,6 +581,101 @@ export class SignatureService {
     }));
   }
 
+  async getEvidenceBundle(documentId: string) {
+    const document = await this.prisma.clinicalDocument.findUnique({
+      where: { id: documentId },
+      include: {
+        pdfArtifact: true,
+        signatures: {
+          orderBy: {
+            createdAt: "desc"
+          }
+        }
+      }
+    });
+
+    if (!document) {
+      throw new NotFoundException("Documento nao encontrado");
+    }
+
+    const auditTrail = await this.prisma.auditLog.findMany({
+      where: {
+        OR: [
+          {
+            entityType: "clinical_document",
+            entityId: documentId
+          },
+          {
+            entityType: "signature_session",
+            entityId: {
+              in: document.signatures.map((session) => session.id)
+            }
+          }
+        ]
+      },
+      orderBy: {
+        occurredAt: "asc"
+      }
+    });
+
+    const latestSignedSession = document.signatures.find(
+      (session) => session.status === SignatureSessionStatus.SIGNED
+    );
+    const payloadHash = document.payloadHash ?? null;
+    const pdfSha256 = document.pdfArtifact?.sha256 ?? null;
+    const chainHash =
+      latestSignedSession && pdfSha256 && payloadHash
+        ? this.buildEvidenceChainHash({
+            documentId: document.id,
+            payloadHash,
+            pdfSha256,
+            providerReference: latestSignedSession.providerReference ?? "",
+            signedAt: latestSignedSession.signedAt?.toISOString() ?? ""
+          })
+        : null;
+
+    return {
+      document: {
+        id: document.id,
+        type: document.type,
+        status: document.status,
+        payloadHash,
+        issuedAt: document.issuedAt?.toISOString() ?? null,
+        layoutVersion: document.layoutVersion
+      },
+      artifact: document.pdfArtifact
+        ? {
+            id: document.pdfArtifact.id,
+            storageKey: document.pdfArtifact.storageKey,
+            sha256: document.pdfArtifact.sha256,
+            createdAt: document.pdfArtifact.createdAt.toISOString()
+          }
+        : null,
+      latestSignedSession: latestSignedSession
+        ? {
+            id: latestSignedSession.id,
+            provider: latestSignedSession.provider,
+            policyVersion: latestSignedSession.policyVersion,
+            signatureLevel: latestSignedSession.signatureLevel,
+            providerReference: latestSignedSession.providerReference,
+            signedAt: latestSignedSession.signedAt?.toISOString() ?? null,
+            evidence: latestSignedSession.evidence ?? null
+          }
+        : null,
+      evidenceChainHash: chainHash,
+      auditTrail: auditTrail.map((entry) => ({
+        id: entry.id,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        action: entry.action,
+        correlationId: entry.correlationId,
+        origin: entry.origin,
+        metadata: entry.metadata,
+        occurredAt: entry.occurredAt.toISOString()
+      }))
+    };
+  }
+
   private async finalizeSignedSession(input: {
     sessionId: string;
     documentId: string;
@@ -627,6 +723,37 @@ export class SignatureService {
     });
 
     const pdfArtifact = await this.ensurePdfArtifact(updatedDocument.id);
+    const evidenceChainHash = this.buildEvidenceChainHash({
+      documentId: updatedDocument.id,
+      payloadHash: updatedDocument.payloadHash ?? "",
+      pdfSha256: pdfArtifact.sha256,
+      providerReference: input.providerReference ?? "",
+      signedAt: input.signedAt
+    });
+
+    await this.prisma.signatureSession.update({
+      where: { id: input.sessionId },
+      data: {
+        evidence: {
+          ...input.complianceRecord,
+          requestContext: {
+            ip: input.requestContext?.ip ?? undefined,
+            userAgent: input.requestContext?.userAgent ?? undefined,
+            origin: input.requestContext?.origin ?? undefined
+          },
+          temporaryWindowUsed: input.usedWindow,
+          providerEvidence: input.evidence,
+          evidenceBundle: {
+            documentPayloadHash: updatedDocument.payloadHash ?? null,
+            pdfArtifactId: pdfArtifact.id,
+            pdfArtifactSha256: pdfArtifact.sha256,
+            providerReference: input.providerReference ?? null,
+            signedAt: input.signedAt,
+            evidenceChainHash
+          }
+        } as unknown as Prisma.InputJsonValue
+      }
+    });
 
     await this.auditService.log({
       actorProfessionalId: input.professionalId,
@@ -640,6 +767,9 @@ export class SignatureService {
         providerReference: input.providerReference,
         usedWindow: input.usedWindow,
         pdfArtifactId: pdfArtifact.id,
+        pdfArtifactSha256: pdfArtifact.sha256,
+        documentPayloadHash: updatedDocument.payloadHash ?? null,
+        evidenceChainHash,
         signatureLevel: input.signatureLevel,
         policyVersion: input.policyVersion,
         retentionCategory: input.retentionCategory,
@@ -659,5 +789,25 @@ export class SignatureService {
       usedWindow: input.usedWindow,
       pdfArtifact
     };
+  }
+
+  private buildEvidenceChainHash(input: {
+    documentId: string;
+    payloadHash: string;
+    pdfSha256: string;
+    providerReference: string;
+    signedAt: string;
+  }) {
+    return createHash("sha256")
+      .update(
+        JSON.stringify({
+          documentId: input.documentId,
+          payloadHash: input.payloadHash,
+          pdfSha256: input.pdfSha256,
+          providerReference: input.providerReference,
+          signedAt: input.signedAt
+        })
+      )
+      .digest("hex");
   }
 }

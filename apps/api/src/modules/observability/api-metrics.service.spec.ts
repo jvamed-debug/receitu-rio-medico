@@ -28,3 +28,24 @@ test("agrega metricas por rota e conta erros 5xx", () => {
   assert.equal(route?.errorCount, 1);
   assert.equal(route?.averageDurationMs, 30);
 });
+
+test("gera alertas e exporta csv operacional", () => {
+  const service = new ApiMetricsService();
+
+  service.record({
+    method: "GET",
+    route: "/api/slow",
+    durationMs: 2500,
+    statusCode: 500
+  });
+
+  const alerts = service.alerts({
+    slowRouteThresholdMs: 1000,
+    errorRouteThreshold: 1
+  });
+  const csv = service.exportCsv();
+
+  assert.equal(alerts.length >= 2, true);
+  assert.match(csv, /method,route,count,errorCount/);
+  assert.match(csv, /GET,\/api\/slow,1,1/);
+});

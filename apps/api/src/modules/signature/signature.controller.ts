@@ -114,6 +114,19 @@ export class SignatureController {
     return this.signatureService.listDocumentSessions(id);
   }
 
+  @Get("documents/:id/signatures/evidence")
+  async getEvidenceBundle(
+    @CurrentPrincipal() principal: AccessPrincipal,
+    @Param("id") id: string
+  ) {
+    await this.resourceAccessService.assertDocumentAccess(
+      principal,
+      id,
+      "document_signature_evidence_read"
+    );
+    return this.signatureService.getEvidenceBundle(id);
+  }
+
   @RequireRoles("professional", "admin", "compliance")
   @Post("signature/sessions/:id/sync")
   async syncSession(

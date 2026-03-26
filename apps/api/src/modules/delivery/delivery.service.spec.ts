@@ -52,6 +52,7 @@ test("gera link seguro com expiracao e limite de uso", async () => {
 
 test("resolve link seguro e decrementa usos restantes", async () => {
   let updated = false;
+  const auditEvents: Array<Record<string, unknown>> = [];
   const service = createService({
     documentShareToken: {
       findUnique: async () => ({
@@ -61,12 +62,14 @@ test("resolve link seguro e decrementa usos restantes", async () => {
         revokedAt: null,
         usedCount: 1,
         maxUses: 5,
+        metadata: null,
         document: {
           id: "doc-1",
           title: "Receita",
           type: "PRESCRIPTION",
           status: "ISSUED",
           issuedAt: new Date("2026-03-22T12:00:00.000Z"),
+          organizationId: "org-1",
           pdfArtifact: null
         }
       }),
@@ -74,14 +77,26 @@ test("resolve link seguro e decrementa usos restantes", async () => {
         updated = true;
       }
     }
+  },
+  undefined,
+  {
+    log: async (event: Record<string, unknown>) => {
+      auditEvents.push(event);
+    }
   });
 
-  const result = await service.resolveShareLink("opaque-token");
+  const result = await service.resolveShareLink("opaque-token", {
+    ip: "127.0.0.1",
+    userAgent: "browser",
+    origin: "public"
+  });
 
   assert.equal(result.tokenId, "share-token-1");
   assert.equal(result.document.id, "doc-1");
   assert.equal(result.remainingUses, 3);
+  assert.equal(result.accessMode, "standard");
   assert.equal(updated, true);
+  assert.equal(auditEvents.length, 1);
 });
 
 test("falha ao resolver link revogado", async () => {
@@ -128,6 +143,10 @@ function createService(
   }>,
   complianceOverrides?: Partial<{
     validateBeforeExternalShare: (...args: any[]) => Promise<any>;
+    getPolicyForDocument: (...args: any[]) => Promise<any>;
+  }>,
+  auditOverrides?: Partial<{
+    log: (...args: any[]) => Promise<any>;
   }>
 ) {
   const prisma = {
@@ -170,8 +189,16 @@ function createService(
         riskLevel: "standard"
       }
     }),
+    getPolicyForDocument: async () => ({
+      riskLevel: "standard"
+    }),
     ...complianceOverrides
   };
 
-  return new DeliveryService(prisma as never, compliance as never);
+  const audit = {
+    log: async () => undefined,
+    ...auditOverrides
+  };
+
+  return new DeliveryService(prisma as never, compliance as never, audit as never);
 }

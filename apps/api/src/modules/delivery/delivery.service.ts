@@ -4,8 +4,10 @@ import {
   NotFoundException
 } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
+import { Prisma } from "@prisma/client";
 
 import { PrismaService } from "../../persistence/prisma.service";
+import { AuditService } from "../audit/audit.service";
 import type { AccessPrincipal } from "../auth/auth.types";
 import { ComplianceService } from "../compliance/compliance.service";
 
@@ -13,7 +15,8 @@ import { ComplianceService } from "../compliance/compliance.service";
 export class DeliveryService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly complianceService: ComplianceService
+    private readonly complianceService: ComplianceService,
+    private readonly auditService: AuditService
   ) {}
 
   channels() {
@@ -113,7 +116,14 @@ export class DeliveryService {
     };
   }
 
-  async resolveShareLink(token: string) {
+  async resolveShareLink(
+    token: string,
+    requestContext?: {
+      ip?: string;
+      userAgent?: string;
+      origin?: string;
+    }
+  ) {
     const shareToken = await this.prisma.documentShareToken.findUnique({
       where: {
         tokenHash: this.hashToken(token)
@@ -143,13 +153,43 @@ export class DeliveryService {
       throw new BadRequestException("Link seguro excedeu o limite de acessos");
     }
 
+    const policy = await this.complianceService.getPolicyForDocument({
+      documentType: toDomainDocumentType(shareToken.document.type),
+      organizationId: shareToken.document.organizationId
+    });
+    const nextUsedCount = shareToken.usedCount + 1;
+
     await this.prisma.documentShareToken.update({
       where: { id: shareToken.id },
       data: {
         usedCount: {
           increment: 1
         },
-        lastUsedAt: new Date()
+        lastUsedAt: new Date(),
+        metadata: mergeJsonRecord(shareToken.metadata, {
+          lastResolvedAt: new Date().toISOString(),
+          lastResolvedIp: requestContext?.ip ?? null,
+          lastResolvedUserAgent: requestContext?.userAgent ?? null,
+          lastResolvedOrigin: requestContext?.origin ?? null
+        })
+      }
+    });
+
+    await this.auditService.log({
+      entityType: "document_share_token",
+      entityId: shareToken.id,
+      action: "share_link_resolved",
+      origin: "api.delivery.public-share",
+      metadata: {
+        documentId: shareToken.document.id,
+        documentType: shareToken.document.type,
+        riskLevel: policy.riskLevel,
+        remainingUses: Math.max(shareToken.maxUses - nextUsedCount, 0),
+        requestContext: {
+          ip: requestContext?.ip ?? undefined,
+          userAgent: requestContext?.userAgent ?? undefined,
+          origin: requestContext?.origin ?? undefined
+        }
       }
     });
 
@@ -157,7 +197,9 @@ export class DeliveryService {
       tokenId: shareToken.id,
       purpose: shareToken.purpose,
       expiresAt: shareToken.expiresAt.toISOString(),
-      remainingUses: Math.max(shareToken.maxUses - shareToken.usedCount - 1, 0),
+      remainingUses: Math.max(shareToken.maxUses - nextUsedCount, 0),
+      riskLevel: policy.riskLevel,
+      accessMode: policy.riskLevel === "high" ? "view-only" : "standard",
       document: {
         id: shareToken.document.id,
         title: shareToken.document.title,
@@ -166,10 +208,9 @@ export class DeliveryService {
         issuedAt: shareToken.document.issuedAt?.toISOString() ?? null,
         artifact: shareToken.document.pdfArtifact
           ? {
-              id: shareToken.document.pdfArtifact.id,
-              storageKey: shareToken.document.pdfArtifact.storageKey,
-              sha256: shareToken.document.pdfArtifact.sha256,
-              createdAt: shareToken.document.pdfArtifact.createdAt.toISOString()
+              available: true,
+              createdAt: shareToken.document.pdfArtifact.createdAt.toISOString(),
+              downloadAllowed: policy.riskLevel !== "high"
             }
           : null
       }
@@ -220,4 +261,30 @@ export class DeliveryService {
       `http://localhost:${process.env.PORT ?? "3001"}`
     );
   }
+}
+
+function toDomainDocumentType(type: string) {
+  switch (type) {
+    case "PRESCRIPTION":
+      return "prescription" as const;
+    case "EXAM_REQUEST":
+      return "exam-request" as const;
+    case "MEDICAL_CERTIFICATE":
+      return "medical-certificate" as const;
+    case "FREE_DOCUMENT":
+    default:
+      return "free-document" as const;
+  }
+}
+
+function mergeJsonRecord(current: unknown, next: Record<string, unknown>) {
+  const currentObject =
+    current && typeof current === "object" && !Array.isArray(current)
+      ? (current as Record<string, unknown>)
+      : {};
+
+  return {
+    ...currentObject,
+    ...next
+  } as Prisma.InputJsonObject;
 }

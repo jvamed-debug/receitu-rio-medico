@@ -68,7 +68,102 @@ export class ApiMetricsService {
       startedAt: this.startedAt,
       totalRequests: this.totalRequests,
       totalErrors: this.totalErrors,
-      routes
+      errorRatePercent:
+        this.totalRequests > 0
+          ? Number(((this.totalErrors / this.totalRequests) * 100).toFixed(2))
+          : 0,
+      routes,
+      slowestRoutes: [...routes]
+        .sort((left, right) => right.maxDurationMs - left.maxDurationMs)
+        .slice(0, 10),
+      unstableRoutes: routes
+        .filter((route) => route.errorCount > 0)
+        .sort((left, right) => right.errorCount - left.errorCount)
+        .slice(0, 10)
     };
   }
+
+  exportCsv() {
+    const snapshot = this.snapshot();
+    const lines = [
+      "method,route,count,errorCount,averageDurationMs,maxDurationMs,lastStatusCode,lastRequestAt"
+    ];
+
+    for (const route of snapshot.routes) {
+      lines.push(
+        [
+          route.method,
+          escapeCsv(route.route),
+          route.count,
+          route.errorCount,
+          route.averageDurationMs,
+          route.maxDurationMs,
+          route.lastStatusCode ?? "",
+          route.lastRequestAt ?? ""
+        ].join(",")
+      );
+    }
+
+    return lines.join("\n");
+  }
+
+  alerts(input?: {
+    slowRouteThresholdMs?: number;
+    errorRouteThreshold?: number;
+  }) {
+    const snapshot = this.snapshot();
+    const slowRouteThresholdMs = input?.slowRouteThresholdMs ?? 1200;
+    const errorRouteThreshold = input?.errorRouteThreshold ?? 1;
+    const alerts: Array<{
+      severity: "info" | "warning" | "critical";
+      code: string;
+      message: string;
+    }> = [];
+
+    if (snapshot.totalErrors > 0) {
+      alerts.push({
+        severity: snapshot.totalErrors >= 5 ? "critical" : "warning",
+        code: "api_errors_present",
+        message: `${snapshot.totalErrors} erro(s) 5xx registrados desde ${snapshot.startedAt}.`
+      });
+    }
+
+    for (const route of snapshot.slowestRoutes.filter(
+      (route) => route.maxDurationMs >= slowRouteThresholdMs
+    )) {
+      alerts.push({
+        severity: route.maxDurationMs >= slowRouteThresholdMs * 2 ? "critical" : "warning",
+        code: "slow_route_detected",
+        message: `${route.method} ${route.route} atingiu ${route.maxDurationMs}ms.`
+      });
+    }
+
+    for (const route of snapshot.unstableRoutes.filter(
+      (route) => route.errorCount >= errorRouteThreshold
+    )) {
+      alerts.push({
+        severity: route.errorCount >= 3 ? "critical" : "warning",
+        code: "unstable_route_detected",
+        message: `${route.method} ${route.route} acumulou ${route.errorCount} erro(s).`
+      });
+    }
+
+    if (alerts.length === 0) {
+      alerts.push({
+        severity: "info",
+        code: "api_healthy_baseline",
+        message: "Nenhum alerta operacional relevante detectado nas metricas da API."
+      });
+    }
+
+    return alerts;
+  }
+}
+
+function escapeCsv(value: string) {
+  if (value.includes(",") || value.includes("\"")) {
+    return `"${value.replaceAll("\"", "\"\"")}"`;
+  }
+
+  return value;
 }

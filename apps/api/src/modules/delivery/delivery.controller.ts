@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
 
 import { ResourceAccessService } from "../access/resource-access.service";
 import { AuthGuard } from "../auth/auth.guard";
@@ -53,7 +53,18 @@ export class PublicDeliveryController {
   constructor(private readonly deliveryService: DeliveryService) {}
 
   @Get(":token")
-  resolveShareLink(@Param("token") token: string) {
-    return this.deliveryService.resolveShareLink(token);
+  resolveShareLink(
+    @Param("token") token: string,
+    @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> }
+  ) {
+    return this.deliveryService.resolveShareLink(token, {
+      ip: request.ip,
+      userAgent: Array.isArray(request.headers["user-agent"])
+        ? request.headers["user-agent"][0]
+        : request.headers["user-agent"],
+      origin: Array.isArray(request.headers.origin)
+        ? request.headers.origin[0]
+        : request.headers.origin
+    });
   }
 }

@@ -36,26 +36,26 @@ Este documento funciona como checklist executiva do programa, marcando:
 - 9. modelo clinico longitudinal estruturado baseline
 - 7. matriz regulatoria institucional por tipo documental
 - 8. LGPD operacional baseline
+- 25. observabilidade baseline com exportacao operacional
+- 6. links compartilhados com trilha contextual e resolucao restrita
+- 14. trilha probatoria baseline com cadeia de evidencia
 
 ### Em progresso forte
 
-- 6. blindar documentos e links compartilhados
 - 13. integrar provedor real ICP-Brasil
-- 14. criar trilha probatoria
 - 15. separar autenticacao e assinatura
 - 16. refinar UX clinica
 - 17. criar biblioteca clinica forte
 - 20. financeiro
 - 21. comunicacao
 - 22. integracao farmaceutica
-- 25. observabilidade
 - 26. filas, eventos e operacao segura
 
 ### Proximos da fila
 
-- 25. aprofundar observabilidade e exportacao analitica
-- 6. endurecer resolucao publica e trilha contextual de links seguros
-- 14. aprofundar trilha probatoria e cadeia de evidencia
+- 26. aprofundar filas, eventos e operacao segura
+- 15. aprofundar binding entre autenticacao elevada e ato de assinatura
+- 16. encurtar fluxo clinico com atalhos por contexto e especialidade
 
 ## Checklist dos 26 passos
 
@@ -123,7 +123,7 @@ Ja entregue:
 
 ### 6. Blindar links compartilhados
 
-Status: em progresso avancado
+Status: concluido no baseline seguro atual
 
 Ja entregue:
 
@@ -133,12 +133,18 @@ Ja entregue:
 - limite de uso
 - revogacao
 - endpoint publico controlado para resolucao do link
+- trilha contextual de resolucao com:
+  - `ip`
+  - `userAgent`
+  - `origin`
+- auditoria de acesso publico ao link seguro
+- politica diferenciada por risco do documento no retorno publico
+- exposicao publica do artefato final reduzida para metadata minima
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- trilha de IP/user-agent na resolucao do token
-- politica diferenciada por risco do documento
-- renderizacao publica ainda mais restrita do artefato final
+- binding com reputacao/rate limiting por origem
+- resposta publica ainda mais granular por canal e por subtipo documental
 
 ### 7. Fechar matriz regulatoria
 
@@ -353,7 +359,7 @@ Falta para fechar:
 
 ### 14. Criar trilha probatoria
 
-Status: em progresso
+Status: concluido no baseline probatorio atual
 
 Ja entregue:
 
@@ -363,12 +369,23 @@ Ja entregue:
 - `signedAt`
 - `evidence`
 - snapshot regulatorio persistido
+- hash de cadeia probatoria com:
+  - `payloadHash`
+  - `pdfSha256`
+  - `providerReference`
+  - `signedAt`
+- bundle de evidencia por documento com:
+  - artefato PDF
+  - ultima sessao assinada
+  - trilha de auditoria
+  - hash consolidado da cadeia
+- metadata probatoria enriquecida no `SignatureSession.evidence`
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- carimbo temporal forte
-- cadeia probatoria mais completa
-- consolidacao juridica do artefato final
+- carimbo temporal forte externo
+- consolidacao juridica com provider homologado ponta a ponta
+- exportacao assinada do bundle probatorio
 
 ### 15. Separar autenticacao e assinatura
 
@@ -619,7 +636,7 @@ Falta para fechar:
 
 ### 25. Observabilidade
 
-Status: em progresso avancado
+Status: concluido no baseline operacional atual
 
 Ja entregue:
 
@@ -630,12 +647,15 @@ Ja entregue:
 - auditoria herdando correlacao
 - dashboard com alertas operacionais
 - severidade consolidada de anomalias externas
+- exportacao operacional de metricas em `json` e `csv`
+- exportacao de trilha recente de auditoria
+- alertas sinteticos de rotas lentas e rotas instaveis
 
-Falta para fechar:
+Fica para evolucao posterior:
 
-- alertas reais
 - tracing distribuido
 - exportacao para stack externa de observabilidade
+- alertas ativos via provider externo
 
 ### 26. Filas, eventos e operacao segura
 

@@ -209,6 +209,13 @@ export class ComplianceService {
     return this.getEffectivePolicy(documentType, principal.organizationId);
   }
 
+  async getPolicyForDocument(input: {
+    documentType: ClinicalDocumentType;
+    organizationId?: string | null;
+  }) {
+    return this.getEffectivePolicy(input.documentType, input.organizationId ?? undefined);
+  }
+
   async validateDraft(documentType: ClinicalDocumentType, input: Record<string, unknown>) {
     const issues: string[] = [];
 
